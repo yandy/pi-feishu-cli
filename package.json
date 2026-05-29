@@ -2,9 +2,17 @@
   "name": "pi-feishu-cli",
   "version": "0.1.0",
   "description": "Feishu IM integration for Pi - converse with Pi from Feishu",
-  "keywords": ["pi-package", "feishu", "lark"],
+  "keywords": ["pi-package", "pi", "feishu", "lark", "extension"],
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yandy/pi-feishu-cli.git"
+  },
+  "homepage": "https://github.com/yandy/pi-feishu-cli#readme",
+  "bugs": {
+    "url": "https://github.com/yandy/pi-feishu-cli/issues"
+  },
   "pi": {
     "extensions": ["./src/extension.ts"],
     "skills": ["./skills"]
@@ -20,6 +28,7 @@
     "vitest": "^3.0.0"
   },
   "scripts": {
+    "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   }
