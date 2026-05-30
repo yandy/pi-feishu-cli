@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig, DEFAULT_CONFIG } from "../src/im/config.js";
+import { loadConfig, saveModel, DEFAULT_CONFIG } from "../src/im/config.js";
 
 describe("loadConfig", () => {
   const tmpDir = join(tmpdir(), "pi-feishu-cli-test-config");
@@ -52,6 +52,20 @@ describe("loadConfig", () => {
     const config = loadConfig(tmpDir);
     expect(config.strategy).toBe("open");
     expect((config as unknown as Record<string, unknown>).unknownField).toBeUndefined();
+  });
+
+  it("saveModel persists model ID to config", () => {
+    saveModel("anthropic/claude-opus-4-5", tmpDir);
+    const config = loadConfig(tmpDir);
+    expect(config.model).toBe("anthropic/claude-opus-4-5");
+  });
+
+  it("saveModel does not overwrite existing strategy", () => {
+    writeFileSync(configPath, JSON.stringify({ strategy: "open" }));
+    saveModel("anthropic/claude-sonnet-4-20250514", tmpDir);
+    const config = loadConfig(tmpDir);
+    expect(config.strategy).toBe("open");
+    expect(config.model).toBe("anthropic/claude-sonnet-4-20250514");
   });
 
   it("uses configDir to determine config file path", () => {

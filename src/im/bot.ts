@@ -71,8 +71,14 @@ export class Bot {
     text: string
   ): { command: string; args: string } | null {
     const trimmed = text.trim();
-    if (trimmed === "/sessions" || trimmed === "/model") {
-      return { command: trimmed.slice(1), args: "" };
+    if (trimmed === "/sessions") {
+      return { command: "sessions", args: "" };
+    }
+    if (trimmed === "/model" || trimmed.startsWith("/model ")) {
+      return {
+        command: "model",
+        args: trimmed === "/model" ? "" : trimmed.slice(7).trim(),
+      };
     }
     if (trimmed.startsWith("/new ")) {
       return { command: "new", args: trimmed.slice(5).trim() || "默认会话" };
@@ -91,9 +97,38 @@ export class Bot {
 
   private extractText(event: FeishuEvent): string {
     const msgType = event.message_type;
-    if (msgType === "text" || msgType === "post") {
-      return event.content ?? "";
+    const content = event.content ?? "";
+    if (!content) return "";
+
+    if (msgType === "text") {
+      try {
+        const parsed = JSON.parse(content);
+        return parsed.text ?? "";
+      } catch {
+        return content;
+      }
     }
+
+    if (msgType === "post") {
+      try {
+        const parsed = JSON.parse(content);
+        const locale = Object.keys(parsed).find((k) => k.includes("-"));
+        const post = locale ? parsed[locale] : parsed;
+        const blocks: unknown[] = post?.content ?? [];
+        const texts: string[] = [];
+        for (const row of blocks) {
+          for (const block of (row as { tag?: string; text?: string }[]) ?? []) {
+            if (block?.tag === "text" && block.text) {
+              texts.push(block.text);
+            }
+          }
+        }
+        return texts.join("\n") || content;
+      } catch {
+        return content;
+      }
+    }
+
     return "";
   }
 

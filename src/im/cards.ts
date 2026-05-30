@@ -1,107 +1,57 @@
 import type { SessionInfo } from "./types.js";
 
-export function buildSessionListCard(
-  chatId: string,
+export function buildSessionListText(
   sessions: SessionInfo[],
   activeId: string | null
 ): string {
-  const header = {
-    title: { tag: "plain_text", content: "Pi 会话管理" },
-    template: "blue" as const,
-  };
-
-  const elements: unknown[] = [];
+  const lines: string[] = ["**Pi 会话管理**", ""];
 
   if (sessions.length === 0) {
-    elements.push({
-      tag: "div",
-      text: { tag: "lark_md", content: "暂无会话" },
-    });
+    lines.push("暂无会话");
   } else {
     for (const sess of sessions) {
       const isActive = sess.id === activeId;
-      const prefix = isActive ? "▶ " : "";
-      elements.push({
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: `${prefix}**${sess.name}**  \n\`${sess.id}\``,
-        },
-      });
-      elements.push({ tag: "hr" });
+      const prefix = isActive ? "▶ " : "  ";
+      lines.push(`${prefix}${isActive ? "**" : ""}${sess.name}${isActive ? "**" : ""}  \n  \`${sess.id}\``);
     }
-    elements.pop();
   }
 
-  elements.push({
-    tag: "action",
-    actions: [
-      {
-        tag: "button",
-        text: { tag: "plain_text", content: "➕ 新建会话" },
-        type: "primary",
-        value: JSON.stringify({ action: "new_session", chat_id: chatId }),
-      },
-      {
-        tag: "button",
-        text: { tag: "plain_text", content: "🔄 切换模型" },
-        value: JSON.stringify({ action: "model_select", chat_id: chatId }),
-      },
-    ],
-  });
+  lines.push(
+    "",
+    "---",
+    "使用以下命令管理会话：",
+    "  - `/new <名称>` — 新建会话",
+    "  - `/switch <id>` — 切换会话",
+    "  - `/rm <id>` — 删除会话",
+  );
 
-  return JSON.stringify({
-    config: { wide_screen_mode: true },
-    header,
-    elements,
-  });
+  return lines.join("\n");
 }
 
-export function buildModelSelectCard(
-  chatId: string,
+export function buildModelListText(
   models: Array<{ id: string; name: string }>,
   current: string
 ): string {
-  const header = {
-    title: { tag: "plain_text", content: "选择模型" },
-    template: "blue" as const,
-  };
-
-  const elements: unknown[] = [];
-
-  elements.push({
-    tag: "div",
-    text: {
-      tag: "lark_md",
-      content: `当前: **${models.find((m) => m.id === current)?.name ?? current}**`,
-    },
-  });
-  elements.push({ tag: "hr" });
+  const currentName = models.find((m) => m.id === current)?.name ?? current;
+  const lines: string[] = [
+    "**选择模型**",
+    "",
+    `当前: **${currentName}**`,
+    "",
+  ];
 
   for (const model of models) {
-    elements.push({
-      tag: "action",
-      actions: [
-        {
-          tag: "button",
-          text: {
-            tag: "plain_text",
-            content: model.id === current ? `▶ ${model.name}` : model.name,
-          },
-          type: model.id === current ? "primary" : "default",
-          value: JSON.stringify({
-            action: "select_model",
-            chat_id: chatId,
-            model_id: model.id,
-          }),
-        },
-      ],
-    });
+    const marker = model.id === current ? "▶ " : "  ";
+    lines.push(`${marker}\`${model.id}\` — ${model.name}`);
   }
 
-  return JSON.stringify({
-    config: { wide_screen_mode: true },
-    header,
-    elements,
-  });
+  lines.push(
+    "",
+    "---",
+    "使用 \`/model <id>\` 切换模型，例如：",
+    "  - \`/model anthropic/claude-opus-4-5\`",
+    "  - \`/model anthropic/claude-sonnet-4-20250514\`",
+  );
+
+  return lines.join("\n");
 }

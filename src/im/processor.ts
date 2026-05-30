@@ -6,7 +6,8 @@ import {
 import type { AssistantMessage, TextContent, ThinkingContent } from "@earendil-works/pi-ai";
 import { SessionRegistry } from "./session-registry.js";
 import { sendMessage, setTypingStatus } from "./messaging.js";
-import { buildSessionListCard, buildModelSelectCard } from "./cards.js";
+import { buildSessionListText, buildModelListText } from "./cards.js";
+import { saveModel } from "./config.js";
 import { log } from "./logger.js";
 import type { FeishuEvent } from "./types.js";
 
@@ -40,8 +41,8 @@ async function handleCommand(
         await sendMessage("暂无会话", chatId);
         return;
       }
-      const card = buildSessionListCard(chatId, chat.sessions, chat.active);
-      await sendMessage(card, chatId, "interactive");
+      const text = buildSessionListText(chat.sessions, chat.active);
+      await sendMessage(text, chatId, "markdown");
       return;
     }
     case "switch": {
@@ -79,8 +80,21 @@ async function handleCommand(
     }
     case "model": {
       const models = getAvailableModels();
-      const card = buildModelSelectCard(chatId, models, currentModel);
-      await sendMessage(card, chatId, "interactive");
+      if (args) {
+        const target = models.find((m) => m.id === args);
+        if (!target) {
+          await sendMessage(
+            `未找到模型: \`${args}\`\n可用模型: ${models.map((m) => `\`${m.id}\``).join(", ")}`,
+            chatId,
+          );
+          return;
+        }
+        saveModel(target.id);
+        await sendMessage(`已切换到模型: **${target.name}**`, chatId);
+        return;
+      }
+      const text = buildModelListText(models, currentModel);
+      await sendMessage(text, chatId, "markdown");
       return;
     }
   }

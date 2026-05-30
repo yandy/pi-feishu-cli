@@ -129,4 +129,33 @@ describe("Bot routing", () => {
     const result = bot.route(event);
     expect(result.type).toBe("skip");
   });
+
+  it("parses JSON-encoded text content (Feishu API format)", () => {
+    const event = makeMsgEvent("oc_chat1", JSON.stringify({ text: "/new json-test" }));
+    const result = bot.route(event);
+    expect(result.type).toBe("command");
+    if (result.type === "command") {
+      expect(result.command).toBe("new");
+    }
+  });
+
+  it("parses /model with model id argument", () => {
+    const event = makeMsgEvent("oc_chat1", "/model anthropic/claude-opus-4-5");
+    const result = bot.route(event);
+    expect(result.type).toBe("command");
+    if (result.type === "command") {
+      expect(result.command).toBe("model");
+      expect(result.args).toBe("anthropic/claude-opus-4-5");
+    }
+  });
+
+  it("parses /model without args still works", () => {
+    const event = makeMsgEvent("oc_chat1", "/model");
+    const result = bot.route(event);
+    expect(result.type).toBe("command");
+    if (result.type === "command") {
+      expect(result.command).toBe("model");
+      expect(result.args).toBe("");
+    }
+  });
 });

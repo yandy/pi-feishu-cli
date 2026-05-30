@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-// Mock messaging.ts (external I/O — lark-cli calls)
 vi.mock("../src/im/messaging.js", () => ({
   sendMessage: vi.fn().mockResolvedValue(true),
   setTypingStatus: vi.fn().mockResolvedValue(true),
 }));
 
-// Mock logger.ts (file I/O)
+vi.mock("../src/im/config.js", () => ({
+  saveModel: vi.fn(),
+}));
+
 vi.mock("../src/im/logger.js", () => ({
   log: vi.fn(),
 }));
 
-// Mock pi-coding-agent (external dependency — avoid calling real services)
 vi.mock("@earendil-works/pi-coding-agent", () => {
   let lineHandler: ((line: string) => void) | null = null;
   return {
@@ -85,7 +86,7 @@ describe("processItem — command type", () => {
     expect(call[1]).toBe("oc_test");
   });
 
-  it("handles /sessions command and sends card", async () => {
+  it("handles /sessions command and sends markdown", async () => {
     const { processItem } = await import("../src/im/processor.js");
     const { sendMessage } = await import("../src/im/messaging.js");
 
@@ -119,7 +120,96 @@ describe("processItem — command type", () => {
     await processItem(queuedItem, { services: {} }, registry, "/tmp/agent", "claude-sonnet");
 
     expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect((sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][2]).toBe("interactive");
+    expect((sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][2]).toBe("markdown");
+  });
+
+  it("handles /model with args and switches model", async () => {
+    const { processItem } = await import("../src/im/processor.js");
+    const { sendMessage } = await import("../src/im/messaging.js");
+    const { saveModel } = await import("../src/im/config.js");
+
+    const tmpdir = await import("node:os").then(o => o.tmpdir());
+    const { SessionRegistry } = await import("../src/im/session-registry.js");
+    const registry = new SessionRegistry(tmpdir);
+
+    const queuedItem = {
+      event: {
+        type: "im.message.receive_v1",
+        chat_id: "oc_test",
+        chat_type: "p2p",
+        content: "/model anthropic/claude-opus-4-5",
+        message_id: "om_126",
+        message_type: "text",
+        sender_id: "ou_user",
+        create_time: "1700000000",
+        event_id: "ev_4",
+        timestamp: "1700000001",
+        raw: {},
+      },
+      route: {
+        type: "command" as const,
+        command: "model",
+        args: "anthropic/claude-opus-4-5",
+        chatId: "oc_test",
+      },
+    };
+
+    await processItem(
+      queuedItem,
+      { services: {} },
+      registry,
+      "/tmp/agent",
+      "anthropic/claude-sonnet-4-20250514"
+    );
+
+    expect(saveModel).toHaveBeenCalledWith("anthropic/claude-opus-4-5");
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    const call = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toContain("Opus");
+    expect(call[1]).toBe("oc_test");
+  });
+
+  it("handles /model with unknown model id", async () => {
+    const { processItem } = await import("../src/im/processor.js");
+    const { sendMessage } = await import("../src/im/messaging.js");
+
+    const { SessionRegistry } = await import("../src/im/session-registry.js");
+    const tmpdir = await import("node:os").then(o => o.tmpdir());
+    const registry = new SessionRegistry(tmpdir);
+
+    const queuedItem = {
+      event: {
+        type: "im.message.receive_v1",
+        chat_id: "oc_test",
+        chat_type: "p2p",
+        content: "/model unknown-model",
+        message_id: "om_127",
+        message_type: "text",
+        sender_id: "ou_user",
+        create_time: "1700000000",
+        event_id: "ev_5",
+        timestamp: "1700000001",
+        raw: {},
+      },
+      route: {
+        type: "command" as const,
+        command: "model",
+        args: "unknown-model",
+        chatId: "oc_test",
+      },
+    };
+
+    await processItem(
+      queuedItem,
+      { services: {} },
+      registry,
+      "/tmp/agent",
+      "anthropic/claude-sonnet-4-20250514"
+    );
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    const call = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toContain("未找到模型");
   });
 });
 
