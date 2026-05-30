@@ -4,12 +4,16 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node
 import { createIPCClient, type IPCClient } from "../src/ipc/client.js";
 import { FEISHU_IM_DIR, PID_FILE, SOCKET_PATH, REGISTRY_FILE } from "../src/config.js";
 import type { DaemonMessage, ExtensionMessage } from "../src/ipc/protocol.js";
+import { parseBotCommand } from "./bot-commands/router.js";
+import { buildHelpCard } from "./bot-commands/help.js";
+import { buildSessionsCard, handleSessionsAction } from "./bot-commands/sessions.js";
+import { buildModelCard, handleModelAction } from "./bot-commands/model.js";
 
 // Package root directory — used as cwd when spawning the daemon so that jiti
 // resolves from the package's own node_modules regardless of process.cwd().
 const PACKAGE_DIR = new URL("..", import.meta.url).pathname;
 
-interface SessionRegistry {
+export interface SessionRegistry {
     [chatId: string]: string;
 }
 
@@ -155,6 +159,36 @@ export default function(pi: ExtensionAPI) {
                             }
 
                             case "message": {
+                                const botCmd = parseBotCommand(msg.content);
+
+                                if (botCmd) {
+                                    if (botCmd !== "help") {
+                                        const sessionFile = registry[msg.chatId];
+                                        if (!sessionFile) {
+                                            await ctx.newSession();
+                                            const sf = ctx.sessionManager.getSessionFile();
+                                            if (sf) {
+                                                registry[msg.chatId] = sf;
+                                                saveRegistry(registry);
+                                            }
+                                        } else {
+                                            try { await ctx.switchSession(sessionFile); } catch { }
+                                        }
+                                    }
+
+                                    let card: unknown;
+                                    if (botCmd === "help") {
+                                        card = buildHelpCard();
+                                    } else if (botCmd === "sessions") {
+                                        card = buildSessionsCard(registry, ctx.sessionManager.getSessionFile() || "");
+                                    } else if (botCmd === "model") {
+                                        const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                        card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
+                                    }
+                                    sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                                    return;
+                                }
+
                                 const tag = `[feishu:#${++injectSequence}]`;
                                 pendingInjects.add(tag);
 
@@ -181,7 +215,49 @@ export default function(pi: ExtensionAPI) {
                             }
 
                             case "cardAction": {
-                                ctx.ui.notify("Card action received", "info");
+                                const rawAction = msg.action as Record<string, unknown> | undefined;
+                                if (!rawAction) return;
+
+                                let parsed: Record<string, string> | null = null;
+                                if (rawAction.tag === "button") {
+                                    parsed = rawAction.value as Record<string, string>;
+                                } else if (rawAction.tag === "select_static") {
+                                    try {
+                                        parsed = JSON.parse(rawAction.option as string);
+                                    } catch {}
+                                }
+                                if (!parsed) return;
+
+                                if (parsed.cmd === "sessions") {
+                                    await handleSessionsAction(
+                                        parsed as unknown as import("./bot-commands/sessions.js").SessionsAction,
+                                        {
+                                            switchSession: (p: string) => ctx.switchSession(p),
+                                            newSession: () => ctx.newSession(),
+                                            getSessionFile: () => ctx.sessionManager.getSessionFile(),
+                                        },
+                                        registry,
+                                        msg.chatId,
+                                    );
+                                    saveRegistry(registry);
+                                    const card = buildSessionsCard(registry, ctx.sessionManager.getSessionFile() || "");
+                                    sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                                } else if (parsed.cmd === "model") {
+                                    const modelAction = parsed as unknown as import("./bot-commands/model.js").ModelAction;
+                                    const result = await handleModelAction(
+                                        modelAction,
+                                        { switchSession: (p: string) => ctx.switchSession(p), modelRegistry: ctx.modelRegistry },
+                                        registry,
+                                        msg.chatId,
+                                        (m: unknown) => pi.setModel(m as any),
+                                    );
+                                    const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                    const card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
+                                    sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                                    if (result) {
+                                        ctx.ui.notify("模型切换成功", "info");
+                                    }
+                                }
                                 break;
                             }
 
