@@ -112,51 +112,55 @@ describe("IPCServer", () => {
     server = null;
   });
 
-  it("rejects second client (emits 'reject')", async () => {
+  it("accepts multiple concurrent clients", async () => {
     server = createIPCServer(SOCK);
     await server.listen();
 
-    const connectPromise = new Promise<void>((resolve) => {
-      server!.on("connect", () => resolve());
+    let connectCount = 0;
+    server.on("connect", () => {
+      connectCount++;
     });
+
     const client1 = await createClient();
-    await connectPromise;
+    const client2 = await createClient();
 
-    const rejectPromise = new Promise<void>((resolve) => {
-      server!.on("reject", () => resolve());
-    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(connectCount).toBe(2);
+    expect(server.socketCount).toBe(2);
 
-    const client2 = new net.Socket();
-    client2.connect(SOCK);
-
-    await rejectPromise;
-    client2.destroy();
     client1.destroy();
+    client2.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.socketCount).toBe(0);
+
     await server.close();
     server = null;
   });
 
-  it("sends bye message content to rejected client", async () => {
+  it("sendToClient broadcasts to all connected clients", async () => {
     server = createIPCServer(SOCK);
     await server.listen();
 
-    const connectPromise = new Promise<void>((resolve) => {
-      server!.on("connect", () => resolve());
-    });
     const client1 = await createClient();
-    await connectPromise;
+    const client2 = await createClient();
 
-    const dataPromise = new Promise<string>((resolve) => {
-      const client2 = new net.Socket();
-      client2.connect(SOCK, () => {
-        client2.once("data", (d) => resolve(d.toString()));
-      });
+    const data1 = new Promise<string>((resolve) => {
+      client1.once("data", (d) => resolve(d.toString()));
+    });
+    const data2 = new Promise<string>((resolve) => {
+      client2.once("data", (d) => resolve(d.toString()));
     });
 
-    const received = await dataPromise;
-    expect(received).toContain("bye");
+    server.sendToClient({ type: "ready", botIdentity: { name: "broadcast" } });
+
+    const [d1, d2] = await Promise.all([data1, data2]);
+    expect(d1).toContain('"type":"ready"');
+    expect(d1).toContain("broadcast");
+    expect(d2).toContain('"type":"ready"');
+    expect(d2).toContain("broadcast");
 
     client1.destroy();
+    client2.destroy();
     await server.close();
     server = null;
   });

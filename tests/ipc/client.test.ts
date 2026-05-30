@@ -93,26 +93,19 @@ describe("IPCClient", () => {
     expect(() => client.send({ type: "shutdown" })).toThrow("Not connected");
   });
 
-  it("handles bye message from server", async () => {
+  it("multiple clients can connect to server simultaneously", async () => {
     server = await startServer();
     const client1 = createIPCClient(SOCK);
-    await client1.connect();
-
     const client2 = createIPCClient(SOCK);
-    const messages: any[] = [];
-    const disconnectPromise = new Promise<void>((resolve) => {
-      client2.on("disconnect", () => resolve());
-    });
-    client2.on("message", (msg: any) => messages.push(msg));
 
+    await client1.connect();
     await client2.connect();
-    await disconnectPromise;
 
-    expect(messages.length).toBe(1);
-    expect(messages[0]).toEqual({ type: "bye", reason: "already connected" });
     expect(client1.connected).toBe(true);
+    expect(client2.connected).toBe(true);
 
     client1.disconnect();
+    client2.disconnect();
   });
 
   it("connect() rejects on bad path", async () => {
