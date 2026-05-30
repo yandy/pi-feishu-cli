@@ -2,11 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn, execSync } from "node:child_process";
 import { readFileSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-
-const FEISHU_IM_DIR = join(homedir(), ".pi", "agent", "feishu-im");
-const PID_FILE = join(FEISHU_IM_DIR, "daemon.pid");
+import { PID_FILE } from "./shared.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

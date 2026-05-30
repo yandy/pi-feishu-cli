@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-import { join } from "node:path";
-import { homedir } from "node:os";
 import { writeFileSync } from "node:fs";
 import {
   createAgentSessionRuntime,
@@ -15,7 +13,7 @@ import { Bot } from "./bot.js";
 import { startEventConsumer } from "./consumer.js";
 import { larkCliAvailable, larkCliConfigured } from "./messaging.js";
 import { log } from "./logger.js";
-import { PID_FILE } from "./paths.js";
+import { PID_FILE, FEISHU_IM_DIR } from "../shared.js";
 import { processItem } from "./processor.js";
 import type { QueuedItem } from "./processor.js";
 
@@ -32,7 +30,7 @@ async function runDaemon() {
   }
 
   const config = loadConfig();
-  const registry = new SessionRegistry(join(homedir(), ".pi", "agent", "feishu-im"));
+  const registry = new SessionRegistry(FEISHU_IM_DIR);
   const bot = new Bot(registry, config.strategy, config.botName);
 
   writeFileSync(PID_FILE, String(process.pid));

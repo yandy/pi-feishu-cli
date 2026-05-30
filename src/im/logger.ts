@@ -1,5 +1,5 @@
 import { appendFileSync } from "node:fs";
-import { LOG_FILE } from "./paths.js";
+import { LOG_FILE } from "../shared.js";
 
 export function log(msg: string): void {
   const ts = new Date().toISOString();

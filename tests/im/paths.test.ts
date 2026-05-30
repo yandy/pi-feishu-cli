@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FEISHU_IM_DIR, PID_FILE, LOG_FILE, CONFIG_FILE, REGISTRY_FILE } from "../../src/im/paths.js";
+import { FEISHU_IM_DIR, PID_FILE, LOG_FILE, CONFIG_FILE, REGISTRY_FILE } from "../../src/shared.js";
 
 describe("paths", () => {
   it("FEISHU_IM_DIR points to .pi/agent/feishu-im", () => {

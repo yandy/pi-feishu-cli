@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { unlinkSync, existsSync, readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { LOG_FILE } from "../../src/im/paths.js";
+import { LOG_FILE } from "../../src/shared.js";
 
 describe("logger", () => {
   afterEach(() => {
