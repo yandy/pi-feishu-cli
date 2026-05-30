@@ -1,5 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
+import { rmSync } from "node:fs";
 import type { SessionsAction } from "../../extensions/bot-commands/sessions.js";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    rmSync: vi.fn(actual.rmSync),
+  };
+});
 import {
   buildSessionsCard,
   handleSessionsAction,
@@ -138,7 +147,8 @@ describe("handleSessionsAction", () => {
     };
 
     await handleSessionsAction(action, ctx, registry, "chat1");
-    expect(registry).toEqual({});
+    expect(rmSync).toHaveBeenCalledWith("/tmp/session.json", { force: true });
+    expect(registry).not.toHaveProperty("chat1");
   });
 
   it("new creates session and updates registry", async () => {

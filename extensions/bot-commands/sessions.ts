@@ -33,6 +33,8 @@ function getSessionInfo(sessionPath: string): { name: string; messageCount: numb
   let name = basename(sessionPath);
   let messageCount = 0;
   try {
+    // SessionManager.open(path, sessionDir, cwdOverride) — passing undefined
+    // for sessionDir and cwdOverride to let SessionManager use defaults.
     const sm = SessionManager.open(sessionPath, undefined, undefined);
     const sessionName = sm.getSessionName();
     if (sessionName) name = sessionName;
@@ -133,13 +135,16 @@ export async function handleSessionsAction(
       delete registry[chatId];
       break;
     case "delete":
-      delete registry[chatId];
       rmSync(action.sessionPath, { force: true });
+      delete registry[chatId];
       break;
     case "new":
       await ctx.newSession();
       const sf = ctx.getSessionFile();
       if (sf) registry[chatId] = sf;
+      break;
+    default:
+      const _exhaustive: never = action.action;
       break;
   }
 }
