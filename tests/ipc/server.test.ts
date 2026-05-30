@@ -135,4 +135,58 @@ describe("IPCServer", () => {
     await server.close();
     server = null;
   });
+
+  it("sends bye message content to rejected client", async () => {
+    server = createIPCServer(SOCK);
+    await server.listen();
+
+    const connectPromise = new Promise<void>((resolve) => {
+      server!.on("connect", () => resolve());
+    });
+    const client1 = await createClient();
+    await connectPromise;
+
+    const dataPromise = new Promise<string>((resolve) => {
+      const client2 = new net.Socket();
+      client2.connect(SOCK, () => {
+        client2.once("data", (d) => resolve(d.toString()));
+      });
+    });
+
+    const received = await dataPromise;
+    expect(received).toContain("bye");
+
+    client1.destroy();
+    await server.close();
+    server = null;
+  });
+
+  it("activeSocket returns null before any client connects", async () => {
+    server = createIPCServer(SOCK);
+    await server.listen();
+
+    expect(server.activeSocket).toBeNull();
+
+    await server.close();
+    server = null;
+  });
+
+  it("emits error event when parseMessage fails", async () => {
+    server = createIPCServer(SOCK);
+    await server.listen();
+
+    const errorPromise = new Promise<Error>((resolve) => {
+      server!.on("error", (err) => resolve(err));
+    });
+
+    const client = await createClient();
+    client.write("not valid json\n");
+
+    const err = await errorPromise;
+    expect(err).toBeInstanceOf(Error);
+
+    client.destroy();
+    await server.close();
+    server = null;
+  });
 });

@@ -106,8 +106,9 @@ export class IPCServer {
         this._activeSocket = null;
       }
       if (this.server) {
-        this.server.close(() => {
-          this.emit("disconnect");
+        this.server.close((err) => {
+          if (err) this.emit("error", err);
+          try { unlinkSync(this.socketPath); } catch {}
           resolve();
         });
       } else {
