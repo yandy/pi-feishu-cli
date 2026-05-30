@@ -33,10 +33,13 @@ async function main() {
   await ipcServer.listen();
   log("info", `IPC server listening on ${SOCKET_PATH}`);
 
-  const creds = loadAuth(FEISHU_IM_DIR);
+  let creds = loadAuth(FEISHU_IM_DIR);
   let channel: Channel | null = null;
 
   const connectChannel = async (appId: string, appSecret: string): Promise<void> => {
+    if (channel?.connected) {
+      await channel.disconnect();
+    }
     channel = createFeishuChannel({ appId, appSecret });
 
     channel.on("message", async (msg) => {
@@ -94,6 +97,7 @@ async function main() {
         try {
           await connectChannel(msg.appId, msg.appSecret);
           saveAuth(FEISHU_IM_DIR, msg.appId, msg.appSecret);
+          creds = { appId: msg.appId, appSecret: msg.appSecret };
           ipcServer.send(socket, {
             type: "ready",
             botIdentity: { name: channel?.botIdentity?.name ?? "bot" },
@@ -195,20 +199,27 @@ async function main() {
   ipcServer.on("connect", (socket) => {
     log("info", "Extension connected");
     if (creds) {
-      connectChannel(creds.appId, creds.appSecret)
-        .then(() => {
-          ipcServer.send(socket, {
-            type: "ready",
-            botIdentity: { name: channel?.botIdentity?.name ?? "bot" },
-          });
-        })
-        .catch((err: Error) => {
-          log("error", `Auto-connect failed: ${err.message}`);
-          ipcServer.send(socket, {
-            type: "needAuth",
-            message: `自动连接失败: ${err.message}`,
-          });
+      if (channel?.connected) {
+        ipcServer.send(socket, {
+          type: "ready",
+          botIdentity: { name: channel.botIdentity?.name ?? "bot" },
         });
+      } else {
+        connectChannel(creds.appId, creds.appSecret)
+          .then(() => {
+            ipcServer.send(socket, {
+              type: "ready",
+              botIdentity: { name: channel?.botIdentity?.name ?? "bot" },
+            });
+          })
+          .catch((err: Error) => {
+            log("error", `Auto-connect failed: ${err.message}`);
+            ipcServer.send(socket, {
+              type: "needAuth",
+              message: `自动连接失败: ${err.message}`,
+            });
+          });
+      }
     } else {
       ipcServer.send(socket, {
         type: "needAuth",
@@ -219,10 +230,6 @@ async function main() {
 
   ipcServer.on("disconnect", () => {
     log("info", "Extension disconnected");
-  });
-
-  ipcServer.on("reject", () => {
-    log("info", "Rejected new connection");
   });
 }
 
