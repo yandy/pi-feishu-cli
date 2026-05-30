@@ -68,7 +68,8 @@ export default function (pi: ExtensionAPI) {
   const pendingInjects = new Set<string>();
   let injectSequence = 0;
 
-  async function getClient(ctx: { ui: { notify: (msg: string, level: string) => void } }): Promise<IPCClient | null> {
+  type NotifyFn = (msg: string, level?: "error" | "info" | "warning") => void;
+  async function getClient(ctx: { ui: { notify: NotifyFn } }): Promise<IPCClient | null> {
     if (ipcClient?.connected) return ipcClient;
 
     if (!isDaemonRunning()) {
