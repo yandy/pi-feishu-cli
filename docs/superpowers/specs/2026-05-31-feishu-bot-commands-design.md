@@ -16,7 +16,7 @@
 |------|----------|------|
 | `/help` | 所有可用命令列表及说明 | 纯信息展示，无交互 |
 | `/sessions` | 会话列表（名称、消息数、最后活跃时间） | 按钮：切换 / 解绑 / 删除 + 底部：新建会话 |
-| `/model` | 模型选择器（下拉列表，当前模型标记） | 按钮：确认切换 |
+| `/model` | 模型选择器（下拉列表，当前模型标记） | 选择后自动切换（无确认按钮，Feishu card V2 select_static 选择即触发） |
 
 ## 3. 文件结构
 
@@ -92,17 +92,17 @@ action value 为 JSON 字符串：`{ "cmd": "sessions", "action": "switch"|"unbi
 ### 6.1 卡片内容
 
 - **当前模型**：`ctx.model?.id` 显示在顶部
-- **模型下拉选择器**：飞书卡片 V2 `select` 组件
+- **模型下拉选择器**：飞书卡片 V2 `select_static` 组件
   - 选项来源：`ctx.modelRegistry.getAvailable()`
-  - 显示名：`model.name`
+  - 显示名：`model.name` + `(provider)`
   - 默认选中：当前模型
-- **确认切换按钮**
+- **自动切换**：选择模型后直接触发 `cardAction` 回调，无需确认按钮
 
 ### 6.2 cardAction 回调
 
-action value 为 JSON 字符串：`{ "cmd": "model", "action": "confirm", "modelProvider": "...", "modelId": "..." }`
+当用户在下拉列表中选择模型时，飞书发送 `cardAction`，action value 为 JSON 字符串：`{ "cmd": "model", "action": "select", "modelProvider": "...", "modelId": "..." }`
 
-1. 收到确认 → 根据 `modelProvider` + `modelId` 查找 Model 对象
+1. 根据 `modelProvider` + `modelId` 查找 Model 对象
 2. `ctx.switchSession(boundSessionPath)` → 切换到当前群绑定的 session
 3. `pi.setModel(selectedModel)` → 仅影响当前 session
 4. `updateCard` 更新卡片显示切换结果
