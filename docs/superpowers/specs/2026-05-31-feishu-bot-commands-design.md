@@ -14,6 +14,7 @@
 
 | 命令 | Card 内容 | 操作 |
 |------|----------|------|
+| `/help` | 所有可用命令列表及说明 | 纯信息展示，无交互 |
 | `/sessions` | 会话列表（名称、消息数、最后活跃时间） | 按钮：切换 / 解绑 / 删除 + 底部：新建会话 |
 | `/model` | 模型选择器（下拉列表，当前模型标记） | 按钮：确认切换 |
 
@@ -24,6 +25,7 @@ extensions/
 ├── index.ts                  # 主入口（改动：message/cardAction case 添加命令路由）
 ├── bot-commands/
 │   ├── router.ts             # 命令解析与路由分发
+│   ├── help.ts               # /help 处理
 │   ├── sessions.ts           # /sessions 处理
 │   └── model.ts              # /model 处理
 └── feishu-card.ts            # 飞书卡片 V2 JSON 构建工具
@@ -34,7 +36,7 @@ extensions/
 ### 4.1 接口
 
 ```typescript
-const BOT_COMMANDS = { sessions: "/sessions", model: "/model" } as const;
+const BOT_COMMANDS = { help: "/help", sessions: "/sessions", model: "/model" } as const;
 type BotCommand = typeof BOT_COMMANDS[keyof typeof BOT_COMMANDS];
 
 function parseBotCommand(content: string): BotCommand | null;
@@ -50,7 +52,7 @@ async function routeBotCommand(
 
 1. `message` case 收到消息 → `parseBotCommand(content)`
 2. 非命令（null）→ 走原有 `pi.sendUserMessage()` 流程
-3. 是命令 → 检查 `registry[chatId]`：
+3. 是命令 → 检查 `registry[chatId]`（`/help` 除外，它不依赖 session）：
    - 无绑定 → 自动 `ctx.newSession()` + 写入 registry
    - 有绑定 → `ctx.switchSession(sessionFile)`
 4. 调用对应 handler → 返回 `{ type: "card", card: object }`
@@ -105,7 +107,22 @@ action value 为 JSON 字符串：`{ "cmd": "model", "action": "confirm", "model
 3. `pi.setModel(selectedModel)` → 仅影响当前 session
 4. `updateCard` 更新卡片显示切换结果
 
-## 7. 卡片构建工具 (`feishu-card.ts`)
+## 7. /help 命令 (`bot-commands/help.ts`)
+
+### 7.1 卡片内容
+
+- **标题**：帮助
+- **内容**：所有可用命令列表，每个命令一行：
+  - `/help` — 显示此帮助信息
+  - `/sessions` — 管理会话（查看、切换、解绑、删除、新建）
+  - `/model` — 切换 AI 模型
+
+### 7.2 特点
+
+- 纯信息展示卡片，无交互按钮
+- 不需要 session 绑定（不触发自动创建 session）
+
+## 8. 卡片构建工具 (`feishu-card.ts`)
 
 提供飞书卡片 V2 JSON 构建函数，封装通用模板和组件：
 
@@ -115,7 +132,7 @@ action value 为 JSON 字符串：`{ "cmd": "model", "action": "confirm", "model
 - `createMarkdownElement(content: string)` — 创建 markdown 文本块
 - `createDividerElement()` — 创建分割线
 
-## 8. 主入口改动 (`extensions/index.ts`)
+## 9. 主入口改动 (`extensions/index.ts`)
 
 ### 8.1 message case 改动（L157-181）
 
@@ -156,18 +173,19 @@ case "cardAction": {
 }
 ```
 
-## 9. 边界条件
+## 10. 边界条件
 
 | 场景 | 处理 |
 |------|------|
 | 无绑定 session 发 `/sessions` 或 `/model` | 自动 `ctx.newSession()` + 写入 registry，再执行命令 |
+| 无绑定 session 发 `/help` | 直接返回帮助卡片，不创建 session |
 | registry 为空时 `/sessions` | 显示空状态卡片 + "新建会话"按钮 |
 | 删除当前正在使用的 session | 先 `ctx.newSession()`，再删除旧 session，更新 registry |
 | 模型列表为空 | 卡片显示 "暂无可用模型" |
 | cardAction value 解析失败 | 静默忽略，记录日志 |
 | 切换/删除的 session 文件不存在 | 从 registry 清理，发出通知 |
 
-## 10. 需要新增的 IPC 消息类型
+## 11. 需要新增的 IPC 消息类型
 
 现有 IPC 协议已支持所有需要的消息类型，无需新增：
 
@@ -175,7 +193,7 @@ case "cardAction": {
 - `updateCard` — 卡片按钮操作后刷新卡片
 - `cardAction` — 接收卡片按钮回调（已从飞书 → Daemon → Extension 全程转发）
 
-## 11. 涉及的外部 API
+## 12. 涉及的外部 API
 
 | API | 用途 | 位置 |
 |-----|------|------|
