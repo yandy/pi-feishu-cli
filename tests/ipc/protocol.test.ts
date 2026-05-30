@@ -90,4 +90,117 @@ describe("IPC Protocol", () => {
       expect(isExtensionMessage(null)).toBe(false);
     });
   });
+
+  describe("Daemon round-trip tests", () => {
+    it("round-trips bye", () => {
+      const msg = createDaemonMessage("bye", { reason: "process exiting" });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips cardAction", () => {
+      const msg = createDaemonMessage("cardAction", {
+        messageId: "m1",
+        chatId: "c1",
+        openId: "o1",
+        action: { key: "value" },
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips error", () => {
+      const msg = createDaemonMessage("error", {
+        message: "something went wrong",
+        code: "E001",
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips needAuth", () => {
+      const msg = createDaemonMessage("needAuth", {
+        message: "authentication required",
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips status", () => {
+      const msg = createDaemonMessage("status", {
+        pid: 1234,
+        uptime: 3600,
+        wsConnected: true,
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips reaction", () => {
+      const msg = createDaemonMessage("reaction", {
+        messageId: "m1",
+        chatId: "c1",
+        userId: "u1",
+        emoji: "👍",
+        added: true,
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+  });
+
+  describe("Extension round-trip tests", () => {
+    it("round-trips stream", () => {
+      const msg = createExtensionMessage("stream", {
+        chatId: "c1",
+        content: "streaming...",
+        replyTo: "m1",
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips streamEnd", () => {
+      const msg = createExtensionMessage("streamEnd", {
+        chatId: "c1",
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips updateCard", () => {
+      const msg = createExtensionMessage("updateCard", {
+        messageId: "m1",
+        card: { title: "hello" },
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips auth", () => {
+      const msg = createExtensionMessage("auth", {
+        appId: "app-123",
+        appSecret: "secret-abc",
+      });
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+
+    it("round-trips status", () => {
+      const msg = createExtensionMessage("status", {});
+      const json = stringifyMessage(msg);
+      const parsed = parseMessage(json);
+      expect(parsed).toEqual(msg);
+    });
+  });
 });
