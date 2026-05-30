@@ -1,19 +1,32 @@
 export interface FeishuImConfig {
   strategy: "open" | "mention";
   model?: string;
-  pollInterval: number;
-  autoStart?: boolean;
+  botName?: string;
+}
+
+export interface FeishuEvent {
+  type: string;
+  chat_id: string;
+  chat_type: string;
+  content: string;
+  message_id: string;
+  message_type: string;
+  sender_id: string;
+  create_time: string;
+  event_id: string;
+  timestamp: string;
+  raw: Record<string, unknown>;
 }
 
 export interface SessionInfo {
   id: string;
   name: string;
-  createdAt: number; // unix ms timestamp
+  createdAt: number;
 }
 
 export interface ChatSessions {
   sessions: SessionInfo[];
-  active: string | null; // session id, or null if none active
+  active: string | null;
 }
 
 export interface Registry {
@@ -23,7 +36,7 @@ export interface Registry {
 export interface DaemonStatus {
   running: boolean;
   pid: number | null;
-  uptime: number | null; // seconds
+  uptime: number | null;
   sessionCount: number;
   chatCount: number;
 }

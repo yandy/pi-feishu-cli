@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   buildSessionListCard,
   buildModelSelectCard,
-} from "../src/cards.js";
-import type { SessionInfo } from "../src/types.js";
+} from "../src/im/cards.js";
+import type { SessionInfo } from "../src/im/types.js";
 
 describe("buildSessionListCard", () => {
   const sessions: SessionInfo[] = [
@@ -14,8 +14,9 @@ describe("buildSessionListCard", () => {
   it("builds card with session entries", () => {
     const card = buildSessionListCard("oc_chat1", sessions, "abc");
     const json = JSON.parse(card);
-    expect(json.card.header).toBeDefined();
-    expect(json.card.elements).toBeDefined();
+    expect(json.header).toBeDefined();
+    expect(json.elements).toBeDefined();
+    expect(json.config.wide_screen_mode).toBe(true);
     expect(JSON.stringify(json).length).toBeGreaterThan(100);
   });
 
@@ -41,7 +42,8 @@ describe("buildModelSelectCard", () => {
     ];
     const card = buildModelSelectCard("oc_chat1", models, "claude-sonnet");
     const json = JSON.parse(card);
-    expect(json.card.header).toBeDefined();
+    expect(json.header).toBeDefined();
+    expect(json.config.wide_screen_mode).toBe(true);
     expect(JSON.stringify(json)).toContain("Claude Sonnet");
     expect(JSON.stringify(json)).toContain("GPT-4o");
   });

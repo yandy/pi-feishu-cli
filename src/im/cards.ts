@@ -30,7 +30,7 @@ export function buildSessionListCard(
       });
       elements.push({ tag: "hr" });
     }
-    elements.pop(); // remove last hr
+    elements.pop();
   }
 
   elements.push({
@@ -51,8 +51,9 @@ export function buildSessionListCard(
   });
 
   return JSON.stringify({
-    msg_type: "interactive",
-    card: { header, elements },
+    config: { wide_screen_mode: true },
+    header,
+    elements,
   });
 }
 
@@ -99,7 +100,8 @@ export function buildModelSelectCard(
   }
 
   return JSON.stringify({
-    msg_type: "interactive",
-    card: { header, elements },
+    config: { wide_screen_mode: true },
+    header,
+    elements,
   });
 }

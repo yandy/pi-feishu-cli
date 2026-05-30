@@ -1,20 +1,17 @@
 import { SessionRegistry } from "./session-registry.js";
-import type { FeishuEvent } from "./poller.js";
-import type { FeishuImConfig } from "./types.js";
+import type { FeishuEvent, FeishuImConfig } from "./types.js";
 
 export interface RouteResultCommand {
   type: "command";
   command: string;
   args: string;
   chatId: string;
-  threadId?: string;
 }
 
 export interface RouteResultMessage {
   type: "message";
   text: string;
   chatId: string;
-  threadId?: string;
 }
 
 export interface RouteResultSkip {
@@ -23,29 +20,28 @@ export interface RouteResultSkip {
 
 export type RouteResult = RouteResultCommand | RouteResultMessage | RouteResultSkip;
 
-const BOT_OPEN_ID = "__bot_open_id__";
-
 export class Bot {
   constructor(
     private registry: SessionRegistry,
-    private strategy: FeishuImConfig["strategy"]
+    private strategy: FeishuImConfig["strategy"],
+    private botName?: string,
   ) {}
 
   route(event: FeishuEvent): RouteResult {
-    const msg = event.event?.message;
-    if (!msg) return { type: "skip" };
-
-    const chatId = msg.chat_id;
-    const text = this.extractText(msg.content, msg.message_type);
+    const chatId = event.chat_id;
+    const text = this.extractText(event);
 
     if (!text) return { type: "skip" };
 
-    const mentions = msg.mentions ?? [];
-    const hasMentions = mentions.length > 0;
-    const isMentioned = mentions.some((m) => m.key === BOT_OPEN_ID);
+    if (event.sender_id && this.isBotSender(event.sender_id)) {
+      return { type: "skip" };
+    }
 
-    if (this.strategy === "mention" && hasMentions && !isMentioned) {
-      if (!this.isCommand(text)) return { type: "skip" };
+    if (this.strategy === "mention" && event.chat_type === "group") {
+      if (!this.isCommand(text)) {
+        const mentioned = this.isMentioned(text);
+        if (!mentioned) return { type: "skip" };
+      }
     }
 
     const commandResult = this.parseCommand(text);
@@ -55,7 +51,6 @@ export class Bot {
         command: commandResult.command,
         args: commandResult.args,
         chatId,
-        threadId: msg.parent_id,
       };
     }
 
@@ -63,7 +58,6 @@ export class Bot {
       type: "message",
       text,
       chatId,
-      threadId: msg.parent_id,
     };
   }
 
@@ -95,15 +89,20 @@ export class Bot {
     return null;
   }
 
-  private extractText(content: string, msgType: string): string {
-    if (msgType === "text") {
-      try {
-        const parsed = JSON.parse(content);
-        return parsed.text ?? "";
-      } catch {
-        return content;
-      }
+  private extractText(event: FeishuEvent): string {
+    const msgType = event.message_type;
+    if (msgType === "text" || msgType === "post") {
+      return event.content ?? "";
     }
     return "";
+  }
+
+  private isMentioned(text: string): boolean {
+    if (this.botName && text.includes(`@${this.botName}`)) return true;
+    return /@\S/.test(text);
+  }
+
+  private isBotSender(senderId: string): boolean {
+    return senderId.startsWith("bot_");
   }
 }

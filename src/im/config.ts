@@ -2,18 +2,18 @@ import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { FeishuImConfig } from "./types.js";
 
-export const DEFAULT_CONFIG: Required<Omit<FeishuImConfig, "model">> = {
+const CONFIG_FILE = "config.json";
+
+export const DEFAULT_CONFIG: FeishuImConfig = {
   strategy: "mention",
-  pollInterval: 5,
-  autoStart: false,
 };
 
-export function loadConfig(configDir: string): FeishuImConfig {
+export function loadConfig(configDir: string = join(process.env.HOME || "~", ".pi", "agent", "feishu-im")): FeishuImConfig {
   if (!existsSync(configDir)) {
     mkdirSync(configDir, { recursive: true });
   }
 
-  const configPath = join(configDir, "config.json");
+  const configPath = join(configDir, CONFIG_FILE);
 
   if (!existsSync(configPath)) {
     return { ...DEFAULT_CONFIG };
@@ -24,8 +24,7 @@ export function loadConfig(configDir: string): FeishuImConfig {
     return {
       strategy: raw.strategy ?? DEFAULT_CONFIG.strategy,
       model: raw.model,
-      pollInterval: raw.pollInterval ?? DEFAULT_CONFIG.pollInterval,
-      autoStart: raw.autoStart ?? DEFAULT_CONFIG.autoStart,
+      botName: raw.botName,
     };
   } catch {
     return { ...DEFAULT_CONFIG };

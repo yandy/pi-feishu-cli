@@ -2,11 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn, execSync } from "node:child_process";
 import { readFileSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-
-const FEISHU_IM_DIR = join(homedir(), ".pi", "agent", "feishu-im");
-const PID_FILE = join(FEISHU_IM_DIR, "daemon.pid");
+import { PID_FILE } from "./im/paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,7 +30,7 @@ function getPid(): number | null {
   }
 }
 
-async function handleStart(ctx: { ui: { notify: (msg: string, type: string) => void } }): Promise<void> {
+async function handleStart(ctx: { ui: { notify: (message: string, type?: "info" | "error" | "warning") => void } }): Promise<void> {
   if (isRunning()) {
     ctx.ui.notify(`飞书 IM 守护进程已在运行 (PID: ${getPid()})`, "info");
     return;
@@ -53,7 +50,7 @@ async function handleStart(ctx: { ui: { notify: (msg: string, type: string) => v
     return;
   }
 
-  const daemonPath = join(__dirname, "daemon.ts");
+  const daemonPath = join(__dirname, "im", "daemon.ts");
 
   const child = spawn("node", ["--import", "jiti/register", daemonPath], {
     detached: true,
@@ -72,7 +69,7 @@ async function handleStart(ctx: { ui: { notify: (msg: string, type: string) => v
   }
 }
 
-function handleStop(ctx: { ui: { notify: (msg: string, type: string) => void } }): void {
+function handleStop(ctx: { ui: { notify: (message: string, type?: "info" | "error" | "warning") => void } }): void {
   const pid = getPid();
   if (!pid || !isRunning()) {
     ctx.ui.notify("飞书 IM 守护进程未在运行", "info");
@@ -88,7 +85,7 @@ function handleStop(ctx: { ui: { notify: (msg: string, type: string) => void } }
   }
 }
 
-function handleStatus(ctx: { ui: { notify: (msg: string, type: string) => void } }): void {
+function handleStatus(ctx: { ui: { notify: (message: string, type?: "info" | "error" | "warning") => void } }): void {
   if (isRunning()) {
     ctx.ui.notify(`飞书 IM 守护进程运行中 (PID: ${getPid()})`, "info");
   } else {
@@ -120,13 +117,6 @@ export default function (pi: ExtensionAPI) {
         default:
           ctx.ui.notify("用法: /feishu-im [start|stop|status|restart]", "error");
       }
-    },
-  });
-
-  pi.registerFlag("feishu-im", {
-    description: "启动时自动启动飞书 IM 守护进程",
-    handler: async (ctx) => {
-      await handleStart(ctx);
     },
   });
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdirSync, unlinkSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SessionRegistry } from "../src/session-registry.js";
+import { SessionRegistry } from "../src/im/session-registry.js";
 
 describe("SessionRegistry", () => {
   const tmpDir = join(tmpdir(), "pi-feishu-cli-test-registry");
@@ -23,7 +23,7 @@ describe("SessionRegistry", () => {
     const session = reg.ensureSession("oc_chat1");
     expect(session.name).toBe("默认会话");
     expect(session.id).toBeDefined();
-    const data = reg.getChatSessions("oc_chat1");
+    const data = reg.getChatSessions("oc_chat1")!;
     expect(data.sessions).toHaveLength(1);
     expect(data.active).toBe(session.id);
   });
@@ -33,7 +33,7 @@ describe("SessionRegistry", () => {
     const s1 = reg.ensureSession("oc_chat1");
     const s2 = reg.ensureSession("oc_chat1");
     expect(s2.id).toBe(s1.id);
-    const data = reg.getChatSessions("oc_chat1");
+    const data = reg.getChatSessions("oc_chat1")!;
     expect(data.sessions).toHaveLength(1);
   });
 
@@ -42,7 +42,7 @@ describe("SessionRegistry", () => {
     reg.ensureSession("oc_chat1");
     const s2 = reg.createSession("oc_chat1", "新功能开发");
     expect(s2.name).toBe("新功能开发");
-    const data = reg.getChatSessions("oc_chat1");
+    const data = reg.getChatSessions("oc_chat1")!;
     expect(data.sessions).toHaveLength(2);
     expect(data.active).toBe(s2.id);
   });
@@ -61,7 +61,7 @@ describe("SessionRegistry", () => {
     const s1 = reg.ensureSession("oc_chat1");
     const s2 = reg.createSession("oc_chat1", "to-delete");
     reg.deleteSession("oc_chat1", s2.id);
-    const data = reg.getChatSessions("oc_chat1");
+    const data = reg.getChatSessions("oc_chat1")!;
     expect(data.sessions).toHaveLength(1);
     expect(data.sessions[0].id).toBe(s1.id);
   });
@@ -81,7 +81,7 @@ describe("SessionRegistry", () => {
     reg1.flush();
 
     const reg2 = new SessionRegistry(registryDir);
-    const data = reg2.getChatSessions("oc_chat1");
+    const data = reg2.getChatSessions("oc_chat1")!;
     expect(data.sessions).toHaveLength(2);
     expect(data.active).toBeDefined();
   });

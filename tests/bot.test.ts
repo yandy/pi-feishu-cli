@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Bot } from "../src/bot.js";
-import { SessionRegistry } from "../src/session-registry.js";
-import type { FeishuEvent } from "../src/poller.js";
+import { Bot } from "../src/im/bot.js";
+import { SessionRegistry } from "../src/im/session-registry.js";
+import type { FeishuEvent } from "../src/im/types.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
@@ -9,26 +9,21 @@ import { existsSync, mkdirSync } from "node:fs";
 function makeMsgEvent(
   chatId: string,
   text: string,
-  mentions?: Array<{ key: string; name: string }>,
-  threadId?: string
+  chatType: "p2p" | "group" = "group",
+  senderId = "ou_test"
 ): FeishuEvent {
   return {
     type: "im.message.receive_v1",
-    event: {
-      message: {
-        chat_id: chatId,
-        message_id: "om_" + Math.random().toString(36).slice(2),
-        parent_id: threadId,
-        message_type: "text",
-        content: JSON.stringify({ text }),
-        mentions,
-      },
-      sender: {
-        sender_id: { open_id: "ou_test" },
-        sender_type: "user",
-      },
-    },
-    raw: {},
+    chat_id: chatId,
+    chat_type: chatType,
+    content: text,
+    message_id: "om_" + Math.random().toString(36).slice(2),
+    message_type: "text",
+    sender_id: senderId,
+    create_time: String(Date.now()),
+    event_id: "ev_" + Math.random().toString(36).slice(2),
+    timestamp: String(Date.now()),
+    raw: { type: "im.message.receive_v1" },
   };
 }
 
@@ -41,7 +36,7 @@ describe("Bot routing", () => {
     tmpDir = join(tmpdir(), "pi-feishu-cli-test-bot-" + Date.now());
     if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
     registry = new SessionRegistry(tmpDir);
-    bot = new Bot(registry, "mention");
+    bot = new Bot(registry, "mention", "MyBot");
   });
 
   it("detects /new command", () => {
@@ -89,16 +84,49 @@ describe("Bot routing", () => {
     }
   });
 
-  it("routes regular text as message in mention mode", () => {
-    const event = makeMsgEvent("oc_chat1", "你好");
+  it("routes p2p text as message in mention mode", () => {
+    const event = makeMsgEvent("oc_chat1", "你好", "p2p");
+    const result = bot.route(event);
+    expect(result.type).toBe("message");
+  });
+
+  it("skips group text without @mention in mention mode", () => {
+    const event = makeMsgEvent("oc_chat1", "你好", "group");
+    const result = bot.route(event);
+    expect(result.type).toBe("skip");
+  });
+
+  it("routes group text with @mention in mention mode", () => {
+    const event = makeMsgEvent("oc_chat1", "@MyBot 你好", "group");
     const result = bot.route(event);
     expect(result.type).toBe("message");
   });
 
   it("routes all messages in open mode", () => {
     const openBot = new Bot(registry, "open");
-    const event = makeMsgEvent("oc_chat1", "你好");
+    const event = makeMsgEvent("oc_chat1", "你好", "group");
     const result = openBot.route(event);
     expect(result.type).toBe("message");
+  });
+
+  it("routes command in group with mention strategy even without @", () => {
+    const event = makeMsgEvent("oc_chat1", "/new test", "group");
+    const result = bot.route(event);
+    expect(result.type).toBe("command");
+    if (result.type === "command") {
+      expect(result.command).toBe("new");
+    }
+  });
+
+  it("skips empty content events", () => {
+    const event = { ...makeMsgEvent("oc_chat1", "", "p2p"), content: "", message_type: "image" };
+    const result = bot.route(event);
+    expect(result.type).toBe("skip");
+  });
+
+  it("skips bot sender messages", () => {
+    const event = makeMsgEvent("oc_chat1", "hello", "p2p", "bot_12345");
+    const result = bot.route(event);
+    expect(result.type).toBe("skip");
   });
 });

@@ -4,7 +4,7 @@ import {
   renderCodeBlock,
   splitLongMessage,
   MESSAGE_MAX_LENGTH,
-} from "../src/renderer.js";
+} from "../src/im/renderer.js";
 
 describe("renderText", () => {
   it("returns plain text unchanged", () => {

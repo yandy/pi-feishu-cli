@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig, DEFAULT_CONFIG } from "../src/config.js";
+import { loadConfig, DEFAULT_CONFIG } from "../src/im/config.js";
 
 describe("loadConfig", () => {
   const tmpDir = join(tmpdir(), "pi-feishu-cli-test-config");
@@ -20,40 +20,51 @@ describe("loadConfig", () => {
   it("returns defaults when no config file exists", () => {
     const config = loadConfig(tmpDir);
     expect(config.strategy).toBe(DEFAULT_CONFIG.strategy);
-    expect(config.pollInterval).toBe(DEFAULT_CONFIG.pollInterval);
     expect(config.model).toBeUndefined();
-    expect(config.autoStart).toBe(DEFAULT_CONFIG.autoStart);
+    expect(config.botName).toBeUndefined();
   });
 
   it("loads and merges partial config", () => {
-    writeFileSync(configPath, JSON.stringify({ strategy: "open", pollInterval: 10 }));
+    writeFileSync(configPath, JSON.stringify({ strategy: "open" }));
     const config = loadConfig(tmpDir);
     expect(config.strategy).toBe("open");
-    expect(config.pollInterval).toBe(10);
+    expect(config.model).toBeUndefined();
+    expect(config.botName).toBeUndefined();
   });
 
-  it("loads full config", () => {
+  it("loads full config with botName", () => {
     writeFileSync(configPath, JSON.stringify({
       strategy: "mention",
       model: "anthropic/claude-sonnet",
-      pollInterval: 3,
-      autoStart: true,
+      botName: "MyBot",
     }));
     const config = loadConfig(tmpDir);
     expect(config.strategy).toBe("mention");
     expect(config.model).toBe("anthropic/claude-sonnet");
-    expect(config.pollInterval).toBe(3);
-    expect(config.autoStart).toBe(true);
+    expect(config.botName).toBe("MyBot");
   });
 
   it("ignores extra unknown fields", () => {
     writeFileSync(configPath, JSON.stringify({
       strategy: "open",
-      pollInterval: 5,
       unknownField: "should be ignored",
     }));
     const config = loadConfig(tmpDir);
     expect(config.strategy).toBe("open");
-    expect((config as Record<string, unknown>).unknownField).toBeUndefined();
+    expect((config as unknown as Record<string, unknown>).unknownField).toBeUndefined();
+  });
+
+  it("uses configDir to determine config file path", () => {
+    const otherDir = join(tmpdir(), "pi-feishu-cli-test-config-other");
+    const otherConfigPath = join(otherDir, "config.json");
+    if (!existsSync(otherDir)) mkdirSync(otherDir, { recursive: true });
+    try {
+      writeFileSync(otherConfigPath, JSON.stringify({ strategy: "open" }));
+      const config = loadConfig(otherDir);
+      expect(config.strategy).toBe("open");
+    } finally {
+      try { unlinkSync(otherConfigPath); } catch {}
+      try { rmdirSync(otherDir); } catch {}
+    }
   });
 });
