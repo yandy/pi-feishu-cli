@@ -10,19 +10,13 @@ pi install ./pi-feishu-cli
 
 ## 启动
 
-**方式一：Pi 内命令**
+在 Pi 中通过扩展命令启动守护进程：
 
 ```
 /feishu-im start    启动守护进程
 /feishu-im status   查看状态
 /feishu-im stop     停止守护进程
 /feishu-im restart  重启守护进程
-```
-
-**方式二：CLI flag**
-
-```bash
-pi --feishu-im
 ```
 
 首次启动会自动检查 `lark-cli` 是否安装和配置，如未完成会给出引导提示。
@@ -39,43 +33,47 @@ pi --feishu-im
 ```json
 {
   "strategy": "mention",
-  "model": "anthropic/claude-sonnet-4-20250514",
-  "pollInterval": 5
+  "model": "anthropic/claude-sonnet-4-20250514"
 }
 ```
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `strategy` | `"open"` \| `"mention"` | `"mention"` | 群聊策略：mention 仅回复 @机器人，open 回复全部 |
+| `strategy` | `"open"` \| `"mention"` | `"mention"` | 群聊策略：mention 仅回复 @机器人的消息，open 回复全部。**私聊不受此限制**，始终回复 |
 | `model` | `string` | 空 | 新会话默认模型，不设置则用 Pi 默认 |
-| `pollInterval` | `number` | `5` | 长轮询间隔（秒） |
+| `botName` | `string` | 空 | 机器人名称，用于群聊 @ 匹配（不设置则按任意 @ 匹配） |
 
 ## 架构
 
 ```
-pi TUI → extension(/feishu-im start)
-                    │
-               spawn daemon
-                    │
-         ┌──────────▼──────────┐
-         │  守护进程 (Node.js)   │
-         │  ┌───────────────┐  │
-         │  │  长轮询事件     │  │
-         │  └───────┬───────┘  │
-         │          ▼          │
-         │  ┌───────────────┐  │
-         │  │  消息路由 Bot   │  │
-         │  │  命令/对话分发  │  │
-         │  └───────┬───────┘  │
-         │          ▼          │
-         │  ┌───────────────┐  │
-         │  │  Pi SDK Agent  │  │
-         │  │  处理消息回复   │  │
-         │  └───────────────┘  │
-         └─────────────────────┘
+Pi extension → spawn daemon (jiti loads TS directly)
+                      │
+           ┌──────────▼──────────┐
+           │     daemon.ts        │
+           │  ┌────────────────┐  │
+           │  │  consumer.ts   │  │ 长轮询飞书消息
+           │  │  (长轮询事件)    │  │
+           │  └───────┬───────┘  │
+           │          ▼          │
+           │  ┌────────────────┐  │
+           │  │  processor.ts  │  │ 消息路由 Bot
+           │  │  命令/对话分发   │  │ 命令/对话分发
+           │  └───────┬───────┘  │
+           │          ▼          │
+           │  ┌────────────────┐  │
+           │  │  messaging.ts  │  │ Pi SDK 交互
+           │  │  消息收发+Agent  │  │ 处理消息回复
+           │  └────────────────┘  │
+           │                      │
+           │  shared services:    │
+           │  bot.ts / cards.ts   │
+           │  renderer.ts /       │
+           │  session-registry.ts │
+           │  config.ts / logger  │
+           └──────────────────────┘
 ```
 
-守护进程独立于 Pi TUI 运行，关闭 Pi 后仍可继续对话。
+守护进程使用 `jiti` 直接加载 TypeScript，无需预编译。独立于 Pi TUI 运行，关闭 Pi 后仍可继续对话。
 
 ## 飞书内命令
 
@@ -94,6 +92,7 @@ pi TUI → extension(/feishu-im start)
 ├── feishu-im/
 │   ├── config.json         # 配置
 │   ├── daemon.pid          # PID
+│   ├── daemon.log          # 日志
 │   └── registry.json       # 飞书↔Pi 会话映射
 └── sessions/               # Pi session 文件
 ```
