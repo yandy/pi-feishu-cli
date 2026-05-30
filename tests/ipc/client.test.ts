@@ -92,4 +92,61 @@ describe("IPCClient", () => {
     const client = createIPCClient(SOCK);
     expect(() => client.send({ type: "shutdown" })).toThrow("Not connected");
   });
+
+  it("handles bye message from server", async () => {
+    server = await startServer();
+    const client1 = createIPCClient(SOCK);
+    await client1.connect();
+
+    const client2 = createIPCClient(SOCK);
+    const messages: any[] = [];
+    const disconnectPromise = new Promise<void>((resolve) => {
+      client2.on("disconnect", () => resolve());
+    });
+    client2.on("message", (msg: any) => messages.push(msg));
+
+    await client2.connect();
+    await disconnectPromise;
+
+    expect(messages.length).toBe(1);
+    expect(messages[0]).toEqual({ type: "bye", reason: "already connected" });
+    expect(client1.connected).toBe(true);
+
+    client1.disconnect();
+  });
+
+  it("connect() rejects on bad path", async () => {
+    const client = createIPCClient("/tmp/nonexistent-path-xyz.sock");
+    await expect(client.connect()).rejects.toThrow();
+    expect(client.connected).toBe(false);
+  });
+
+  it("connect() when already connected resolves immediately", async () => {
+    server = await startServer();
+    const client = createIPCClient(SOCK);
+    await client.connect();
+    expect(client.connected).toBe(true);
+
+    const result = await client.connect();
+    expect(result).toBe(true);
+
+    client.disconnect();
+  });
+
+  it("emits error on malformed message", async () => {
+    server = await startServer();
+    const client = createIPCClient(SOCK);
+    await client.connect();
+
+    const errorPromise = new Promise<Error>((resolve) => {
+      client.on("error", (err: Error) => resolve(err));
+    });
+
+    server!.activeSocket!.write("not valid json\n");
+
+    const err = await errorPromise;
+    expect(err).toBeInstanceOf(Error);
+
+    client.disconnect();
+  });
 });

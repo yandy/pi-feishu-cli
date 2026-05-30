@@ -6,6 +6,7 @@ export class IPCClient {
   private socketPath: string;
   private listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
   private buffer = "";
+  private _connecting = false;
 
   constructor(socketPath: string) {
     this.socketPath = socketPath;
@@ -31,7 +32,10 @@ export class IPCClient {
         return;
       }
 
+      this._connecting = true;
+
       this.socket = net.createConnection(this.socketPath, () => {
+        this._connecting = false;
         resolve(true);
       });
 
@@ -57,12 +61,18 @@ export class IPCClient {
       });
 
       this.socket.on("close", () => {
+        if (this._connecting) {
+          this._connecting = false;
+          reject(new Error("Connection closed"));
+          return;
+        }
         this.socket = null;
         this.emit("disconnect");
       });
 
       this.socket.on("error", (err) => {
-        if (!this.socket) {
+        if (this._connecting) {
+          this._connecting = false;
           reject(err);
           return;
         }
