@@ -72,15 +72,21 @@ export default function(pi: ExtensionAPI) {
     let injectSequence = 0;
 
     type NotifyFn = (msg: string, level?: "error" | "info" | "warning") => void;
-    async function getClient(ctx: { ui: { notify: NotifyFn } }): Promise<IPCClient | null> {
-        if (ipcClient?.connected) return ipcClient;
+    type OnMessageFn = (msg: DaemonMessage) => void;
+    async function getClient(
+        ctx: { ui: { notify: NotifyFn } },
+        onMessage?: OnMessageFn,
+    ): Promise<IPCClient | null> {
+        if (ipcClient?.connected) {
+            if (onMessage) ipcClient.on("message", onMessage);
+            return ipcClient;
+        }
 
         if (!isDaemonRunning()) {
             spawnDaemon();
             ctx.ui.notify("Daemon spawned, waiting for socket...", "info");
             if (!(await waitForSocket())) {
                 let detail = "socket not created within timeout";
-                // Try to read the daemon log for diagnostics
                 const logPath = `${FEISHU_IM_DIR}/daemon.log`;
                 try {
                     if (existsSync(logPath)) {
@@ -97,6 +103,11 @@ export default function(pi: ExtensionAPI) {
         }
 
         ipcClient = createIPCClient(SOCKET_PATH);
+
+        if (onMessage) {
+            ipcClient.on("message", onMessage);
+        }
+
         try {
             await ipcClient.connect();
         } catch (err) {
@@ -126,12 +137,7 @@ export default function(pi: ExtensionAPI) {
 
             switch (subcommand) {
                 case "start": {
-                    const client = await getClient(ctx);
-                    if (!client) return;
-
-                    ctx.ui.notify("Connected to daemon", "info");
-
-                    client.on("message", async (msg: DaemonMessage) => {
+                    const client = await getClient(ctx, async (msg) => {
                         switch (msg.type) {
                             case "ready": {
                                 ctx.ui.notify(`Feishu bot online: ${msg.botIdentity.name}`, "info");
@@ -193,7 +199,9 @@ export default function(pi: ExtensionAPI) {
                             }
                         }
                     });
+                    if (!client) return;
 
+                    ctx.ui.notify("Connected to daemon", "info");
                     client.send({ type: "status" });
                     break;
                 }

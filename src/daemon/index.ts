@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, existsSync, createWriteStream, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync, createWriteStream, rmSync, unlinkSync } from "node:fs";
 import { createIPCServer } from "../ipc/server.js";
 import { createFeishuChannel, type Channel } from "../channel/index.js";
 import { loadAuth, saveAuth } from "../auth/index.js";
@@ -17,15 +17,17 @@ async function main() {
 
   log("info", `Daemon started (pid=${process.pid})`);
 
-  const cleanup = () => {
+  const cleanup = async () => {
     log("info", "Daemon shutting down");
     try { rmSync(PID_FILE); } catch {}
+    try { unlinkSync(SOCKET_PATH); } catch {}
+    await ipcServer.close().catch(() => {});
     logStream.end();
     process.exit(0);
   };
 
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
+  process.on("SIGINT", () => { void cleanup(); });
+  process.on("SIGTERM", () => { void cleanup(); });
 
   const ipcServer = createIPCServer(SOCKET_PATH);
   await ipcServer.listen();
@@ -184,7 +186,7 @@ async function main() {
       case "shutdown": {
         log("info", "Shutdown requested via IPC");
         try { await channel?.disconnect(); } catch {}
-        cleanup();
+        await cleanup();
         break;
       }
     }

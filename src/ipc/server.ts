@@ -4,7 +4,7 @@ import { parseMessage, stringifyMessage, type DaemonMessage, type ExtensionMessa
 
 export class IPCServer {
   private server: net.Server | null = null;
-  private _activeSocket: net.Socket | null = null;
+  private _sockets: Set<net.Socket> = new Set();
   private socketPath: string;
   private listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
 
@@ -17,7 +17,18 @@ export class IPCServer {
   }
 
   get activeSocket(): net.Socket | null {
-    return this._activeSocket && !this._activeSocket.destroyed ? this._activeSocket : null;
+    for (const sock of this._sockets) {
+      if (!sock.destroyed) return sock;
+    }
+    return null;
+  }
+
+  get socketCount(): number {
+    let count = 0;
+    for (const sock of this._sockets) {
+      if (!sock.destroyed) count++;
+    }
+    return count;
   }
 
   on(event: string, handler: (...args: any[]) => void): void {
@@ -36,15 +47,7 @@ export class IPCServer {
       }
 
       this.server = net.createServer((socket) => {
-        if (this._activeSocket && !this._activeSocket.destroyed) {
-          socket.write(stringifyMessage({ type: "bye", reason: "already connected" }));
-          socket.end();
-          socket.on("error", () => {});
-          this.emit("reject");
-          return;
-        }
-
-        this._activeSocket = socket;
+        this._sockets.add(socket);
         let buffer = "";
 
         socket.on("data", (data: Buffer) => {
@@ -64,7 +67,7 @@ export class IPCServer {
         });
 
         socket.on("close", () => {
-          this._activeSocket = null;
+          this._sockets.delete(socket);
           this.emit("disconnect");
         });
 
@@ -92,19 +95,25 @@ export class IPCServer {
   }
 
   sendToClient(msg: DaemonMessage): boolean {
-    const sock = this.activeSocket;
-    if (!sock) return false;
-    this.send(sock, msg);
-    return true;
+    let sent = false;
+    for (const sock of this._sockets) {
+      if (!sock.destroyed) {
+        this.send(sock, msg);
+        sent = true;
+      }
+    }
+    return sent;
   }
 
   close(): Promise<void> {
     return new Promise((resolve) => {
-      if (this._activeSocket && !this._activeSocket.destroyed) {
-        this._activeSocket.end();
-        this._activeSocket.destroy();
-        this._activeSocket = null;
+      for (const sock of this._sockets) {
+        if (!sock.destroyed) {
+          sock.end();
+          sock.destroy();
+        }
       }
+      this._sockets.clear();
       if (this.server) {
         this.server.close((err) => {
           if (err) this.emit("error", err);
