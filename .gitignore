@@ -1,5 +1,6 @@
 node_modules/
 dist/
 *.pid
+*.sock
 .DS_Store
 .pi/
