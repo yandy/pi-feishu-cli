@@ -30,6 +30,10 @@ describe("parseBotCommand", () => {
     expect(parseBotCommand(" /help")).toBeNull();
   });
 
+  it("returns null for bare /", () => {
+    expect(parseBotCommand("/")).toBeNull();
+  });
+
   it("ignores extra args after command", () => {
     expect(parseBotCommand("/sessions extra")).toBe("sessions");
     expect(parseBotCommand("/model claude-3")).toBe("model");

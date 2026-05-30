@@ -6,11 +6,9 @@ export const BOT_COMMANDS = {
 
 export type BotCommand = keyof typeof BOT_COMMANDS;
 
-const COMMAND_MAP: Record<string, BotCommand> = {
-  "/help": "help",
-  "/sessions": "sessions",
-  "/model": "model",
-};
+const COMMAND_MAP = Object.fromEntries(
+  Object.entries(BOT_COMMANDS).map(([key, value]) => [value, key])
+) as Record<string, BotCommand>;
 
 export function parseBotCommand(content: string): BotCommand | null {
   if (!content.startsWith("/")) return null;
