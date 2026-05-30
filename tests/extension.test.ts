@@ -9,18 +9,13 @@ vi.mock("node:child_process", () => ({
 }));
 
 vi.mock("node:fs", () => {
-  let pidFileContent = "";
   return {
-    readFileSync: vi.fn(() => pidFileContent),
+    readFileSync: vi.fn(() => ""),
     writeFileSync: vi.fn(),
     unlinkSync: vi.fn(),
     existsSync: vi.fn(() => false),
   };
 });
-
-vi.mock("../src/im/paths.js", () => ({
-  PID_FILE: "/tmp/test-daemon.pid",
-}));
 
 describe("extension module", () => {
   it("exports default function that registers command", async () => {

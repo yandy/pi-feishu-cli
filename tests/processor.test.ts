@@ -1,13 +1,42 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
+// Mock messaging.ts (external I/O — lark-cli calls)
 vi.mock("../src/im/messaging.js", () => ({
   sendMessage: vi.fn().mockResolvedValue(true),
   setTypingStatus: vi.fn().mockResolvedValue(true),
 }));
 
+// Mock logger.ts (file I/O)
 vi.mock("../src/im/logger.js", () => ({
   log: vi.fn(),
 }));
+
+// Mock pi-coding-agent (external dependency — avoid calling real services)
+vi.mock("@earendil-works/pi-coding-agent", () => {
+  let lineHandler: ((line: string) => void) | null = null;
+  return {
+    createAgentSessionFromServices: vi.fn().mockResolvedValue({
+      session: {
+        subscribe: vi.fn((handler: (e: unknown) => void) => {
+          lineHandler = (line: string) => handler({
+            type: "agent_end",
+            messages: [{ role: "assistant", content: [{ type: "text", text: line }] }],
+          });
+        }),
+        prompt: vi.fn().mockImplementation(async () => {
+          if (lineHandler) lineHandler("hello from test");
+        }),
+        dispose: vi.fn(),
+      },
+    }),
+    SessionManager: {
+      open: vi.fn().mockReturnValue({}),
+      inMemory: vi.fn().mockReturnValue({}),
+    },
+  };
+});
+
+vi.mock("@earendil-works/pi-ai", () => ({}));
 
 describe("processItem — command type", () => {
   afterEach(() => { vi.clearAllMocks(); });
@@ -97,9 +126,9 @@ describe("processItem — command type", () => {
 describe("processItem — message type", () => {
   afterEach(() => { vi.clearAllMocks(); });
 
-  it("handles message and calls setTypingStatus before and after", async () => {
+  it("handles message and calls setTypingStatus then sendMessage", async () => {
     const { processItem } = await import("../src/im/processor.js");
-    const { setTypingStatus } = await import("../src/im/messaging.js");
+    const { setTypingStatus, sendMessage } = await import("../src/im/messaging.js");
 
     const tmpdir = await import("node:os").then(o => o.tmpdir());
     const { SessionRegistry } = await import("../src/im/session-registry.js");
@@ -128,6 +157,10 @@ describe("processItem — message type", () => {
 
     await processItem(queuedItem, { services: {} }, registry, "/tmp/agent", "claude-sonnet");
 
-    expect(setTypingStatus).toHaveBeenCalled();
+    expect(setTypingStatus).toHaveBeenCalledWith("om_125", true);
+    expect(sendMessage).toHaveBeenCalled();
+    expect((sendMessage as ReturnType<typeof vi.fn>).mock.calls.some(
+      (call: unknown[]) => call[1] === "oc_test"
+    )).toBe(true);
   });
 });

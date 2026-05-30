@@ -2,8 +2,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn, execSync } from "node:child_process";
 import { readFileSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { PID_FILE } from "./im/paths.js";
+
+const FEISHU_IM_DIR = join(homedir(), ".pi", "agent", "feishu-im");
+const PID_FILE = join(FEISHU_IM_DIR, "daemon.pid");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,22 +53,27 @@ async function handleStart(ctx: { ui: { notify: (message: string, type?: "info" 
     return;
   }
 
-  const daemonPath = join(__dirname, "im", "daemon.ts");
+  try {
+    const daemonPath = join(__dirname, "im", "daemon.ts");
 
-  const child = spawn("node", ["--import", "jiti/register", daemonPath], {
-    detached: true,
-    stdio: "ignore",
-    env: { ...process.env, PI_FEISHU_IM: "1" },
-  });
+    const child = spawn("node", ["--import", "jiti/register", daemonPath], {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, PI_FEISHU_IM: "1" },
+    });
 
-  child.unref();
+    child.unref();
 
-  await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
 
-  if (isRunning()) {
-    ctx.ui.notify(`飞书 IM 守护进程已启动 (PID: ${getPid()})`, "info");
-  } else {
-    ctx.ui.notify("飞书 IM 守护进程启动失败，请检查日志", "error");
+    if (isRunning()) {
+      ctx.ui.notify(`飞书 IM 守护进程已启动 (PID: ${getPid()})`, "info");
+    } else {
+      ctx.ui.notify("飞书 IM 守护进程启动失败，请检查日志", "error");
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    ctx.ui.notify(`飞书 IM 启动失败: ${msg}`, "error");
   }
 }
 
