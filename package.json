@@ -18,7 +18,8 @@
     "skills": ["./skills"]
   },
   "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.66.0"
+    "@larksuiteoapi/node-sdk": "^1.66.0",
+    "jiti": "^2.0.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
