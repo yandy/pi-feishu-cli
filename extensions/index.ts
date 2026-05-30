@@ -207,6 +207,14 @@ export default function(pi: ExtensionAPI) {
                 }
 
                 case "stop": {
+                    if (ipcClient?.connected) {
+                        ipcClient.send({ type: "shutdown" });
+                        ipcClient.disconnect();
+                        ipcClient = null;
+                        ctx.ui.notify("Shutdown sent, daemon will stop", "info");
+                        return;
+                    }
+
                     if (!existsSync(SOCKET_PATH)) {
                         ctx.ui.notify("Daemon is not running", "info");
                         return;
@@ -221,14 +229,16 @@ export default function(pi: ExtensionAPI) {
                     } catch {
                         ctx.ui.notify("Failed to connect to daemon", "error");
                     }
-
-                    ipcClient?.disconnect();
-                    ipcClient = null;
                     break;
                 }
 
                 case "restart": {
-                    if (existsSync(SOCKET_PATH)) {
+                    if (ipcClient?.connected) {
+                        ipcClient.send({ type: "shutdown" });
+                        ipcClient.disconnect();
+                        ipcClient = null;
+                        await new Promise((r) => setTimeout(r, 500));
+                    } else if (existsSync(SOCKET_PATH)) {
                         try {
                             const client = createIPCClient(SOCKET_PATH);
                             await client.connect();
@@ -240,8 +250,6 @@ export default function(pi: ExtensionAPI) {
 
                     try { rmSync(SOCKET_PATH); } catch { }
                     try { rmSync(PID_FILE); } catch { }
-                    ipcClient?.disconnect();
-                    ipcClient = null;
 
                     const client = await getClient(ctx);
                     if (client) {
@@ -251,6 +259,11 @@ export default function(pi: ExtensionAPI) {
                 }
 
                 case "status": {
+                    if (ipcClient?.connected) {
+                        ipcClient.send({ type: "status" });
+                        return;
+                    }
+
                     if (!isDaemonRunning()) {
                         ctx.ui.notify("Daemon is not running", "info");
                         return;
