@@ -1,15 +1,11 @@
-import { createLarkChannel, LoggerLevel, type NormalizedMessage, type CardActionEvent } from "@larksuiteoapi/node-sdk";
+import { createLarkChannel, LoggerLevel, type OutboundConfig, type NormalizedMessage, type CardActionEvent } from "@larksuiteoapi/node-sdk";
 
 export type { NormalizedMessage, CardActionEvent };
 
 export interface CreateChannelOptions {
   appId: string;
   appSecret: string;
-  outbound?: {
-    streamInitialText?: string;
-    streamThrottleMs?: number;
-    streamThrottleChars?: number;
-  };
+  outbound?: Partial<OutboundConfig>;
 }
 
 export interface Channel {

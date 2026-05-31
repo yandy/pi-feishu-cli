@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { createFeishuChannel, type Channel } from "../../src/channel/index.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createFeishuChannel } from "../../src/channel/index.js";
 
-vi.mock("@larksuiteoapi/node-sdk", () => ({
+const { createLarkChannel } = vi.hoisted(() => ({
   createLarkChannel: vi.fn((opts: any) => ({
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -11,13 +11,19 @@ vi.mock("@larksuiteoapi/node-sdk", () => ({
     stream: vi.fn(),
     updateCard: vi.fn(),
   })),
+}));
+
+vi.mock("@larksuiteoapi/node-sdk", () => ({
+  createLarkChannel,
   LoggerLevel: { info: "info" },
 }));
 
-describe("Channel outbound config", () => {
-  it("should pass outbound.streamInitialText to createLarkChannel", async () => {
-    const { createLarkChannel } = await import("@larksuiteoapi/node-sdk");
+beforeEach(() => {
+  createLarkChannel.mockClear();
+});
 
+describe("Channel outbound config", () => {
+  it("should pass outbound.streamInitialText to createLarkChannel", () => {
     createFeishuChannel({
       appId: "a",
       appSecret: "s",
@@ -31,13 +37,10 @@ describe("Channel outbound config", () => {
     );
   });
 
-  it("should not pass outbound when undefined", async () => {
-    const { createLarkChannel } = await import("@larksuiteoapi/node-sdk");
-    vi.mocked(createLarkChannel).mockClear();
-
+  it("should not pass outbound when undefined", () => {
     createFeishuChannel({ appId: "a", appSecret: "s" });
 
-    const callOpts = vi.mocked(createLarkChannel).mock.calls[0][0];
+    const callOpts = createLarkChannel.mock.calls[0][0];
     expect(callOpts).not.toHaveProperty("outbound");
   });
 });
