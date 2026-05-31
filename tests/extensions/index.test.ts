@@ -1,8 +1,81 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import type { ExtensionAPI, RegisteredCommand } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { EventEmitter } from "node:events";
+import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { FEISHU_IM_DIR, PID_FILE, REGISTRY_FILE } from "../../src/config.js";
+
+// ---- Mock IPC client so getClient() doesn't need a real daemon ----
+
+let mockIPC: MockIPCClient | null = null;
+
+class MockIPCClient extends EventEmitter {
+  connected = true;
+  connect = vi.fn<() => Promise<true>>().mockResolvedValue(true);
+  send = vi.fn();
+  disconnect = vi.fn();
+}
+
+vi.mock("../../src/ipc/client.js", () => ({
+  createIPCClient: vi.fn(() => {
+    mockIPC = new MockIPCClient();
+    return mockIPC;
+  }),
+}));
+
+function createFreshSessionCtx(overrides: Record<string, unknown> = {}) {
+  return {
+    sessionManager: {
+      getSessionFile: vi.fn(() => "/tmp/test-session.json"),
+    },
+    modelRegistry: {
+      getAvailable: vi.fn(() => []),
+      find: vi.fn(() => null),
+    },
+    model: undefined,
+    ui: { notify: vi.fn(), input: vi.fn() },
+    sendUserMessage: vi.fn(),
+    ...overrides,
+  };
+}
+
+function createStaleAwareCtx() {
+  let stale = false;
+  const freshCtx = createFreshSessionCtx();
+
+  const assertNotStale = (target: string) => {
+    if (stale) throw new Error(`stale ctx: ${target}`);
+  };
+
+  return {
+    _freshCtx: freshCtx,
+    newSession: vi.fn(async (opts?: { withSession?: (ctx: any) => Promise<void> }) => {
+      stale = true;
+      if (opts?.withSession) await opts.withSession(freshCtx);
+    }),
+    switchSession: vi.fn(async (_path: string, opts?: { withSession?: (ctx: any) => Promise<void> }) => {
+      stale = true;
+      if (opts?.withSession) await opts.withSession(freshCtx);
+    }),
+    sessionManager: {
+      getSessionFile: vi.fn(() => {
+        assertNotStale("sessionManager.getSessionFile");
+        return undefined;
+      }),
+    },
+    modelRegistry: {
+      getAvailable: vi.fn(() => {
+        assertNotStale("modelRegistry.getAvailable");
+        return [];
+      }),
+      find: vi.fn(() => null),
+    },
+    model: undefined,
+    ui: { notify: vi.fn(), input: vi.fn() },
+  };
+}
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = join(moduleDir, "../..");
@@ -102,4 +175,181 @@ describe("daemon spawn integration", () => {
     child.kill("SIGTERM");
     await new Promise((r) => setTimeout(r, 200));
   }, 10000);
+});
+
+describe("stale ctx prevention after newSession / switchSession", () => {
+  beforeAll(() => {
+    mkdirSync(FEISHU_IM_DIR, { recursive: true });
+    writeFileSync(PID_FILE, String(process.pid));
+  });
+
+  afterAll(() => {
+    try { unlinkSync(PID_FILE); } catch {}
+  });
+
+  beforeEach(() => {
+    mockIPC = null;
+    try { unlinkSync(REGISTRY_FILE); } catch {}
+  });
+
+  afterEach(async () => {
+    mockIPC = null;
+    // Drain pending rejections from async handlers that crashed
+    await new Promise((r) => setTimeout(r, 30));
+  });
+
+  function setupExtension() {
+    const { api, commands } = createMockAPI();
+    (api as any).sendUserMessage = vi.fn();
+    (api as any).setModel = vi.fn(async () => true);
+    return { api, commands };
+  }
+
+  it("calls newSession WITH a withSession callback for bot command on new chat", async () => {
+    // Write registry BEFORE init so loadRegistry() picks it up
+    writeFileSync(REGISTRY_FILE, JSON.stringify({}));
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = createStaleAwareCtx();
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "message",
+      chatId: "test-chat-new",
+      content: "/sessions",
+    });
+
+    await vi.waitFor(() => {
+      expect(ctx.newSession).toHaveBeenCalled();
+    });
+
+    const firstCallArg = ctx.newSession.mock.calls[0][0];
+    // RED: with current code, newSession() is called WITHOUT withSession
+    // This assertion will FAIL — which is what TDD expects
+    expect(firstCallArg).toBeDefined();
+    expect(firstCallArg!.withSession).toBeDefined();
+    expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
+    // The stale ctx's getSessionFile must NOT have been called
+    expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
+  });
+
+  it("calls switchSession WITH a withSession callback for bot command on existing chat", async () => {
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-ex": "/tmp/.pi/test-session.json" }));
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = createStaleAwareCtx();
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "message",
+      chatId: "test-chat-ex",
+      content: "/sessions",
+    });
+
+    await vi.waitFor(() => {
+      expect(ctx.switchSession).toHaveBeenCalled();
+    });
+
+    const firstCallArg = ctx.switchSession.mock.calls[0][1];
+    expect(firstCallArg).toBeDefined();
+    expect(firstCallArg!.withSession).toBeDefined();
+    expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
+    expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
+  });
+
+  it("uses newCtx.sendUserMessage inside withSession after switchSession for user message", async () => {
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-msg": "/tmp/.pi/msg-session.json" }));
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = createStaleAwareCtx();
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "message",
+      chatId: "test-chat-msg",
+      content: "hello world",
+    });
+
+    await vi.waitFor(() => {
+      expect(ctx.switchSession).toHaveBeenCalled();
+    });
+
+    const firstCallArg = ctx.switchSession.mock.calls[0][1];
+    expect(firstCallArg).toBeDefined();
+    // RED: current code does NOT pass withSession for this path
+    expect(firstCallArg!.withSession).toBeDefined();
+    expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
+    expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
+  });
+
+  it("uses withSession when cardAction triggers session switch", async () => {
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-card": "/tmp/.pi/card-session.json" }));
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = createStaleAwareCtx();
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "cardAction",
+      chatId: "test-chat-card",
+      messageId: "msg-1",
+      action: { tag: "button", value: { cmd: "sessions", action: "switch", sessionPath: "/tmp/.pi/other.json" } },
+    });
+
+    await vi.waitFor(() => {
+      expect(ctx.switchSession).toHaveBeenCalled();
+    });
+
+    const firstCallArg = ctx.switchSession.mock.calls[0][1];
+    expect(firstCallArg).toBeDefined();
+    // RED: current code doesn't use withSession in cardAction
+    expect(firstCallArg!.withSession).toBeDefined();
+  });
+
+  it("calls setModel BEFORE switchSession on cardAction model switch and avoids stale getAvailable", async () => {
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-model": "/tmp/.pi/model-session.json" }));
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = createStaleAwareCtx();
+    ctx.modelRegistry.find = vi.fn(() => ({ provider: "openai", id: "gpt-4" })) as any;
+    await cmd.handler!("start", ctx as any);
+
+    const callOrder: string[] = [];
+    const origSetModel = (api as any).setModel;
+    (api as any).setModel = vi.fn(async () => { callOrder.push("setModel"); return true; });
+    const origSwitchSession = ctx.switchSession;
+    ctx.switchSession = vi.fn(async (path: string) => { callOrder.push("switchSession"); });
+
+    mockIPC!.emit("message", {
+      type: "cardAction",
+      chatId: "test-chat-model",
+      messageId: "msg-model",
+      action: { tag: "select_static", option: JSON.stringify({ cmd: "model", action: "select", modelProvider: "openai", modelId: "gpt-4" }) },
+    });
+
+    await vi.waitFor(() => {
+      expect(callOrder.length).toBeGreaterThan(0);
+    });
+
+    // RED: current code calls switchSession first, then setModel
+    // Fix should call setModel before switchSession
+    expect(callOrder[0]).toBe("setModel");
+    // The stale ctx's getAvailable must NOT have been called
+    expect(ctx.modelRegistry.getAvailable).not.toHaveBeenCalled();
+  });
 });

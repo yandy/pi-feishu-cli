@@ -7,7 +7,7 @@ import type { DaemonMessage, ExtensionMessage } from "../src/ipc/protocol.js";
 import { parseBotCommand } from "./bot-commands/router.js";
 import { buildHelpCard } from "./bot-commands/help.js";
 import { buildSessionsCard, handleSessionsAction } from "./bot-commands/sessions.js";
-import { buildModelCard, handleModelAction } from "./bot-commands/model.js";
+import { buildModelCard } from "./bot-commands/model.js";
 
 // Package root directory — used as cwd when spawning the daemon so that jiti
 // resolves from the package's own node_modules regardless of process.cwd().
@@ -165,26 +165,39 @@ export default function(pi: ExtensionAPI) {
                                     if (botCmd !== "help") {
                                         const sessionFile = registry[msg.chatId];
                                         if (!sessionFile) {
-                                            await ctx.newSession();
-                                            const sf = ctx.sessionManager.getSessionFile();
-                                            if (sf) {
-                                                registry[msg.chatId] = sf;
-                                                saveRegistry(registry);
-                                            }
+                                            await ctx.newSession({ withSession: async (newCtx) => {
+                                                const sf = newCtx.sessionManager.getSessionFile();
+                                                if (sf) {
+                                                    registry[msg.chatId] = sf;
+                                                    saveRegistry(registry);
+                                                }
+                                                let card: unknown;
+                                                if (botCmd === "sessions") {
+                                                    card = buildSessionsCard(registry, newCtx.sessionManager.getSessionFile() || "");
+                                                } else if (botCmd === "model") {
+                                                    const models = newCtx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                                    card = buildModelCard(models, newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined);
+                                                }
+                                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                                            }});
                                         } else {
-                                            try { await ctx.switchSession(sessionFile); } catch { }
+                                            try {
+                                                await ctx.switchSession(sessionFile, { withSession: async (newCtx) => {
+                                                    let card: unknown;
+                                                    if (botCmd === "sessions") {
+                                                        card = buildSessionsCard(registry, newCtx.sessionManager.getSessionFile() || "");
+                                                    } else if (botCmd === "model") {
+                                                        const models = newCtx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                                        card = buildModelCard(models, newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined);
+                                                    }
+                                                    sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                                                }});
+                                            } catch { }
                                         }
+                                        return;
                                     }
 
-                                    let card: unknown;
-                                    if (botCmd === "help") {
-                                        card = buildHelpCard();
-                                    } else if (botCmd === "sessions") {
-                                        card = buildSessionsCard(registry, ctx.sessionManager.getSessionFile() || "");
-                                    } else if (botCmd === "model") {
-                                        const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                        card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
-                                    }
+                                    const card = buildHelpCard();
                                     sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
                                     return;
                                 }
@@ -201,15 +214,23 @@ export default function(pi: ExtensionAPI) {
 
                                 const sessionFile = registry[msg.chatId];
                                 if (sessionFile) {
-                                    try { await ctx.switchSession(sessionFile); } catch { }
-                                }
-
-                                await pi.sendUserMessage(prompt);
-
-                                const newSessionFile = ctx.sessionManager.getSessionFile();
-                                if (newSessionFile && !registry[msg.chatId]) {
-                                    registry[msg.chatId] = newSessionFile;
-                                    saveRegistry(registry);
+                                    try {
+                                        await ctx.switchSession(sessionFile, { withSession: async (newCtx) => {
+                                            await newCtx.sendUserMessage(prompt);
+                                            const newSessionFile = newCtx.sessionManager.getSessionFile();
+                                            if (newSessionFile && !registry[msg.chatId]) {
+                                                registry[msg.chatId] = newSessionFile;
+                                                saveRegistry(registry);
+                                            }
+                                        }});
+                                    } catch { }
+                                } else {
+                                    await pi.sendUserMessage(prompt);
+                                    const newSessionFile = ctx.sessionManager.getSessionFile();
+                                    if (newSessionFile && !registry[msg.chatId]) {
+                                        registry[msg.chatId] = newSessionFile;
+                                        saveRegistry(registry);
+                                    }
                                 }
                                 break;
                             }
@@ -229,33 +250,50 @@ export default function(pi: ExtensionAPI) {
                                 if (!parsed) return;
 
                                 if (parsed.cmd === "sessions") {
+                                    const sessionsAction = parsed as unknown as import("./bot-commands/sessions.js").SessionsAction;
+                                    let afterSessionFile: string | undefined;
                                     await handleSessionsAction(
-                                        parsed as unknown as import("./bot-commands/sessions.js").SessionsAction,
+                                        sessionsAction,
                                         {
-                                            switchSession: (p: string) => ctx.switchSession(p),
-                                            newSession: () => ctx.newSession(),
-                                            getSessionFile: () => ctx.sessionManager.getSessionFile(),
+                                            switchSession: async (p: string) => {
+                                                await ctx.switchSession(p, { withSession: async (newCtx) => {
+                                                    afterSessionFile = newCtx.sessionManager.getSessionFile();
+                                                }});
+                                            },
+                                            newSession: async () => {
+                                                await ctx.newSession({ withSession: async (newCtx) => {
+                                                    afterSessionFile = newCtx.sessionManager.getSessionFile();
+                                                }});
+                                            },
+                                            getSessionFile: () => afterSessionFile ?? ctx.sessionManager.getSessionFile(),
                                         },
                                         registry,
                                         msg.chatId,
                                     );
                                     saveRegistry(registry);
-                                    const card = buildSessionsCard(registry, ctx.sessionManager.getSessionFile() || "");
+                                    const card = buildSessionsCard(registry, afterSessionFile ?? ctx.sessionManager.getSessionFile() ?? "");
                                     sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
                                 } else if (parsed.cmd === "model") {
                                     const modelAction = parsed as unknown as import("./bot-commands/model.js").ModelAction;
-                                    const result = await handleModelAction(
-                                        modelAction,
-                                        { switchSession: (p: string) => ctx.switchSession(p), modelRegistry: ctx.modelRegistry },
-                                        registry,
-                                        msg.chatId,
-                                        (m: unknown) => pi.setModel(m as any),
-                                    );
-                                    const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                    const card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
-                                    sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                    if (result) {
-                                        ctx.ui.notify("模型切换成功", "info");
+                                    const model = ctx.modelRegistry.find(modelAction.modelProvider, modelAction.modelId);
+                                    let modelSet = false;
+                                    if (model) {
+                                        await pi.setModel(model as any);
+                                        modelSet = true;
+                                    }
+                                    const sessionPath = registry[msg.chatId];
+                                    if (sessionPath) {
+                                        await ctx.switchSession(sessionPath, { withSession: async (newCtx) => {
+                                            const models = newCtx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                            const card = buildModelCard(models, newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined);
+                                            sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                                            if (modelSet) newCtx.ui.notify("模型切换成功", "info");
+                                        }});
+                                    } else {
+                                        const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                        const card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
+                                        sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                                        if (modelSet) ctx.ui.notify("模型切换成功", "info");
                                     }
                                 }
                                 break;
