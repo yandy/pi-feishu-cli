@@ -426,6 +426,9 @@ describe("activeChatId forwarding", () => {
 
   it("message_update forwards stream using activeChatId", async () => {
     const { api, commands } = setupExtension();
+    // Keep sendUserMessage pending so activeChatId stays set during event dispatch
+    let resolveSend: () => void = () => {};
+    (api as any).sendUserMessage = vi.fn(() => new Promise<void>(r => { resolveSend = r; }));
     const ext = await import("../../extensions/index.js");
     ext.default(api);
 
@@ -466,10 +469,14 @@ describe("activeChatId forwarding", () => {
       chatId: "oc-test-forward",
       content: "reply",
     });
+
+    resolveSend();
   });
 
-  it("message_end sends streamEnd and resets activeChatId", async () => {
+  it("message_end sends streamEnd for the active chat", async () => {
     const { api, commands } = setupExtension();
+    let resolveSend: () => void = () => {};
+    (api as any).sendUserMessage = vi.fn(() => new Promise<void>(r => { resolveSend = r; }));
     const ext = await import("../../extensions/index.js");
     ext.default(api);
 
@@ -497,7 +504,7 @@ describe("activeChatId forwarding", () => {
     )?.[1];
 
     await messageEndHandler(
-      { message: { role: "assistant" } },
+      { message: { role: "assistant", content: [{ type: "text", text: "final" }] } },
       { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
     );
 
@@ -508,7 +515,10 @@ describe("activeChatId forwarding", () => {
     expect(streamEndCalls[0]![0]).toMatchObject({
       type: "streamEnd",
       chatId: "oc-test-end",
+      content: "final",
     });
+
+    resolveSend();
   });
 
   it("handles stale pi.sendUserMessage gracefully without crashing", async () => {
