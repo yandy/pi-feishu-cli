@@ -457,11 +457,15 @@ export default function(pi: ExtensionAPI) {
         if (event.message.role !== "assistant") return;
         if (!activeChatId) return;
 
-        const textContent = event.message.content?.find(
-            (c: { type: string }) => c.type === "text"
-        ) as { text?: string } | undefined;
-        if (textContent?.text) {
-            sendToDaemon({ type: "stream", chatId: activeChatId, content: textContent.text });
+        try {
+            const textContent = event.message.content?.find(
+                (c: { type: string }) => c.type === "text"
+            ) as { text?: string } | undefined;
+            if (textContent?.text) {
+                sendToDaemon({ type: "stream", chatId: activeChatId, content: textContent.text });
+            }
+        } catch (e) {
+            // message_update event structure may differ by model
         }
     });
 
@@ -475,6 +479,16 @@ export default function(pi: ExtensionAPI) {
             forwardingCount = 0;
             activeChatId = null;
         }
-        sendToDaemon({ type: "streamEnd", chatId });
+
+        // Extract final content as fallback in case message_update never fired
+        let finalContent: string | undefined;
+        try {
+            const textContent = event.message.content?.find(
+                (c: { type: string }) => c.type === "text"
+            ) as { text?: string } | undefined;
+            finalContent = textContent?.text;
+        } catch {}
+
+        sendToDaemon({ type: "streamEnd", chatId, content: finalContent });
     });
 }

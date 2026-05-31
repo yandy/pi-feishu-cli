@@ -240,6 +240,15 @@ export async function main() {
         if (session) {
           session.ended = true;
           session.notify();
+        } else if (msg.content) {
+          // Fallback: no stream was active (message_update didn't fire),
+          // send the final content as a regular message
+          try {
+            await channel.send(msg.chatId, { markdown: msg.content });
+            log("info", `Sent fallback message for ${msg.chatId}`);
+          } catch (err) {
+            log("error", `Fallback send failed: ${(err as Error).message}`);
+          }
         }
         break;
       }
