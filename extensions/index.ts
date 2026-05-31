@@ -1,13 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { createIPCClient, type IPCClient } from "../src/ipc/client.js";
 import { FEISHU_IM_DIR, PID_FILE, SOCKET_PATH, REGISTRY_FILE } from "../src/config.js";
 import type { DaemonMessage, ExtensionMessage } from "../src/ipc/protocol.js";
 import { parseBotCommand } from "./bot-commands/router.js";
 import { buildHelpCard } from "./bot-commands/help.js";
 import { buildSessionsCard, handleSessionsAction } from "./bot-commands/sessions.js";
-import { buildModelCard } from "./bot-commands/model.js";
+import { buildModelCard, handleModelAction } from "./bot-commands/model.js";
 
 // Package root directory — used as cwd when spawning the daemon so that jiti
 // resolves from the package's own node_modules regardless of process.cwd().
@@ -283,25 +283,26 @@ export default function(pi: ExtensionAPI) {
                                     sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
                                 } else if (parsed.cmd === "model") {
                                     const modelAction = parsed as unknown as import("./bot-commands/model.js").ModelAction;
-                                    const model = ctx.modelRegistry.find(modelAction.modelProvider, modelAction.modelId);
-                                    let modelSet = false;
-                                    if (model) {
-                                        await pi.setModel(model as any);
-                                        modelSet = true;
-                                    }
+                                    const modelSet = await handleModelAction(
+                                        modelAction,
+                                        {
+                                            switchSession: ctx.switchSession,
+                                            newSession: ctx.newSession,
+                                            modelRegistry: ctx.modelRegistry,
+                                        },
+                                        registry,
+                                        msg.chatId,
+                                        (m) => pi.setModel(m as any),
+                                    );
+                                    saveRegistry(registry);
                                     const sessionPath = registry[msg.chatId];
                                     if (sessionPath) {
-                                        await ctx.switchSession(sessionPath, { withSession: async (newCtx) => {
+                                        await ctx.switchSession(sessionPath, { withSession: async (newCtx: any) => {
                                             const models = newCtx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
                                             const card = buildModelCard(models, newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined);
                                             sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
                                             if (modelSet) newCtx.ui.notify("模型切换成功", "info");
                                         }});
-                                    } else {
-                                        const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                        const card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
-                                        sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                        if (modelSet) ctx.ui.notify("模型切换成功", "info");
                                     }
                                 }
                                 break;
@@ -322,6 +323,14 @@ export default function(pi: ExtensionAPI) {
 
                             case "bye": {
                                 ctx.ui.notify("Connection rejected: daemon already has an active client", "warning");
+                                break;
+                            }
+
+                            case "reaction": {
+                                ctx.ui.notify(
+                                    `用户 ${msg.userId} ${msg.added ? "添加" : "移除"}了表情 ${msg.emoji}`,
+                                    "info",
+                                );
                                 break;
                             }
                         }
@@ -375,7 +384,7 @@ export default function(pi: ExtensionAPI) {
                         } catch { }
                     }
 
-                    try { rmSync(SOCKET_PATH); } catch { }
+                    try { unlinkSync(SOCKET_PATH); } catch { }
                     try { rmSync(PID_FILE); } catch { }
 
                     const client = await getClient(ctx);

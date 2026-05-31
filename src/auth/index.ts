@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { AUTH_FILE } from "../config.js";
 
 export interface AuthCredentials {
   appId: string;
@@ -7,7 +7,7 @@ export interface AuthCredentials {
 }
 
 export function loadAuth(dir: string): AuthCredentials | null {
-  const filePath = join(dir, "auth.json");
+  const filePath = AUTH_FILE;
   try {
     if (!existsSync(filePath)) return null;
     const raw = readFileSync(filePath, "utf-8");
@@ -23,6 +23,6 @@ export function loadAuth(dir: string): AuthCredentials | null {
 
 export function saveAuth(dir: string, appId: string, appSecret: string): void {
   mkdirSync(dir, { recursive: true });
-  const filePath = join(dir, "auth.json");
+  const filePath = AUTH_FILE;
   writeFileSync(filePath, JSON.stringify({ appId, appSecret }, null, 2), "utf-8");
 }

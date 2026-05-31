@@ -41,13 +41,13 @@ pi install npm:pi-feishu-cli
 └─────────────────────┘                  └──────────────────┘
 ```
 
-- **Extension**：运行在 Pi 进程内，注册命令、管理会话映射、监听 Pi 事件实现飞书↔Pi 双向同步
+- **Extension**：运行在 Pi 进程内，注册命令、管理会话映射、监听 Pi 事件实现飞书→Pi 消息转发
 - **Daemon**：独立进程（`spawn` detach + unref），基于 `@larksuiteoapi/node-sdk` Channel 模块维护飞书 WebSocket 长连接，Pi 关闭后仍可运行
 - **IPC**：Unix domain socket (`/tmp/pi-feishu-im.sock`)，JSON-line 协议，Daemon 同时只接受一个 Extension 连接
 
 ## 飞书对话
 
-用户通过飞书机器人发送消息（支持文字、图片、文件等），消息经 Channel SDK 归一化后转发至 Pi。Pi 的回复以流式（markdown）形式返回飞书。飞书与 Pi 终端对话双向同步。
+用户通过飞书机器人发送消息（支持文字、图片、文件等），消息经 Channel SDK 归一化后转发至 Pi。Pi 的回复以流式（markdown）形式返回飞书。
 
 ## 管理操作
 

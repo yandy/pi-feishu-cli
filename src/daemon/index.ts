@@ -91,6 +91,18 @@ export async function main() {
       }
     });
 
+    channel.on("reaction", async (evt) => {
+      log("info", `Reaction from ${(evt as any).chatId}: ${(evt as any).emoji} ${(evt as any).added ? 'added' : 'removed'}`);
+      ipcServer.sendToClient({
+        type: "reaction",
+        messageId: (evt as any).messageId ?? "",
+        chatId: (evt as any).chatId ?? "",
+        userId: (evt as any).userId ?? "",
+        emoji: (evt as any).emoji ?? "",
+        added: (evt as any).added ?? true,
+      });
+    });
+
     channel.on("error", (err: Error) => {
       log("error", `Channel error: ${err.message}`);
       ipcServer.sendToClient({ type: "error", message: err.message });

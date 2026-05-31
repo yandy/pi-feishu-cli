@@ -135,8 +135,11 @@ export async function handleSessionsAction(
       delete registry[chatId];
       break;
     case "delete":
+      await ctx.newSession();
+      const newSessionFile = ctx.getSessionFile();
       rmSync(action.sessionPath, { force: true });
       delete registry[chatId];
+      if (newSessionFile) registry[chatId] = newSessionFile;
       break;
     case "new":
       await ctx.newSession();

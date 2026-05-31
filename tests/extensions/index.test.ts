@@ -332,10 +332,11 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     await cmd.handler!("start", ctx as any);
 
     const callOrder: string[] = [];
-    const origSetModel = (api as any).setModel;
     (api as any).setModel = vi.fn(async () => { callOrder.push("setModel"); return true; });
-    const origSwitchSession = ctx.switchSession;
-    ctx.switchSession = vi.fn(async (path: string) => { callOrder.push("switchSession"); });
+    ctx.switchSession = vi.fn(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
+      callOrder.push("switchSession");
+      await opts?.withSession?.({ modelRegistry: ctx.modelRegistry, model: ctx.model, ui: ctx.ui });
+    });
 
     mockIPC!.emit("message", {
       type: "cardAction",
@@ -345,12 +346,12 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     });
 
     await vi.waitFor(() => {
-      expect(callOrder.length).toBeGreaterThan(0);
+      expect(callOrder.length).toBe(2);
     });
 
-    // RED: current code calls switchSession first, then setModel
-    // Fix should call setModel before switchSession
-    expect(callOrder[0]).toBe("setModel");
+    // switchSession called first to enter session context, then setModel inside withSession
+    expect(callOrder[0]).toBe("switchSession");
+    expect(callOrder[1]).toBe("setModel");
     // The stale ctx's getAvailable must NOT have been called
     expect(ctx.modelRegistry.getAvailable).not.toHaveBeenCalled();
   });

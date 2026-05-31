@@ -35,6 +35,7 @@ vi.mock("../../src/channel/index.js", () => ({
 
 vi.mock("../../src/config.js", () => ({
   FEISHU_IM_DIR: "/tmp/test-pi-feishu-daemon-offline",
+  AUTH_FILE: "/tmp/test-pi-feishu-daemon-offline/auth.json",
   SOCKET_PATH: "/tmp/test-pi-feishu-offline-queue.sock",
   PID_FILE: "/tmp/test-pi-feishu-daemon-offline.pid",
   DAEMON_LOG: "/tmp/test-pi-feishu-daemon-offline.log",

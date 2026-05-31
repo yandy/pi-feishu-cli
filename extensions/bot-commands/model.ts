@@ -78,21 +78,30 @@ export function buildModelCard(
 export async function handleModelAction(
   action: ModelAction,
   ctx: {
-    switchSession: (path: string) => Promise<unknown>;
+    switchSession: (path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => Promise<unknown>;
+    newSession: (opts?: { withSession?: (newCtx: any) => Promise<void> }) => Promise<unknown>;
     modelRegistry: { find: (provider: string, id: string) => unknown };
   },
   registry: Record<string, string>,
   chatId: string,
   setModel: (model: unknown) => Promise<boolean>,
 ): Promise<boolean> {
+  const model = ctx.modelRegistry.find(action.modelProvider, action.modelId);
+  if (!model) return false;
+
   const sessionPath = registry[chatId];
   if (sessionPath) {
-    await ctx.switchSession(sessionPath);
+    await ctx.switchSession(sessionPath, { withSession: async () => {
+      await setModel(model);
+    }});
+  } else {
+    await ctx.newSession({ withSession: async (newCtx: any) => {
+      await setModel(model);
+      const sf = newCtx.sessionManager.getSessionFile();
+      if (sf) {
+        registry[chatId] = sf;
+      }
+    }});
   }
-
-  const model = ctx.modelRegistry.find(action.modelProvider, action.modelId);
-  if (model) {
-    return await setModel(model);
-  }
-  return false;
+  return true;
 }
