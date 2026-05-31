@@ -634,36 +634,40 @@ Expected: 所有测试通过。
 
 ---
 
-### Task 7: 标记历史 spec 中的过期设计
+### Task 7: 标记历史文档中的过期设计
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md`
+- Modify: `docs/superpowers/plans/2026-05-31-daemon-ipc-multi-client-plan.md`
 
-- [ ] **Step 7.1: 标记过期章节**
+- [ ] **Step 7.1: 标记 rebuild spec 中的过期设计**
 
-在 `docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md` 中：
+在 `docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md` 文档开头（标题之后、第 1 节之前）添加过期标记块：
 
-**2.1 飞书会话机器人** 中 "双向同步：飞书对话 ↔ Pi TUI 对话" 这一行改为添加过期标记：
-
-```
-- **双向同步**：飞书对话 → Pi TUI 对话（已改为仅飞书消息触发 Pi 处理，Pi TUI 对话不再同步到飞书）
-```
-
-**5.2 Pi → 飞书** 和 **5.3 Pi 事件处理总览** 中 `before_agent_start` 相关内容标记为过期：
-
-在 5.2 表格的 `before_agent_start` 行末尾添加 `~~（已废弃）~~`，并在 5.3 表格的 `before_agent_start` 行末尾添加 `~~（已废弃）~~`。
-
-或者在文档开头添加一个醒目的过期标记块：
-
-```
+```markdown
 > **注意**: 以下设计已在新设计中修改——
 > - 2.1 双向同步：Pi TUI 不再自动同步到飞书（见 [2026-05-31 设计](./2026-05-31-single-ipc-forwarding-design.md)）
-> - 4.2 连接握手：已按原始设计回退为单连接，Daemon 同时仅服务 1 个 Extension
+> - 4.2 连接握手：已确认恢复为单连接（与 spec 一致），Daemon 同时仅服务 1 个 Extension
 ```
 
-- [ ] **Step 7.2: 提交**
+同时在 2.1 中 "双向同步：飞书对话 ↔ Pi TUI 对话" 改为：
+
+```
+- 飞书消息 → Pi 处理（仅飞书消息触发 Pi，Pi TUI 对话不再同步到飞书）
+```
+
+- [ ] **Step 7.2: 标记多连接 plan 为整体过期**
+
+在 `docs/superpowers/plans/2026-05-31-daemon-ipc-multi-client-plan.md` 文档开头（标题之后、第一段之前）添加过期标记块：
+
+```markdown
+> **已过期**: 此计划已被 [2026-05-31 单连接 IPC + 选择性转发 计划](./2026-05-31-single-ipc-forwarding.md) 替代。
+> IPCServer 已恢复为单连接设计，与本计划方向相反。本计划仅保留作为历史参考。
+```
+
+- [ ] **Step 7.3: 提交**
 
 ```bash
-git add docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md
-git commit -m "docs: mark outdated designs in rebuild spec"
+git add docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md docs/superpowers/plans/2026-05-31-daemon-ipc-multi-client-plan.md
+git commit -m "docs: mark outdated designs in rebuild spec and multi-client plan"
 ```
