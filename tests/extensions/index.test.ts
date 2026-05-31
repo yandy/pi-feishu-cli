@@ -510,4 +510,34 @@ describe("activeChatId forwarding", () => {
       chatId: "oc-test-end",
     });
   });
+
+  it("handles stale pi.sendUserMessage gracefully without crashing", async () => {
+    const { api, commands } = setupExtension();
+    (api as any).sendUserMessage = vi.fn().mockRejectedValue(new Error("stale ctx"));
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = {
+      sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
+      ui: { notify: vi.fn(), input: vi.fn() },
+      modelRegistry: { getAvailable: vi.fn(() => []) },
+      model: undefined,
+    };
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "message",
+      chatId: "oc-stale",
+      content: "hello",
+    });
+
+    // Should not throw — catch should send error message to daemon
+    await vi.waitFor(() => {
+      const sendCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        (call: any[]) => call[0]?.type === "send" && (call[0] as any)?.content?.text?.includes("restart")
+      );
+      expect(sendCalls.length).toBeGreaterThan(0);
+    });
+  });
 });
