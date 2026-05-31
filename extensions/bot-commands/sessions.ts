@@ -97,13 +97,13 @@ export function buildSessionsCard(
           "danger",
         ),
       );
-      elements.push({ tag: "actions", actions: buttons } as FeishuCardElement);
+      elements.push({ tag: "action", actions: buttons } as FeishuCardElement);
     }
   }
 
   elements.push(createDividerBlock());
   elements.push({
-    tag: "actions",
+    tag: "action",
     actions: [
       createActionButton(
         "新建会话",

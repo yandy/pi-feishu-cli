@@ -10,7 +10,7 @@ export interface FeishuCardConfig {
 export type FeishuCardElement =
   | { tag: "div"; text?: { tag: "lark_md"; content: string }; fields?: unknown[] }
   | { tag: "hr" }
-  | { tag: "actions"; actions: FeishuButtonElement[] }
+  | { tag: "action"; actions: FeishuButtonElement[] }
   | { tag: "note"; elements: { tag: "plain_text"; content: string }[] }
   | { tag: "select_static"; placeholder: { tag: "plain_text"; content: string }; options: { text: { tag: "plain_text"; content: string }; value: string }[]; initial_option?: string };
 
