@@ -461,8 +461,21 @@ export default function(pi: ExtensionAPI) {
             const textContent = event.message.content?.find(
                 (c: { type: string }) => c.type === "text"
             ) as { text?: string } | undefined;
+            const thinkingContent = event.message.content?.find(
+                (c: { type: string }) => c.type === "thinking"
+            ) as { thinking?: string } | undefined;
+
+            const parts: string[] = [];
+            if (thinkingContent?.thinking) {
+                parts.push("> " + thinkingContent.thinking.replace(/\n/g, "\n> "));
+            }
             if (textContent?.text) {
-                sendToDaemon({ type: "stream", chatId: activeChatId, content: textContent.text });
+                parts.push(textContent.text);
+            }
+            const markdown = parts.join("\n\n");
+
+            if (markdown) {
+                sendToDaemon({ type: "stream", chatId: activeChatId, content: markdown });
             }
         } catch (e) {
             // message_update event structure may differ by model
@@ -476,22 +489,34 @@ export default function(pi: ExtensionAPI) {
 
         const chatId = activeChatId;
 
-        // Extract final content as fallback in case message_update never fired
+        // Extract text + thinking content as fallback in case message_update never fired
         let finalContent: string | undefined;
         try {
             const textContent = event.message.content?.find(
                 (c: { type: string }) => c.type === "text"
             ) as { text?: string } | undefined;
-            finalContent = textContent?.text;
+
+            // Only send when text content is ready — skip thinking-only intermediate blocks.
+            // The text block accumulates both thinking and text content.
+            if (textContent?.text) {
+                const thinkingContent = event.message.content?.find(
+                    (c: { type: string }) => c.type === "thinking"
+                ) as { thinking?: string } | undefined;
+
+                const parts: string[] = [];
+                if (thinkingContent?.thinking) {
+                    parts.push("> " + thinkingContent.thinking.replace(/\n/g, "\n> "));
+                }
+                parts.push(textContent.text);
+                finalContent = parts.join("\n\n");
+
+                activeChatId = null;
+                forwardingCount = 0;
+            }
         } catch {}
 
-        // Only clear activeChatId when we have actual text content to send,
-        // not for intermediate messages like thinking blocks.
         if (finalContent) {
-            activeChatId = null;
-            forwardingCount = 0;
+            sendToDaemon({ type: "streamEnd", chatId, content: finalContent });
         }
-
-        sendToDaemon({ type: "streamEnd", chatId, content: finalContent });
     });
 }
