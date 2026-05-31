@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { createIPCClient, type IPCClient } from "../src/ipc/client.js";
 import { FEISHU_IM_DIR, PID_FILE, SOCKET_PATH, REGISTRY_FILE } from "../src/config.js";
 import type { DaemonMessage, ExtensionMessage } from "../src/ipc/protocol.js";
@@ -139,7 +139,7 @@ export default function(pi: ExtensionAPI) {
     // ---- Commands ----
 
     pi.registerCommand("feishu-im", {
-        description: "Feishu IM integration commands. Subcommands: start, stop, restart, status",
+        description: "Feishu IM integration commands. Subcommands: start, stop, status",
         handler: async (args, ctx) => {
             const subcommand = args.trim().split(/\s+/)[0];
 
@@ -375,36 +375,6 @@ export default function(pi: ExtensionAPI) {
                     break;
                 }
 
-                case "restart": {
-                    if (ipcClient?.connected) {
-                        ipcClient.send({ type: "shutdown" });
-                        ipcClient.disconnect();
-                        ipcClient = null;
-                    } else if (existsSync(SOCKET_PATH)) {
-                        try {
-                            const client = createIPCClient(SOCKET_PATH);
-                            await client.connect();
-                            client.send({ type: "shutdown" });
-                            client.disconnect();
-                        } catch { }
-                    }
-
-                    // Wait for old daemon to actually exit (PID file gone)
-                    const deadline = Date.now() + 5000;
-                    while (Date.now() < deadline && isDaemonRunning()) {
-                        await new Promise((r) => setTimeout(r, 100));
-                    }
-                    // Force clean stale files
-                    try { unlinkSync(SOCKET_PATH); } catch {}
-                    try { rmSync(PID_FILE); } catch {}
-
-                    const client = await getClient(ctx);
-                    if (client) {
-                        client.send({ type: "status" });
-                    }
-                    break;
-                }
-
                 case "status": {
                     if (ipcClient?.connected) {
                         ipcClient.send({ type: "status" });
@@ -442,7 +412,7 @@ export default function(pi: ExtensionAPI) {
 
                 default: {
                     ctx.ui.notify(
-                        "Unknown subcommand. Usage: /feishu-im <start|stop|restart|status>",
+                        "Unknown subcommand. Usage: /feishu-im <start|stop|status>",
                         "warning",
                     );
                 }

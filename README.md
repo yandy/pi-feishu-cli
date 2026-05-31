@@ -17,7 +17,6 @@ pi install npm:pi-feishu-cli
 | `/feishu-im start` | 启动 Daemon 并连接飞书 |
 | `/feishu-im status` | 查看 Daemon 运行状态 |
 | `/feishu-im stop` | 停止 Daemon |
-| `/feishu-im restart` | 重启 Daemon |
 
 首次启动时若无飞书凭据，会引导在 Pi 终端中输入 App ID 和 App Secret。凭据通过后自动持久化到 `~/.pi/agent/feishu-im/auth.json`。
 
