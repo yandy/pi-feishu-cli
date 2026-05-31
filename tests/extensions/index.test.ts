@@ -352,4 +352,48 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     // The stale ctx's getAvailable must NOT have been called
     expect(ctx.modelRegistry.getAvailable).not.toHaveBeenCalled();
   });
+
+  it("does NOT register before_agent_start hook (TUI sync removed)", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const calls = (api.on as any).mock.calls.filter(
+      (call: [string, any]) => call[0] === "before_agent_start"
+    );
+    expect(calls.length).toBe(0);
+  });
+
+  it("does NOT register session_shutdown hook (pendingInjects removed)", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const calls = (api.on as any).mock.calls.filter(
+      (call: [string, any]) => call[0] === "session_shutdown"
+    );
+    expect(calls.length).toBe(0);
+  });
+
+  it("message_update handler still forwards for feishu-triggered sessions", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const handler = (api.on as any).mock.calls.find(
+      (call: [string, any]) => call[0] === "message_update"
+    );
+    expect(handler).toBeDefined();
+  });
+
+  it("message_end handler still forwards for feishu-triggered sessions", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const handler = (api.on as any).mock.calls.find(
+      (call: [string, any]) => call[0] === "message_end"
+    );
+    expect(handler).toBeDefined();
+  });
 });
