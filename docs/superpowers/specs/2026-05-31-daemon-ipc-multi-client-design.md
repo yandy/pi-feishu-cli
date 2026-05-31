@@ -8,7 +8,7 @@
 
 ## 设计
 
-### 1. IPC Server 支持多连接
+### 1. IPC Server 支持多连接 ~~（已废弃）~~
 
 **文件:** `src/ipc/server.ts`
 
@@ -48,9 +48,9 @@ WebSocket：
 - **问题1（消息时序）:** `getClient` 的 `onMessage` 在 `connect()` 前注册，不丢失初始消息
 - **问题3（socket 清理）:** cleanup 中 `unlinkSync(SOCKET_PATH)` + `await ipcServer.close()`
 
-## 测试变更
+## 测试变更 ~~（已废弃）~~
 
-- `server.test.ts`: "rejects second client" / "sends bye message" → 替换为多连接测试（并发 client、broadcast）
+- `server.test.ts`: "rejects second client" / "sends bye message" → 替换为多连接测试（并发 client、broadcast）— 现已恢复为单连接测试
 - `client.test.ts`: "handles bye message" → 替换为多 client 同时连接测试
 
 ## 不涉及
