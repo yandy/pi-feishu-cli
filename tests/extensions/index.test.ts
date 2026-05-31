@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import type { ExtensionAPI, RegisteredCommand } from "@earendil-works/pi-coding-agent";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { EventEmitter } from "node:events";
@@ -148,7 +148,7 @@ describe("daemon spawn integration", () => {
 
     // VITEST must not be inherited by the daemon child process
     const { VITEST: _vitest, ...childEnv } = process.env;
-    const child = spawn("node", ["--import", "jiti/register", daemonPath], {
+    const child: ChildProcess = spawn("node", ["--import", "jiti/register", daemonPath], {
       cwd: packageDir,
       env: {
         ...childEnv,
@@ -173,9 +173,18 @@ describe("daemon spawn integration", () => {
 
     expect(socketReady).toBe(true);
 
-    // Clean up
-    child.kill("SIGTERM");
-    await new Promise((r) => setTimeout(r, 200));
+    // Clean up: send SIGTERM, wait up to 3s for exit, force SIGKILL if needed
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+      const exited = await Promise.race([
+        new Promise<boolean>((resolve) => child.on("exit", () => resolve(true))),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
+      ]);
+      if (!exited) {
+        child.kill("SIGKILL");
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
   }, 10000);
 });
 
