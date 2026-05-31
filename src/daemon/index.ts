@@ -1,11 +1,12 @@
 import { writeFileSync, mkdirSync, existsSync, createWriteStream, rmSync, unlinkSync } from "node:fs";
+import * as net from "node:net";
 import { createIPCServer } from "../ipc/server.js";
 import { createFeishuChannel, type Channel } from "../channel/index.js";
 import { loadAuth, saveAuth } from "../auth/index.js";
 import { FEISHU_IM_DIR, SOCKET_PATH, PID_FILE, DAEMON_LOG } from "../config.js";
-import type { ExtensionMessage } from "../ipc/protocol.js";
+import type { DaemonMessage, ExtensionMessage } from "../ipc/protocol.js";
 
-async function main() {
+export async function main() {
   mkdirSync(FEISHU_IM_DIR, { recursive: true });
   writeFileSync(PID_FILE, String(process.pid), "utf-8");
 
@@ -44,7 +45,7 @@ async function main() {
 
     channel.on("message", async (msg) => {
       log("info", `Received message from ${msg.chatId}`);
-      ipcServer.sendToClient({
+      const daemonMsg: DaemonMessage = {
         type: "message",
         messageId: msg.messageId,
         chatId: msg.chatId,
@@ -61,18 +62,33 @@ async function main() {
         threadId: msg.threadId as string | undefined,
         replyToMessageId: msg.replyToMessageId as string | undefined,
         createTime: msg.createTime,
-      });
+      };
+      const sent = ipcServer.sendToClient(daemonMsg);
+      if (!sent) {
+        pendingMessages.push(daemonMsg);
+        if (channel?.connected) {
+          try {
+            await channel.send(msg.chatId, {
+              text: "Pi 暂时离线，请稍后再试。",
+            }, { replyTo: msg.messageId });
+          } catch {}
+        }
+      }
     });
 
     channel.on("cardAction", async (evt) => {
       log("info", `Card action from ${(evt as any).chatId}`);
-      ipcServer.sendToClient({
+      const daemonMsg: DaemonMessage = {
         type: "cardAction",
         messageId: (evt as any).messageId ?? "",
         chatId: (evt as any).chatId ?? "",
         openId: (evt as any).openId ?? "",
         action: (evt as any).action ?? {},
-      });
+      };
+      const sent = ipcServer.sendToClient(daemonMsg);
+      if (!sent) {
+        pendingMessages.push(daemonMsg);
+      }
     });
 
     channel.on("error", (err: Error) => {
@@ -88,6 +104,12 @@ async function main() {
   };
 
   const streamMap = new Map<string, { replyTo?: string; chunks: string[]; active: boolean }>();
+
+  const pendingMessages: DaemonMessage[] = [];
+  const flushPending = (socket: net.Socket) => {
+    for (const msg of pendingMessages) ipcServer.send(socket, msg);
+    pendingMessages.length = 0;
+  };
 
   ipcServer.on("message", async (msg: ExtensionMessage, socket) => {
     log("info", `IPC message: ${msg.type}`);
@@ -204,6 +226,7 @@ async function main() {
           type: "ready",
           botIdentity: { name: channel.botIdentity?.name ?? "bot" },
         });
+        flushPending(socket);
       } else {
         connectChannel(creds.appId, creds.appSecret)
           .then(() => {
@@ -211,6 +234,7 @@ async function main() {
               type: "ready",
               botIdentity: { name: channel?.botIdentity?.name ?? "bot" },
             });
+            flushPending(socket);
           })
           .catch((err: Error) => {
             log("error", `Auto-connect failed: ${err.message}`);
@@ -218,6 +242,7 @@ async function main() {
               type: "needAuth",
               message: `自动连接失败: ${err.message}`,
             });
+            flushPending(socket);
           });
       }
     } else {
@@ -225,6 +250,7 @@ async function main() {
         type: "needAuth",
         message: "请配置飞书应用凭据: App ID 和 App Secret",
       });
+      flushPending(socket);
     }
   });
 
@@ -237,7 +263,9 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error("Daemon fatal error:", err);
-  process.exit(1);
-});
+if (!process.env["VITEST"]) {
+  main().catch((err) => {
+    console.error("Daemon fatal error:", err);
+    process.exit(1);
+  });
+}

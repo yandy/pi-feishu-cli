@@ -146,10 +146,12 @@ describe("daemon spawn integration", () => {
 
     const daemonPath = join(packageDir, "src", "daemon", "index.ts");
 
+    // VITEST must not be inherited by the daemon child process
+    const { VITEST: _vitest, ...childEnv } = process.env;
     const child = spawn("node", ["--import", "jiti/register", daemonPath], {
       cwd: packageDir,
       env: {
-        ...process.env,
+        ...childEnv,
         DAEMON_START_TIME: String(Date.now()),
       },
       stdio: "pipe",
