@@ -353,6 +353,9 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     expect(ctx.modelRegistry.getAvailable).not.toHaveBeenCalled();
   });
 
+});
+
+describe("pi event hook registration", () => {
   it("does NOT register before_agent_start hook (TUI sync removed)", async () => {
     const { api } = createMockAPI();
     const ext = await import("../../extensions/index.js");
