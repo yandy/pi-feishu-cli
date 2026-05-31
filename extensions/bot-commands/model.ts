@@ -78,7 +78,7 @@ export function buildModelCard(
 export async function handleModelAction(
   action: ModelAction,
   ctx: {
-    switchSession: (path: string) => Promise<void>;
+    switchSession: (path: string) => Promise<unknown>;
     modelRegistry: { find: (provider: string, id: string) => unknown };
   },
   registry: Record<string, string>,

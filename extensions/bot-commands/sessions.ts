@@ -119,8 +119,8 @@ export function buildSessionsCard(
 export async function handleSessionsAction(
   action: SessionsAction,
   ctx: {
-    switchSession: (path: string) => Promise<void>;
-    newSession: () => Promise<void>;
+    switchSession: (path: string) => Promise<unknown>;
+    newSession: () => Promise<unknown>;
     getSessionFile: () => string | undefined;
   },
   registry: Record<string, string>,
