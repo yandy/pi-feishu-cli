@@ -31,9 +31,7 @@ export class IPCServer {
 
   listen(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (existsSync(this.socketPath)) {
-        unlinkSync(this.socketPath);
-      }
+      try { if (existsSync(this.socketPath)) { unlinkSync(this.socketPath); } } catch {}
 
       this.server = net.createServer((socket) => {
         if (this._activeSocket && !this._activeSocket.destroyed) {

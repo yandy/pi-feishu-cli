@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, existsSync, createWriteStream, rmSync, unlinkSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync, existsSync, createWriteStream, rmSync, unlinkSync } from "node:fs";
 import * as net from "node:net";
 import { createIPCServer } from "../ipc/server.js";
 import { createFeishuChannel, type Channel } from "../channel/index.js";
@@ -8,7 +8,30 @@ import type { DaemonMessage, ExtensionMessage } from "../ipc/protocol.js";
 
 export async function main() {
   mkdirSync(FEISHU_IM_DIR, { recursive: true });
-  writeFileSync(PID_FILE, String(process.pid), "utf-8");
+
+  // PID file exclusive lock (wx flag + PID alive check)
+  try {
+    writeFileSync(PID_FILE, String(process.pid), { flag: "wx", encoding: "utf-8" });
+  } catch (e: any) {
+    if (e.code === "EEXIST") {
+      try {
+        const oldPid = parseInt(readFileSync(PID_FILE, "utf-8").trim(), 10);
+        process.kill(oldPid, 0);
+        // Old process is alive — another daemon running
+        process.exit(0);
+      } catch {
+        // Old process is dead — clean up stale PID
+        try { rmSync(PID_FILE); } catch {}
+        try {
+          writeFileSync(PID_FILE, String(process.pid), { flag: "wx", encoding: "utf-8" });
+        } catch {
+          process.exit(1);
+        }
+      }
+    } else {
+      throw e;
+    }
+  }
 
   const logStream = createWriteStream(DAEMON_LOG, { flags: "a" });
   const log = (level: string, msg: string) => {
@@ -20,9 +43,10 @@ export async function main() {
 
   const cleanup = async () => {
     log("info", "Daemon shutting down");
-    try { rmSync(PID_FILE); } catch {}
-    try { unlinkSync(SOCKET_PATH); } catch {}
+    try { await channel?.disconnect(); } catch {}
     await ipcServer.close().catch(() => {});
+    try { unlinkSync(SOCKET_PATH); } catch {}
+    try { rmSync(PID_FILE); } catch {}
     logStream.end();
     process.exit(0);
   };

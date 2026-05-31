@@ -47,12 +47,13 @@ function spawnDaemon(): void {
 
   const daemonPath = new URL("../src/daemon/index.ts", import.meta.url).pathname;
 
+  const { VITEST: _vitest, ...childEnv } = process.env as Record<string, string | undefined>;
   const child = spawn("node", ["--import", "jiti/register", daemonPath], {
     detached: true,
     stdio: "ignore",
     cwd: PACKAGE_DIR,
     env: {
-      ...process.env,
+      ...childEnv,
       DAEMON_START_TIME: String(Date.now()),
     },
   });
@@ -373,19 +374,23 @@ export default function(pi: ExtensionAPI) {
                         ipcClient.send({ type: "shutdown" });
                         ipcClient.disconnect();
                         ipcClient = null;
-                        await new Promise((r) => setTimeout(r, 500));
                     } else if (existsSync(SOCKET_PATH)) {
                         try {
                             const client = createIPCClient(SOCKET_PATH);
                             await client.connect();
                             client.send({ type: "shutdown" });
                             client.disconnect();
-                            await new Promise((r) => setTimeout(r, 500));
                         } catch { }
                     }
 
-                    try { unlinkSync(SOCKET_PATH); } catch { }
-                    try { rmSync(PID_FILE); } catch { }
+                    // Wait for old daemon to actually exit (PID file gone)
+                    const deadline = Date.now() + 5000;
+                    while (Date.now() < deadline && isDaemonRunning()) {
+                        await new Promise((r) => setTimeout(r, 100));
+                    }
+                    // Force clean stale files
+                    try { unlinkSync(SOCKET_PATH); } catch {}
+                    try { rmSync(PID_FILE); } catch {}
 
                     const client = await getClient(ctx);
                     if (client) {
