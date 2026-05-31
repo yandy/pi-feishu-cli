@@ -489,34 +489,29 @@ export default function(pi: ExtensionAPI) {
 
         const chatId = activeChatId;
 
-        // Extract text + thinking content as fallback in case message_update never fired
         let finalContent: string | undefined;
+        let end = false;
         try {
             const textContent = event.message.content?.find(
                 (c: { type: string }) => c.type === "text"
             ) as { text?: string } | undefined;
+            const thinkingContent = event.message.content?.find(
+                (c: { type: string }) => c.type === "thinking"
+            ) as { thinking?: string } | undefined;
 
-            // Only send when text content is ready — skip thinking-only intermediate blocks.
-            // The text block accumulates both thinking and text content.
+            const parts: string[] = [];
+            if (thinkingContent?.thinking) {
+                parts.push("> " + thinkingContent.thinking.replace(/\n/g, "\n> "));
+            }
             if (textContent?.text) {
-                const thinkingContent = event.message.content?.find(
-                    (c: { type: string }) => c.type === "thinking"
-                ) as { thinking?: string } | undefined;
-
-                const parts: string[] = [];
-                if (thinkingContent?.thinking) {
-                    parts.push("> " + thinkingContent.thinking.replace(/\n/g, "\n> "));
-                }
                 parts.push(textContent.text);
-                finalContent = parts.join("\n\n");
-
+                end = true;
                 activeChatId = null;
                 forwardingCount = 0;
             }
+            finalContent = parts.join("\n\n") || undefined;
         } catch {}
 
-        if (finalContent) {
-            sendToDaemon({ type: "streamEnd", chatId, content: finalContent });
-        }
+        sendToDaemon({ type: "streamEnd", chatId, content: finalContent, end });
     });
 }

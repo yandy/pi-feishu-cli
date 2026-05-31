@@ -237,10 +237,10 @@ export async function main() {
       case "streamEnd": {
         if (!channel?.connected) return;
         const session = activeStreams.get(msg.chatId);
-        if (session) {
+        if (session && msg.end !== false) {
           session.ended = true;
           session.notify();
-        } else if (msg.content) {
+        } else if (!session && msg.content) {
           // Fallback: no stream was active (message_update didn't fire),
           // send the final content as a regular message
           try {

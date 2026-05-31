@@ -85,7 +85,7 @@ export type SendContent =
 export type ExtensionMessage =
   | { type: "send"; chatId: string; content: SendContent; replyTo?: string; replyInThread?: boolean; mentions?: MentionInfo[] }
   | { type: "stream"; chatId: string; content: string; replyTo?: string }
-  | { type: "streamEnd"; chatId: string; content?: string }
+  | { type: "streamEnd"; chatId: string; content?: string; end?: boolean }
   | { type: "updateCard"; messageId: string; card: unknown }
   | { type: "shutdown" }
   | { type: "status" }
