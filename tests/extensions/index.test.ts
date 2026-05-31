@@ -265,7 +265,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
   });
 
-  it("uses newCtx.sendUserMessage inside withSession after switchSession for user message", async () => {
+  it("sends user message directly via pi.sendUserMessage (simplified forwarding)", async () => {
     writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-msg": "/tmp/.pi/msg-session.json" }));
     const { api, commands } = setupExtension();
     const ext = await import("../../extensions/index.js");
@@ -282,15 +282,10 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     });
 
     await vi.waitFor(() => {
-      expect(ctx.switchSession).toHaveBeenCalled();
+      expect((api as any).sendUserMessage).toHaveBeenCalledWith("hello world");
     });
 
-    const firstCallArg = ctx.switchSession.mock.calls[0][1];
-    expect(firstCallArg).toBeDefined();
-    // RED: current code does NOT pass withSession for this path
-    expect(firstCallArg!.withSession).toBeDefined();
-    expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
-    expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
+    expect(ctx.switchSession).not.toHaveBeenCalled();
   });
 
   it("uses withSession when cardAction triggers session switch", async () => {
@@ -401,5 +396,118 @@ describe("pi event hook registration", () => {
       (call: [string, any]) => call[0] === "message_end"
     );
     expect(handler).toBeDefined();
+  });
+});
+
+describe("activeChatId forwarding", () => {
+  beforeAll(() => {
+    mkdirSync(FEISHU_IM_DIR, { recursive: true });
+    try { writeFileSync(PID_FILE, String(process.pid)); } catch {}
+  });
+
+  afterAll(() => {
+    try { unlinkSync(PID_FILE); } catch {}
+  });
+
+  beforeEach(() => {
+    mockIPC = null;
+  });
+
+  afterEach(async () => {
+    mockIPC = null;
+    await new Promise((r) => setTimeout(r, 30));
+  });
+
+  function setupExtension() {
+    const { api, commands } = createMockAPI();
+    (api as any).sendUserMessage = vi.fn();
+    return { api, commands };
+  }
+
+  it("message_update forwards stream using activeChatId", async () => {
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = {
+      sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
+      ui: { notify: vi.fn(), input: vi.fn() },
+      modelRegistry: { getAvailable: vi.fn(() => []) },
+      model: undefined,
+    };
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "message",
+      chatId: "oc-test-forward",
+      content: "hello",
+    });
+
+    await vi.waitFor(() => {
+      expect((api as any).sendUserMessage).toHaveBeenCalled();
+    });
+
+    const messageUpdateHandler = (api.on as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call: any[]) => call[0] === "message_update"
+    )?.[1];
+
+    await messageUpdateHandler(
+      { message: { role: "assistant", content: [{ type: "text", text: "reply" }] } },
+      { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
+    );
+
+    const streamCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call: any[]) => call[0]?.type === "stream"
+    );
+    expect(streamCalls.length).toBeGreaterThan(0);
+    expect(streamCalls[0]![0]).toMatchObject({
+      type: "stream",
+      chatId: "oc-test-forward",
+      content: "reply",
+    });
+  });
+
+  it("message_end sends streamEnd and resets activeChatId", async () => {
+    const { api, commands } = setupExtension();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const cmd = commands.get("feishu-im")!;
+    const ctx = {
+      sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
+      ui: { notify: vi.fn(), input: vi.fn() },
+      modelRegistry: { getAvailable: vi.fn(() => []) },
+      model: undefined,
+    };
+    await cmd.handler!("start", ctx as any);
+
+    mockIPC!.emit("message", {
+      type: "message",
+      chatId: "oc-test-end",
+      content: "hello",
+    });
+
+    await vi.waitFor(() => {
+      expect((api as any).sendUserMessage).toHaveBeenCalled();
+    });
+
+    const messageEndHandler = (api.on as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call: any[]) => call[0] === "message_end"
+    )?.[1];
+
+    await messageEndHandler(
+      { message: { role: "assistant" } },
+      { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
+    );
+
+    const streamEndCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call: any[]) => call[0]?.type === "streamEnd"
+    );
+    expect(streamEndCalls.length).toBeGreaterThan(0);
+    expect(streamEndCalls[0]![0]).toMatchObject({
+      type: "streamEnd",
+      chatId: "oc-test-end",
+    });
   });
 });

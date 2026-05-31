@@ -73,7 +73,8 @@ async function waitForSocket(timeoutMs: number = 5000): Promise<boolean> {
 export default function(pi: ExtensionAPI) {
     const registry = loadRegistry();
     let ipcClient: IPCClient | null = null;
-    const forwardingSessions = new Set<string>();
+    let activeChatId: string | null = null;
+    let forwardingCount = 0;
 
     type NotifyFn = (msg: string, level?: "error" | "info" | "warning") => void;
     type OnMessageFn = (msg: DaemonMessage) => void;
@@ -208,38 +209,14 @@ export default function(pi: ExtensionAPI) {
                                         .join(", ")
                                     : "");
 
-                                const sessionFile = registry[msg.chatId];
-                                if (sessionFile) {
-                                    try {
-                                        forwardingSessions.add(sessionFile);
-                                        await ctx.switchSession(sessionFile, { withSession: async (newCtx) => {
-                                            try {
-                                                await newCtx.sendUserMessage(prompt);
-                                            } finally {
-                                                forwardingSessions.delete(sessionFile);
-                                            }
-                                            const newSessionFile = newCtx.sessionManager.getSessionFile();
-                                            if (newSessionFile && !registry[msg.chatId]) {
-                                                registry[msg.chatId] = newSessionFile;
-                                                saveRegistry(registry);
-                                            }
-                                        }});
-                                    } catch {
-                                        forwardingSessions.delete(sessionFile);
-                                    }
-                                } else {
-                                    const currentSession = ctx.sessionManager.getSessionFile();
-                                    if (currentSession) forwardingSessions.add(currentSession);
-                                    try {
-                                        await pi.sendUserMessage(prompt);
-                                    } finally {
-                                        if (currentSession) forwardingSessions.delete(currentSession);
-                                    }
-                                    const newSessionFile = ctx.sessionManager.getSessionFile();
-                                    if (newSessionFile && !registry[msg.chatId]) {
-                                        registry[msg.chatId] = newSessionFile;
-                                        saveRegistry(registry);
-                                    }
+                                activeChatId = msg.chatId;
+                                forwardingCount++;
+                                try {
+                                    await pi.sendUserMessage(prompt);
+                                } catch {
+                                    sendToDaemon({ type: "send", chatId: msg.chatId, content: { text: "Pi 会话已失效，请执行 /feishu-im restart" } });
+                                    activeChatId = null;
+                                    forwardingCount = 0;
                                 }
                                 break;
                             }
@@ -449,32 +426,26 @@ export default function(pi: ExtensionAPI) {
     pi.on("message_update", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
         if (event.message.role !== "assistant") return;
-
-        const sessionFile = _ctx.sessionManager.getSessionFile();
-        if (!sessionFile) return;
-        if (!forwardingSessions.has(sessionFile)) return;
-        const chatId = Object.keys(registry).find((k) => registry[k] === sessionFile);
-        if (!chatId) return;
+        if (!activeChatId) return;
 
         const textContent = event.message.content?.find(
             (c: { type: string }) => c.type === "text"
         ) as { text?: string } | undefined;
         if (textContent?.text) {
-            sendToDaemon({ type: "stream", chatId, content: textContent.text });
+            sendToDaemon({ type: "stream", chatId: activeChatId, content: textContent.text });
         }
     });
 
     pi.on("message_end", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
         if (event.message.role !== "assistant") return;
+        if (!activeChatId) return;
 
-        const sessionFile = _ctx.sessionManager.getSessionFile();
-        if (!sessionFile) return;
-        if (!forwardingSessions.has(sessionFile)) return;
-        const chatId = Object.keys(registry).find((k) => registry[k] === sessionFile);
-        if (!chatId) return;
-
-        forwardingSessions.delete(sessionFile);
+        const chatId = activeChatId;
+        if (--forwardingCount <= 0) {
+            forwardingCount = 0;
+            activeChatId = null;
+        }
         sendToDaemon({ type: "streamEnd", chatId });
     });
 }
