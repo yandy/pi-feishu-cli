@@ -1,4 +1,4 @@
-# 单连接 IPC + 选择性转发 实施计划
+# 单连接 IPC + 选择性转发 实施计划 (TDD)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,21 +14,113 @@
 
 | 文件 | 变更 |
 |------|------|
+| `tests/ipc/server.test.ts` | 多连接测试 → 单连接拒绝测试 |
 | `src/ipc/server.ts` | 回退到原始单连接实现 |
-| `src/daemon/index.ts` | 添加 `reject` 事件处理器 |
+| `tests/extensions/index.test.ts` | 新增 TDD 测试：验证 TUI 同步钩子已移除 |
 | `extensions/index.ts` | 删除 TUI 同步钩子，新增 forwarding set，清理 tag 逻辑 |
-| `tests/ipc/server.test.ts` | 多连接测试替换为单连接拒绝测试 |
+| `src/daemon/index.ts` | 添加 `reject` 事件处理器 |
+| `docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md` | 标记过期设计 |
 
 ---
 
-### Task 1: 回退 IPCServer 到单连接
+### Task 1: RED — 编写失败的 server 单连接测试
+
+**Files:**
+- Modify: `tests/ipc/server.test.ts`
+
+- [ ] **Step 1.1: 删除多连接测试，替换为单连接测试**
+
+删除 `tests/ipc/server.test.ts` 中的两个多连接测试：
+- "accepts multiple concurrent clients"（line 115-138）
+- "sendToClient broadcasts to all connected clients"（line 140-166）
+
+替换为以下三个新测试：
+
+```typescript
+  it("rejects second client with bye message", async () => {
+    server = createIPCServer(SOCK);
+    await server.listen();
+
+    let rejectCount = 0;
+    server.on("reject", () => { rejectCount++; });
+
+    const client1 = await createClient();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.activeSocket).not.toBeNull();
+
+    const client2 = await createClient();
+
+    const byeData = await new Promise<string>((resolve) => {
+      client2.once("data", (d) => resolve(d.toString()));
+    });
+
+    const bye = JSON.parse(byeData.trim());
+    expect(bye.type).toBe("bye");
+    expect(rejectCount).toBe(1);
+
+    client1.destroy();
+    client2.destroy();
+    await server.close();
+    server = null;
+  });
+
+  it("accepts new client after first disconnects", async () => {
+    server = createIPCServer(SOCK);
+    await server.listen();
+
+    const client1 = await createClient();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.activeSocket).not.toBeNull();
+
+    client1.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.activeSocket).toBeNull();
+
+    let connected = false;
+    server.on("connect", () => { connected = true; });
+
+    const client2 = await createClient();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(connected).toBe(true);
+
+    client2.destroy();
+    await server.close();
+    server = null;
+  });
+
+  it("sendToClient returns false when no client connected", () => {
+    server = createIPCServer(SOCK);
+    const result = server.sendToClient({ type: "ready", botIdentity: { name: "bot" } });
+    expect(result).toBe(false);
+  });
+```
+
+- [ ] **Step 1.2: 运行测试，确认失败 (RED)**
+
+```bash
+npx vitest run tests/ipc/server.test.ts
+```
+
+Expected: 三个新测试 FAIL——
+- "rejects second client": 当前代码允许多连接，不会发送 bye
+- "accepts new client after first disconnects": 当前 `activeSocket` getter 返回 `_sockets` 中的任意一个，disconnect 后行为不确定
+- "sendToClient returns false": 当前 `sendToClient` 广播到所有 socket，无 socket 时不会返回 false 而是静默成功
+
+```bash
+git add tests/ipc/server.test.ts
+git commit -m "test: add failing single-connection server tests (RED)"
+```
+
+---
+
+### Task 2: GREEN — 实现单连接 IPCServer
 
 **Files:**
 - Modify: `src/ipc/server.ts`
 
-- [ ] **Step 1: 替换 IPCServer 实现**
+- [ ] **Step 2.1: 替换 IPCServer 为原始单连接实现**
 
-将 `src/ipc/server.ts` 完整替换为以下内容：
+将 `src/ipc/server.ts` 完整替换为：
 
 ```typescript
 import * as net from "node:net";
@@ -156,7 +248,15 @@ export function createIPCServer(socketPath: string): IPCServer {
 }
 ```
 
-- [ ] **Step 2: 验证类型兼容性**
+- [ ] **Step 2.2: 运行测试，确认通过 (GREEN)**
+
+```bash
+npx vitest run tests/ipc/server.test.ts
+```
+
+Expected: 全部 PASS（包括新增的三个测试和已有的五个测试）。
+
+- [ ] **Step 2.3: 验证类型兼容性**
 
 ```bash
 npx tsc --noEmit
@@ -164,72 +264,98 @@ npx tsc --noEmit
 
 Expected: 无错误。
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 2.4: 提交**
 
 ```bash
 git add src/ipc/server.ts
-git commit -m "feat: revert IPCServer to single-connection with bye rejection"
+git commit -m "feat: revert IPCServer to single-connection with bye rejection (GREEN)"
 ```
 
 ---
 
-### Task 2: Daemon 添加 reject 处理器
+### Task 3: RED — 编写失败的 extension forwarding 测试
 
 **Files:**
-- Modify: `src/daemon/index.ts`
+- Modify: `tests/extensions/index.test.ts`
 
-- [ ] **Step 1: 添加 reject 事件处理器**
+- [ ] **Step 3.1: 在文件末尾添加 forwarding 行为测试**
 
-在 `src/daemon/index.ts` 中，找到 `ipcServer.on("disconnect", ...)` 之前插入：
-
-```
-  ipcServer.on("reject", () => {
-    log("info", "Rejected new connection - already connected");
-  });
-```
-
-最终 daemon 事件注册部分应变为：
+在 `tests/extensions/index.test.ts` 末尾（最后一条测试之后，`});` 之前）添加以下测试：
 
 ```typescript
-  ipcServer.on("disconnect", () => {
-    log("info", "Extension disconnected");
+  it("does NOT register before_agent_start hook (TUI sync removed)", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const calls = (api.on as any).mock.calls.filter(
+      (call: [string, any]) => call[0] === "before_agent_start"
+    );
+    expect(calls.length).toBe(0);
   });
 
-  ipcServer.on("reject", () => {
-    log("info", "Rejected new connection - already connected");
+  it("does NOT register session_shutdown hook (pendingInjects removed)", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const calls = (api.on as any).mock.calls.filter(
+      (call: [string, any]) => call[0] === "session_shutdown"
+    );
+    expect(calls.length).toBe(0);
+  });
+
+  it("message_update handler still forwards for feishu-triggered sessions", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const handler = (api.on as any).mock.calls.find(
+      (call: [string, any]) => call[0] === "message_update"
+    );
+    expect(handler).toBeDefined();
+  });
+
+  it("message_end handler still forwards for feishu-triggered sessions", async () => {
+    const { api } = createMockAPI();
+    const ext = await import("../../extensions/index.js");
+    ext.default(api);
+
+    const handler = (api.on as any).mock.calls.find(
+      (call: [string, any]) => call[0] === "message_end"
+    );
+    expect(handler).toBeDefined();
   });
 ```
 
-- [ ] **Step 2: 验证类型兼容性**
+- [ ] **Step 3.2: 运行测试，确认失败 (RED)**
 
 ```bash
-npx tsc --noEmit
+npx vitest run tests/extensions/index.test.ts
 ```
 
-Expected: 无错误。
-
-- [ ] **Step 3: 提交**
+Expected: 前两个测试 FAIL——
+- "does NOT register before_agent_start": 当前 `before_agent_start` 仍在注册
+- "does NOT register session_shutdown": 当前 `session_shutdown` 仍在注册
+- 后两个测试 PASS（`message_update`/`message_end` 已存在）
 
 ```bash
-git add src/daemon/index.ts
-git commit -m "feat: add reject event handler for single-connection IPC"
+git add tests/extensions/index.test.ts
+git commit -m "test: add failing extension forwarding tests (RED)"
 ```
 
 ---
 
-### Task 3: Extension 选择性 Pi→飞书转发
+### Task 4: GREEN — 实现 extension 选择性转发
 
 **Files:**
 - Modify: `extensions/index.ts`
 
-本任务分三个子步骤，按顺序执行：
+按顺序执行以下步骤：
 
-**3a: 添加 forwarding Sessions set 和清理 tag 逻辑**
+- [ ] **Step 4.1: 替换 state 变量声明**
 
-- [ ] **Step 3a-1: 替换 state 变量声明**
-
-在 `extensions/index.ts` 中，找到：
-
+找到：
 ```typescript
     let ipcClient: IPCClient | null = null;
     const pendingInjects = new Set<string>();
@@ -237,20 +363,14 @@ git commit -m "feat: add reject event handler for single-connection IPC"
 ```
 
 替换为：
-
 ```typescript
     let ipcClient: IPCClient | null = null;
     const forwardingSessions = new Set<string>();
 ```
 
-**3b: 修改飞书消息注入点**
+- [ ] **Step 4.2: 删除 tag 前缀，重新定义 prompt**
 
-注意：以下步骤需要按顺序执行，先定义 `prompt` 再修改两个分支。
-
-- [ ] **Step 3b-1: 删除 tag 前缀，重新定义 prompt**
-
-找到 tag 前缀相关代码（约 line 205-213），当前代码：
-
+找到：
 ```typescript
                                 const tag = `[feishu:#${++injectSequence}]`;
                                 pendingInjects.add(tag);
@@ -264,7 +384,6 @@ git commit -m "feat: add reject event handler for single-connection IPC"
 ```
 
 替换为：
-
 ```typescript
                                 const prompt = msg.content + (msg.resources?.length
                                     ? "\n\nAttachments: " + msg.resources
@@ -273,12 +392,9 @@ git commit -m "feat: add reject event handler for single-connection IPC"
                                     : "");
 ```
 
-注意：替换后 `prompt` 仍然在 `botCmd` early return 之后、`sessionFile` 判断之前定义，两个分支可用。
+- [ ] **Step 4.3: 修改有 session 的 user message 路径**
 
-- [ ] **Step 3b-2: 修改 user message 分支 — 有 session 路径**
-
-找到 `message` case 中用户消息的 `switchSession` 路径（约 line 216-225），当前代码：
-
+找到：
 ```typescript
                                 const sessionFile = registry[msg.chatId];
                                 if (sessionFile) {
@@ -294,8 +410,7 @@ git commit -m "feat: add reject event handler for single-connection IPC"
                                     } catch { }
 ```
 
-改为：
-
+替换为：
 ```typescript
                                 const sessionFile = registry[msg.chatId];
                                 if (sessionFile) {
@@ -318,10 +433,9 @@ git commit -m "feat: add reject event handler for single-connection IPC"
                                     }
 ```
 
-- [ ] **Step 3b-3: 修改 user message 分支 — 无 session 路径**
+- [ ] **Step 4.4: 修改无 session 的 user message 路径**
 
-找到 `message` case 中用户消息的 `pi.sendUserMessage` 路径（约 line 227-234），当前代码：
-
+找到：
 ```typescript
                                 } else {
                                     await pi.sendUserMessage(prompt);
@@ -333,8 +447,7 @@ git commit -m "feat: add reject event handler for single-connection IPC"
                                 }
 ```
 
-改为：
-
+替换为：
 ```typescript
                                 } else {
                                     const currentSession = ctx.sessionManager.getSessionFile();
@@ -352,16 +465,13 @@ git commit -m "feat: add reject event handler for single-connection IPC"
                                 }
 ```
 
-**3c: 修改 event hooks**
+- [ ] **Step 4.5: 删除 before_agent_start hook**
 
-- [ ] **Step 3c-1: 删除 before_agent_start hook**
+删除整个 `pi.on("before_agent_start", ...)` 块。
 
-删除整个 `pi.on("before_agent_start", ...)` 块（约 line 422-440）。
+- [ ] **Step 4.6: 修改 message_update hook（添加 forwardingSessions 判断）**
 
-- [ ] **Step 3c-2: 修改 message_update hook**
-
-找到 `pi.on("message_update", ...)`（约 line 442-457），当前代码：
-
+找到：
 ```typescript
     pi.on("message_update", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
@@ -381,8 +491,7 @@ git commit -m "feat: add reject event handler for single-connection IPC"
     });
 ```
 
-替换为（添加 forwardingSessions 判断）：
-
+替换为：
 ```typescript
     pi.on("message_update", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
@@ -403,10 +512,9 @@ git commit -m "feat: add reject event handler for single-connection IPC"
     });
 ```
 
-- [ ] **Step 3c-3: 修改 message_end hook**
+- [ ] **Step 4.7: 修改 message_end hook（添加判断 + cleanup）**
 
-找到 `pi.on("message_end", ...)`（约 line 459-469），当前代码：
-
+找到：
 ```typescript
     pi.on("message_end", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
@@ -421,8 +529,7 @@ git commit -m "feat: add reject event handler for single-connection IPC"
     });
 ```
 
-替换为（添加 forwardingSessions 判断 + cleanup）：
-
+替换为：
 ```typescript
     pi.on("message_end", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
@@ -439,9 +546,13 @@ git commit -m "feat: add reject event handler for single-connection IPC"
     });
 ```
 
-- [ ] **Step 3c-4: 添加 bye 消息处理**
+- [ ] **Step 4.8: 删除 session_shutdown hook**
 
-在 `start` 子命令的 `getClient` 回调的 message listener 中（`switch (msg.type)` 内），添加 `bye` case。找到最后一个 case 后插入：
+删除整个 `pi.on("session_shutdown", ...)` 块。
+
+- [ ] **Step 4.9: 添加 bye 消息处理**
+
+在 `start` 子命令的 `getClient` 回调中 `switch (msg.type)` 内，在已有 case 之中添加：
 
 ```typescript
                             case "bye": {
@@ -450,13 +561,15 @@ git commit -m "feat: add reject event handler for single-connection IPC"
                             }
 ```
 
-该 case 应放在其他 case 之中（如 `status` case 附近），与其他 `switch` case 同级。
+- [ ] **Step 4.10: 运行测试，确认通过 (GREEN)**
 
-- [ ] **Step 3c-5: 删除 session_shutdown hook**
+```bash
+npx vitest run tests/extensions/index.test.ts
+```
 
-删除整个 `pi.on("session_shutdown", ...)` 块（约 line 471-473）。
+Expected: 全部 PASS——前两个新增测试通过（before_agent_start / session_shutdown 已不存在），后两个新增测试通过（message_update / message_end 仍存在），所有已有测试也通过。
 
-- [ ] **Step 3c-6: 验证类型兼容性**
+- [ ] **Step 4.11: 验证类型兼容性**
 
 ```bash
 npx tsc --noEmit
@@ -464,109 +577,50 @@ npx tsc --noEmit
 
 Expected: 无错误。
 
-- [ ] **Step 3c-7: 提交**
+- [ ] **Step 4.12: 提交**
 
 ```bash
 git add extensions/index.ts
-git commit -m "feat: replace TUI sync with selective feishu-triggered forwarding"
+git commit -m "feat: replace TUI sync with selective feishu-triggered forwarding (GREEN)"
 ```
 
 ---
 
-### Task 4: 更新 server 测试
+### Task 5: Daemon 添加 reject 处理器
 
 **Files:**
-- Modify: `tests/ipc/server.test.ts`
+- Modify: `src/daemon/index.ts`
 
-- [ ] **Step 4-1: 替换多连接测试**
+- [ ] **Step 5.1: 添加 reject 事件处理器**
 
-将 `tests/ipc/server.test.ts` 中的两个多连接测试替换为单连接拒绝测试：
-
-删除以下两个测试：
-- "accepts multiple concurrent clients"（line 115-138）
-- "sendToClient broadcasts to all connected clients"（line 140-166）
-
-替换为：
+在 `src/daemon/index.ts` 中，在 `ipcServer.on("disconnect", ...)` 之后添加：
 
 ```typescript
-  it("rejects second client with bye message", async () => {
-    server = createIPCServer(SOCK);
-    await server.listen();
-
-    let rejectCount = 0;
-    server.on("reject", () => { rejectCount++; });
-
-    const client1 = await createClient();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(server.activeSocket).not.toBeNull();
-
-    const client2 = await createClient();
-
-    const byeData = await new Promise<string>((resolve) => {
-      client2.once("data", (d) => resolve(d.toString()));
-    });
-
-    const bye = JSON.parse(byeData.trim());
-    expect(bye.type).toBe("bye");
-    expect(rejectCount).toBe(1);
-
-    client1.destroy();
-    client2.destroy();
-    await server.close();
-    server = null;
-  });
-
-  it("accepts new client after first disconnects", async () => {
-    server = createIPCServer(SOCK);
-    await server.listen();
-
-    const client1 = await createClient();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(server.activeSocket).not.toBeNull();
-
-    client1.destroy();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(server.activeSocket).toBeNull();
-
-    let connected = false;
-    server.on("connect", () => { connected = true; });
-
-    const client2 = await createClient();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(connected).toBe(true);
-
-    client2.destroy();
-    await server.close();
-    server = null;
-  });
-
-  it("sendToClient returns false when no client connected", () => {
-    server = createIPCServer(SOCK);
-    const result = server.sendToClient({ type: "ready", botIdentity: { name: "bot" } });
-    expect(result).toBe(false);
+  ipcServer.on("reject", () => {
+    log("info", "Rejected new connection - already connected");
   });
 ```
 
-- [ ] **Step 4-2: 运行 server 测试验证**
+- [ ] **Step 5.2: 验证类型兼容性**
 
 ```bash
-npx vitest run tests/ipc/server.test.ts
+npx tsc --noEmit
 ```
 
-Expected: 所有测试通过。
+Expected: 无错误。
 
-- [ ] **Step 4-3: 提交**
+- [ ] **Step 5.3: 提交**
 
 ```bash
-git add tests/ipc/server.test.ts
-git commit -m "test: replace multi-connection tests with single-connection rejection tests"
+git add src/daemon/index.ts
+git commit -m "feat: add reject event handler for single-connection IPC"
 ```
 
 ---
 
-### Task 5: 全量测试验证
+### Task 6: 全量测试验证
 
-- [ ] **Step 5-1: 运行全量测试**
+- [ ] **Step 6.1: 运行全量测试**
 
 ```bash
 npx vitest run
@@ -574,6 +628,42 @@ npx vitest run
 
 Expected: 所有测试通过。
 
-- [ ] **Step 5-2: 提交（如有修复）**
+- [ ] **Step 6.2: 提交（如有修复）**
 
 若测试有失败，修复后提交。
+
+---
+
+### Task 7: 标记历史 spec 中的过期设计
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md`
+
+- [ ] **Step 7.1: 标记过期章节**
+
+在 `docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md` 中：
+
+**2.1 飞书会话机器人** 中 "双向同步：飞书对话 ↔ Pi TUI 对话" 这一行改为添加过期标记：
+
+```
+- **双向同步**：飞书对话 → Pi TUI 对话（已改为仅飞书消息触发 Pi 处理，Pi TUI 对话不再同步到飞书）
+```
+
+**5.2 Pi → 飞书** 和 **5.3 Pi 事件处理总览** 中 `before_agent_start` 相关内容标记为过期：
+
+在 5.2 表格的 `before_agent_start` 行末尾添加 `~~（已废弃）~~`，并在 5.3 表格的 `before_agent_start` 行末尾添加 `~~（已废弃）~~`。
+
+或者在文档开头添加一个醒目的过期标记块：
+
+```
+> **注意**: 以下设计已在新设计中修改——
+> - 2.1 双向同步：Pi TUI 不再自动同步到飞书（见 [2026-05-31 设计](./2026-05-31-single-ipc-forwarding-design.md)）
+> - 4.2 连接握手：已按原始设计回退为单连接，Daemon 同时仅服务 1 个 Extension
+```
+
+- [ ] **Step 7.2: 提交**
+
+```bash
+git add docs/superpowers/specs/2026-05-30-pi-feishu-cli-rebuild-design.md
+git commit -m "docs: mark outdated designs in rebuild spec"
+```
