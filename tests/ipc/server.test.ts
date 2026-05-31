@@ -112,57 +112,61 @@ describe("IPCServer", () => {
     server = null;
   });
 
-  it("accepts multiple concurrent clients", async () => {
+  it("rejects second client with bye message", async () => {
     server = createIPCServer(SOCK);
     await server.listen();
 
-    let connectCount = 0;
-    server.on("connect", () => {
-      connectCount++;
-    });
+    let rejectCount = 0;
+    server.on("reject", () => { rejectCount++; });
 
     const client1 = await createClient();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.activeSocket).not.toBeNull();
+
     const client2 = await createClient();
 
-    await new Promise((r) => setTimeout(r, 50));
-    expect(connectCount).toBe(2);
-    expect(server.socketCount).toBe(2);
+    const byeData = await new Promise<string>((resolve) => {
+      client2.once("data", (d) => resolve(d.toString()));
+    });
+
+    const bye = JSON.parse(byeData.trim());
+    expect(bye.type).toBe("bye");
+    expect(rejectCount).toBe(1);
 
     client1.destroy();
     client2.destroy();
-    await new Promise((r) => setTimeout(r, 50));
-    expect(server.socketCount).toBe(0);
-
     await server.close();
     server = null;
   });
 
-  it("sendToClient broadcasts to all connected clients", async () => {
+  it("accepts new client after first disconnects", async () => {
     server = createIPCServer(SOCK);
     await server.listen();
 
     const client1 = await createClient();
-    const client2 = await createClient();
-
-    const data1 = new Promise<string>((resolve) => {
-      client1.once("data", (d) => resolve(d.toString()));
-    });
-    const data2 = new Promise<string>((resolve) => {
-      client2.once("data", (d) => resolve(d.toString()));
-    });
-
-    server.sendToClient({ type: "ready", botIdentity: { name: "broadcast" } });
-
-    const [d1, d2] = await Promise.all([data1, data2]);
-    expect(d1).toContain('"type":"ready"');
-    expect(d1).toContain("broadcast");
-    expect(d2).toContain('"type":"ready"');
-    expect(d2).toContain("broadcast");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.activeSocket).not.toBeNull();
 
     client1.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(server.activeSocket).toBeNull();
+
+    let connected = false;
+    server.on("connect", () => { connected = true; });
+
+    const client2 = await createClient();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(connected).toBe(true);
+
     client2.destroy();
     await server.close();
     server = null;
+  });
+
+  it("sendToClient returns false when no client connected", () => {
+    server = createIPCServer(SOCK);
+    const result = server.sendToClient({ type: "ready", botIdentity: { name: "bot" } });
+    expect(result).toBe(false);
   });
 
   it("activeSocket returns null before any client connects", async () => {
