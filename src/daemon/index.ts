@@ -65,7 +65,13 @@ export async function main() {
     if (channel?.connected) {
       await channel.disconnect();
     }
-    channel = createFeishuChannel({ appId, appSecret });
+    channel = createFeishuChannel({
+      appId,
+      appSecret,
+      outbound: {
+        streamInitialText: "🤔 Pi 思考中...",
+      },
+    });
 
     channel.on("message", async (msg) => {
       log("info", `Received message from ${msg.chatId}`);
@@ -139,7 +145,13 @@ export async function main() {
     log("info", "Feishu channel connected");
   };
 
-  const streamMap = new Map<string, { replyTo?: string; chunks: string[]; active: boolean }>();
+  interface StreamSession {
+    replyTo?: string;
+    pendingChunks: string[];
+    ended: boolean;
+    notify: () => void;
+  }
+  const activeStreams = new Map<string, StreamSession>();
 
   const pendingMessages: DaemonMessage[] = [];
   const flushPending = (socket: net.Socket) => {
@@ -188,38 +200,46 @@ export async function main() {
 
       case "stream": {
         if (!channel?.connected) return;
-        const state = streamMap.get(msg.chatId);
-        if (state) {
-          state.chunks.push(msg.content);
-        } else {
-          streamMap.set(msg.chatId, {
+        let session = activeStreams.get(msg.chatId);
+        if (!session) {
+          session = {
             replyTo: msg.replyTo,
-            chunks: [msg.content],
-            active: false,
+            pendingChunks: [msg.content],
+            ended: false,
+            notify: () => {},
+          };
+          activeStreams.set(msg.chatId, session);
+
+          channel.stream(msg.chatId, {
+            markdown: async (controller) => {
+              while (!session!.ended || session!.pendingChunks.length > 0) {
+                if (session!.pendingChunks.length > 0) {
+                  await controller.append(session!.pendingChunks.shift()!);
+                } else {
+                  await new Promise<void>((resolve) => {
+                    session!.notify = resolve;
+                  });
+                }
+              }
+            },
+          }, { replyTo: msg.replyTo }).catch((err) => {
+            log("error", `Stream failed: ${(err as Error).message}`);
+          }).finally(() => {
+            activeStreams.delete(msg.chatId);
           });
+        } else {
+          session.pendingChunks.push(msg.content);
+          session.notify();
         }
         break;
       }
 
       case "streamEnd": {
         if (!channel?.connected) return;
-        const state = streamMap.get(msg.chatId);
-        if (!state || state.active) return;
-
-        state.active = true;
-        const allChunks = [...state.chunks];
-        streamMap.delete(msg.chatId);
-
-        try {
-          await channel.stream(msg.chatId, {
-            markdown: async (s) => {
-              for (const chunk of allChunks) {
-                await s.append(chunk);
-              }
-            },
-          }, { replyTo: state.replyTo });
-        } catch (err) {
-          log("error", `Stream failed: ${(err as Error).message}`);
+        const session = activeStreams.get(msg.chatId);
+        if (session) {
+          session.ended = true;
+          session.notify();
         }
         break;
       }
