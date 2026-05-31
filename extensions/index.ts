@@ -72,8 +72,7 @@ async function waitForSocket(timeoutMs: number = 5000): Promise<boolean> {
 export default function(pi: ExtensionAPI) {
     const registry = loadRegistry();
     let ipcClient: IPCClient | null = null;
-    const pendingInjects = new Set<string>();
-    let injectSequence = 0;
+    const forwardingSessions = new Set<string>();
 
     type NotifyFn = (msg: string, level?: "error" | "info" | "warning") => void;
     type OnMessageFn = (msg: DaemonMessage) => void;
@@ -202,30 +201,39 @@ export default function(pi: ExtensionAPI) {
                                     return;
                                 }
 
-                                const tag = `[feishu:#${++injectSequence}]`;
-                                pendingInjects.add(tag);
-
-                                let prompt = tag + " " + msg.content;
-                                if (msg.resources?.length) {
-                                    prompt += "\n\nAttachments: " + msg.resources
+                                const prompt = msg.content + (msg.resources?.length
+                                    ? "\n\nAttachments: " + msg.resources
                                         .map((r) => `${r.type}${r.fileName ? ` ${r.fileName}` : ""}`)
-                                        .join(", ");
-                                }
+                                        .join(", ")
+                                    : "");
 
                                 const sessionFile = registry[msg.chatId];
                                 if (sessionFile) {
                                     try {
+                                        forwardingSessions.add(sessionFile);
                                         await ctx.switchSession(sessionFile, { withSession: async (newCtx) => {
-                                            await newCtx.sendUserMessage(prompt);
+                                            try {
+                                                await newCtx.sendUserMessage(prompt);
+                                            } finally {
+                                                forwardingSessions.delete(sessionFile);
+                                            }
                                             const newSessionFile = newCtx.sessionManager.getSessionFile();
                                             if (newSessionFile && !registry[msg.chatId]) {
                                                 registry[msg.chatId] = newSessionFile;
                                                 saveRegistry(registry);
                                             }
                                         }});
-                                    } catch { }
+                                    } catch {
+                                        forwardingSessions.delete(sessionFile);
+                                    }
                                 } else {
-                                    await pi.sendUserMessage(prompt);
+                                    const currentSession = ctx.sessionManager.getSessionFile();
+                                    if (currentSession) forwardingSessions.add(currentSession);
+                                    try {
+                                        await pi.sendUserMessage(prompt);
+                                    } finally {
+                                        if (currentSession) forwardingSessions.delete(currentSession);
+                                    }
                                     const newSessionFile = ctx.sessionManager.getSessionFile();
                                     if (newSessionFile && !registry[msg.chatId]) {
                                         registry[msg.chatId] = newSessionFile;
@@ -309,6 +317,11 @@ export default function(pi: ExtensionAPI) {
                                     `PID: ${msg.pid}, Uptime: ${Math.round(msg.uptime / 1000)}s, WS: ${msg.wsConnected ? "connected" : "disconnected"}`,
                                     "info",
                                 );
+                                break;
+                            }
+
+                            case "bye": {
+                                ctx.ui.notify("Connection rejected: daemon already has an active client", "warning");
                                 break;
                             }
                         }
@@ -419,32 +432,13 @@ export default function(pi: ExtensionAPI) {
 
     // ---- Pi → Feishu forwarding ----
 
-    pi.on("before_agent_start", async (event, _ctx) => {
-        if (!ipcClient?.connected) return;
-
-        if (pendingInjects.size > 0) {
-            for (const tag of pendingInjects) {
-                if (event.prompt?.startsWith(tag)) {
-                    pendingInjects.delete(tag);
-                    return;
-                }
-            }
-        }
-
-        const sessionFile = _ctx.sessionManager.getSessionFile();
-        if (!sessionFile) return;
-        const chatId = Object.keys(registry).find((k) => registry[k] === sessionFile);
-        if (!chatId) return;
-
-        sendToDaemon({ type: "send", chatId, content: { text: event.prompt } });
-    });
-
     pi.on("message_update", async (event, _ctx) => {
         if (!ipcClient?.connected) return;
         if (event.message.role !== "assistant") return;
 
         const sessionFile = _ctx.sessionManager.getSessionFile();
         if (!sessionFile) return;
+        if (!forwardingSessions.has(sessionFile)) return;
         const chatId = Object.keys(registry).find((k) => registry[k] === sessionFile);
         if (!chatId) return;
 
@@ -462,13 +456,11 @@ export default function(pi: ExtensionAPI) {
 
         const sessionFile = _ctx.sessionManager.getSessionFile();
         if (!sessionFile) return;
+        if (!forwardingSessions.has(sessionFile)) return;
         const chatId = Object.keys(registry).find((k) => registry[k] === sessionFile);
         if (!chatId) return;
 
+        forwardingSessions.delete(sessionFile);
         sendToDaemon({ type: "streamEnd", chatId });
-    });
-
-    pi.on("session_shutdown", async (_event, _ctx) => {
-        pendingInjects.clear();
     });
 }
