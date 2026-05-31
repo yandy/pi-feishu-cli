@@ -82,14 +82,14 @@ export async function handleModelAction(
     newSession: (opts?: { withSession?: (newCtx: any) => Promise<void> }) => Promise<unknown>;
     modelRegistry: { find: (provider: string, id: string) => unknown };
   },
-  registry: Record<string, string>,
-  chatId: string,
+  registry: { sessions: string[]; current?: string },
+  _chatId: string,
   setModel: (model: unknown) => Promise<boolean>,
 ): Promise<boolean> {
   const model = ctx.modelRegistry.find(action.modelProvider, action.modelId);
   if (!model) return false;
 
-  const sessionPath = registry[chatId];
+  const sessionPath = registry.current;
   if (sessionPath) {
     await ctx.switchSession(sessionPath, { withSession: async () => {
       await setModel(model);
@@ -99,7 +99,8 @@ export async function handleModelAction(
       await setModel(model);
       const sf = newCtx.sessionManager.getSessionFile();
       if (sf) {
-        registry[chatId] = sf;
+        registry.current = sf;
+        registry.sessions = [...new Set([...registry.sessions, sf])];
       }
     }});
   }

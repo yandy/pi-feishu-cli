@@ -238,8 +238,8 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
   });
 
-  it("calls switchSession WITH a withSession callback for bot command on existing chat", async () => {
-    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-ex": "/tmp/.pi/test-session.json" }));
+  it("calls newSession WITH a withSession callback for /sessions bot command (registry redesign)", async () => {
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/test-session.json"], current: "/tmp/.pi/test-session.json" }));
     const { api, commands } = setupExtension();
     const ext = await import("../../extensions/index.js");
     ext.default(api);
@@ -255,10 +255,10 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     });
 
     await vi.waitFor(() => {
-      expect(ctx.switchSession).toHaveBeenCalled();
+      expect(ctx.newSession).toHaveBeenCalled();
     });
 
-    const firstCallArg = ctx.switchSession.mock.calls[0][1];
+    const firstCallArg = ctx.newSession.mock.calls[0][0];
     expect(firstCallArg).toBeDefined();
     expect(firstCallArg!.withSession).toBeDefined();
     expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
@@ -266,7 +266,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
   });
 
   it("sends user message directly via pi.sendUserMessage (simplified forwarding)", async () => {
-    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-msg": "/tmp/.pi/msg-session.json" }));
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/msg-session.json"], current: "/tmp/.pi/msg-session.json" }));
     const { api, commands } = setupExtension();
     const ext = await import("../../extensions/index.js");
     ext.default(api);
@@ -285,11 +285,12 @@ describe("stale ctx prevention after newSession / switchSession", () => {
       expect((api as any).sendUserMessage).toHaveBeenCalledWith("hello world");
     });
 
+    expect(ctx.newSession).not.toHaveBeenCalled();
     expect(ctx.switchSession).not.toHaveBeenCalled();
   });
 
   it("uses withSession when cardAction triggers session switch", async () => {
-    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-card": "/tmp/.pi/card-session.json" }));
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/card-session.json"], current: "/tmp/.pi/card-session.json" }));
     const { api, commands } = setupExtension();
     const ext = await import("../../extensions/index.js");
     ext.default(api);
@@ -311,12 +312,11 @@ describe("stale ctx prevention after newSession / switchSession", () => {
 
     const firstCallArg = ctx.switchSession.mock.calls[0][1];
     expect(firstCallArg).toBeDefined();
-    // RED: current code doesn't use withSession in cardAction
     expect(firstCallArg!.withSession).toBeDefined();
   });
 
   it("calls setModel BEFORE switchSession on cardAction model switch and avoids stale getAvailable", async () => {
-    writeFileSync(REGISTRY_FILE, JSON.stringify({ "test-chat-model": "/tmp/.pi/model-session.json" }));
+    writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/model-session.json"], current: "/tmp/.pi/model-session.json" }));
     const { api, commands } = setupExtension();
     const ext = await import("../../extensions/index.js");
     ext.default(api);

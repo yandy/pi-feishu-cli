@@ -13,7 +13,7 @@ import {
 
 export interface SessionsAction {
   cmd: "sessions";
-  action: "switch" | "unbind" | "delete" | "new";
+  action: "switch" | "delete" | "new";
   sessionPath: string;
 }
 
@@ -53,18 +53,17 @@ function getSessionInfo(sessionPath: string): { name: string; messageCount: numb
 }
 
 export function buildSessionsCard(
-  registry: Record<string, string>,
+  sessions: string[],
   currentSessionFile: string,
 ): Record<string, unknown> {
   const elements: FeishuCardElement[] = [];
-  const entries = Object.entries(registry);
 
-  if (entries.length === 0) {
+  if (sessions.length === 0) {
     elements.push(
-      createMarkdownBlock("暂无绑定的会话\n发送任意消息即可自动创建并绑定一个新会话。"),
+      createMarkdownBlock("暂无会话\n发送任意消息即可自动创建会话。"),
     );
   } else {
-    for (const [chatId, sessionPath] of entries) {
+    for (const sessionPath of sessions) {
       if (elements.length > 0) {
         elements.push(createDividerBlock());
       }
@@ -86,11 +85,6 @@ export function buildSessionsCard(
         );
       }
       buttons.push(
-        createActionButton(
-          "解绑",
-          { cmd: "sessions", action: "unbind", sessionPath } satisfies SessionsAction,
-          "default",
-        ),
         createActionButton(
           "删除",
           { cmd: "sessions", action: "delete", sessionPath } satisfies SessionsAction,
@@ -123,28 +117,30 @@ export async function handleSessionsAction(
     newSession: () => Promise<unknown>;
     getSessionFile: () => string | undefined;
   },
-  registry: Record<string, string>,
-  chatId: string,
+  registry: { sessions: string[]; current?: string },
 ): Promise<void> {
   switch (action.action) {
     case "switch":
       await ctx.switchSession(action.sessionPath);
-      registry[chatId] = action.sessionPath;
-      break;
-    case "unbind":
-      delete registry[chatId];
+      registry.current = action.sessionPath;
       break;
     case "delete":
       await ctx.newSession();
       const newSessionFile = ctx.getSessionFile();
       rmSync(action.sessionPath, { force: true });
-      delete registry[chatId];
-      if (newSessionFile) registry[chatId] = newSessionFile;
+      registry.sessions = registry.sessions.filter(s => s !== action.sessionPath);
+      if (newSessionFile) {
+        registry.current = newSessionFile;
+        registry.sessions = [...new Set([...registry.sessions, newSessionFile])];
+      }
       break;
     case "new":
       await ctx.newSession();
       const sf = ctx.getSessionFile();
-      if (sf) registry[chatId] = sf;
+      if (sf) {
+        registry.current = sf;
+        registry.sessions = [...new Set([...registry.sessions, sf])];
+      }
       break;
     default:
       const _exhaustive: never = action.action;

@@ -64,7 +64,7 @@ describe("ModelAction JSON", () => {
 });
 
 describe("handleModelAction", () => {
-  it("switches session when registry has chatId", async () => {
+  it("switches session when registry has current", async () => {
     const switchSession = vi.fn().mockImplementation(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
       await opts?.withSession?.({});
     });
@@ -72,7 +72,7 @@ describe("handleModelAction", () => {
     const getSessionFile = vi.fn();
     const modelRegistry = { find: vi.fn().mockReturnValue({ name: "GPT-4" }) };
     const ctx = { switchSession, newSession, getSessionFile, modelRegistry };
-    const registry: Record<string, string> = { chat_123: "/sessions/test.json" };
+    const registry: { sessions: string[]; current?: string } = { sessions: ["/sessions/test.json"], current: "/sessions/test.json" };
     const setModel = vi.fn().mockResolvedValue(true);
 
     const action: ModelAction = {
@@ -90,7 +90,7 @@ describe("handleModelAction", () => {
     expect(result).toBe(true);
   });
 
-  it("creates new session when registry has no chatId", async () => {
+  it("creates new session when registry has no current", async () => {
     const switchSession = vi.fn();
     const newSession = vi.fn().mockImplementation(async (opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
       await opts?.withSession?.({
@@ -100,7 +100,7 @@ describe("handleModelAction", () => {
     const getSessionFile = vi.fn();
     const modelRegistry = { find: vi.fn().mockReturnValue({ name: "GPT-4" }) };
     const ctx = { switchSession, newSession, getSessionFile, modelRegistry };
-    const registry: Record<string, string> = {};
+    const registry: { sessions: string[]; current?: string } = { sessions: [] };
     const setModel = vi.fn().mockResolvedValue(true);
 
     const action: ModelAction = {
@@ -114,7 +114,8 @@ describe("handleModelAction", () => {
 
     expect(newSession).toHaveBeenCalledWith(expect.objectContaining({ withSession: expect.any(Function) }));
     expect(setModel).toHaveBeenCalledWith({ name: "GPT-4" });
-    expect(registry["chat_123"]).toBe("/sessions/new.json");
+    expect(registry.current).toBe("/sessions/new.json");
+    expect(registry.sessions).toContain("/sessions/new.json");
     expect(result).toBe(true);
   });
 
@@ -124,7 +125,7 @@ describe("handleModelAction", () => {
     const getSessionFile = vi.fn();
     const modelRegistry = { find: vi.fn().mockReturnValue(undefined) };
     const ctx = { switchSession, newSession, getSessionFile, modelRegistry };
-    const registry: Record<string, string> = {};
+    const registry: { sessions: string[]; current?: string } = { sessions: [] };
     const setModel = vi.fn();
 
     const action: ModelAction = {
