@@ -559,4 +559,155 @@ describe("activeChatId forwarding", () => {
             expect(sendCalls.length).toBeGreaterThan(0);
         });
     });
+
+    it("registers agent_end event handler", async () => {
+        const { api } = createMockAPI();
+        const ext = await import("../../extensions/index.js");
+        ext.default(api);
+
+        const agentEndCalls = (api.on as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0] === "agent_end"
+        );
+        expect(agentEndCalls.length).toBe(1);
+    });
+
+    it("agent_end handler sends streamEnd with end: true and clears activeChatId", async () => {
+        const { api, commands } = setupExtension();
+        let resolveSend: () => void = () => { };
+        (api as any).sendUserMessage = vi.fn(() => new Promise<void>(r => { resolveSend = r; }));
+        const ext = await import("../../extensions/index.js");
+        ext.default(api);
+
+        const cmd = commands.get("feishu-im")!;
+        const ctx = {
+            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
+            ui: { notify: vi.fn(), input: vi.fn() },
+            modelRegistry: { getAvailable: vi.fn(() => []) },
+            model: undefined,
+        };
+        await cmd.handler!("start", ctx as any);
+
+        mockIPC!.emit("message", {
+            type: "message",
+            chatId: "oc-agent-end",
+            content: "hello",
+        });
+
+        await vi.waitFor(() => {
+            expect((api as any).sendUserMessage).toHaveBeenCalled();
+        });
+
+        // Fire agent_end — the entire conversation is done
+        const agentEndHandler = (api.on as ReturnType<typeof vi.fn>).mock.calls.find(
+            (call: any[]) => call[0] === "agent_end"
+        )?.[1];
+        expect(agentEndHandler).toBeDefined();
+
+        (mockIPC!.send as ReturnType<typeof vi.fn>).mockClear();
+
+        await agentEndHandler?.({ messages: [] }, {});
+
+        const streamEndCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "streamEnd"
+        );
+        // After agent_end, streamEnd should be sent with end: true
+        expect(streamEndCalls.length).toBeGreaterThan(0);
+        expect(streamEndCalls[0]![0]).toMatchObject({
+            type: "streamEnd",
+            chatId: "oc-agent-end",
+            end: true,
+        });
+
+        // After agent_end, message_update should NOT forward (activeChatId cleared)
+        const messageUpdateHandler = (api.on as ReturnType<typeof vi.fn>).mock.calls.find(
+            (call: any[]) => call[0] === "message_update"
+        )?.[1];
+
+        (mockIPC!.send as ReturnType<typeof vi.fn>).mockClear();
+
+        await messageUpdateHandler?.(
+            { message: { role: "assistant", content: [{ type: "text", text: "late reply" }] } },
+            {},
+        );
+
+        const streamCallsAfterEnd = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "stream"
+        );
+        expect(streamCallsAfterEnd.length).toBe(0);
+
+        resolveSend();
+    });
+
+    it("message_end does NOT clear activeChatId (multi-message conversation)", async () => {
+        const { api, commands } = setupExtension();
+        let resolveSend: () => void = () => { };
+        (api as any).sendUserMessage = vi.fn(() => new Promise<void>(r => { resolveSend = r; }));
+        const ext = await import("../../extensions/index.js");
+        ext.default(api);
+
+        const cmd = commands.get("feishu-im")!;
+        const ctx = {
+            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
+            ui: { notify: vi.fn(), input: vi.fn() },
+            modelRegistry: { getAvailable: vi.fn(() => []) },
+            model: undefined,
+        };
+        await cmd.handler!("start", ctx as any);
+
+        mockIPC!.emit("message", {
+            type: "message",
+            chatId: "oc-multi-msg",
+            content: "hello",
+        });
+
+        await vi.waitFor(() => {
+            expect((api as any).sendUserMessage).toHaveBeenCalled();
+        });
+
+        const messageEndHandler = (api.on as ReturnType<typeof vi.fn>).mock.calls.find(
+            (call: any[]) => call[0] === "message_end"
+        )?.[1];
+        const messageUpdateHandler = (api.on as ReturnType<typeof vi.fn>).mock.calls.find(
+            (call: any[]) => call[0] === "message_update"
+        )?.[1];
+
+        // First assistant message ends (with text)
+        await messageEndHandler?.(
+            { message: { role: "assistant", content: [{ type: "text", text: "first reply" }] } },
+            {},
+        );
+
+        // Check that the streamEnd sent with end=false (not end=true)
+        const streamEndCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "streamEnd"
+        );
+        expect(streamEndCalls.length).toBe(1);
+        expect(streamEndCalls[0]![0]).toMatchObject({
+            type: "streamEnd",
+            chatId: "oc-multi-msg",
+            end: false,
+        });
+
+        (mockIPC!.send as ReturnType<typeof vi.fn>).mockClear();
+
+        // Second assistant message arrives (e.g., after tool call)
+        // activeChatId should still be set, so message_update should forward
+        await messageUpdateHandler?.(
+            { message: { role: "assistant", content: [{ type: "text", text: "second reply" }] } },
+            {},
+        );
+
+        const streamCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "stream"
+        );
+        // Bug: with current code, this would be 0 because activeChatId was cleared
+        expect(streamCalls.length).toBeGreaterThan(0);
+        expect(streamCalls[0]![0]).toMatchObject({
+            type: "stream",
+            chatId: "oc-multi-msg",
+            content: "second reply",
+        });
+
+        resolveSend();
+    });
 });

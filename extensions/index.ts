@@ -459,29 +459,35 @@ export default function(pi: ExtensionAPI) {
 
         const chatId = activeChatId;
 
-        let finalContent: string | undefined;
-        let end = false;
-        try {
-            const textContent = event.message.content?.find(
-                (c: { type: string }) => c.type === "text"
-            ) as { text?: string } | undefined;
-            const thinkingContent = event.message.content?.find(
-                (c: { type: string }) => c.type === "thinking"
-            ) as { thinking?: string } | undefined;
+		let finalContent: string | undefined;
+		try {
+			const textContent = event.message.content?.find(
+				(c: { type: string }) => c.type === "text"
+			) as { text?: string } | undefined;
+			const thinkingContent = event.message.content?.find(
+				(c: { type: string }) => c.type === "thinking"
+			) as { thinking?: string } | undefined;
 
-            const parts: string[] = [];
-            if (thinkingContent?.thinking) {
-                parts.push("> " + thinkingContent.thinking.replace(/\n/g, "\n> "));
-            }
-            if (textContent?.text) {
-                parts.push(textContent.text);
-                end = true;
-                activeChatId = null;
-                forwardingCount = 0;
-            }
-            finalContent = parts.join("\n\n") || undefined;
-        } catch {}
+			const parts: string[] = [];
+			if (thinkingContent?.thinking) {
+				parts.push("> " + thinkingContent.thinking.replace(/\n/g, "\n> "));
+			}
+			if (textContent?.text) {
+				parts.push(textContent.text);
+			}
+			finalContent = parts.join("\n\n") || undefined;
+		} catch {}
 
-        sendToDaemon({ type: "streamEnd", chatId, content: finalContent, end });
+		sendToDaemon({ type: "streamEnd", chatId, content: finalContent, end: false });
+    });
+
+    pi.on("agent_end", async (_event, _ctx) => {
+        if (!ipcClient?.connected) return;
+        if (!activeChatId) return;
+
+        const chatId = activeChatId;
+        sendToDaemon({ type: "streamEnd", chatId, end: true });
+        activeChatId = null;
+        forwardingCount = 0;
     });
 }
