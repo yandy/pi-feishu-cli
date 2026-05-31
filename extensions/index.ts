@@ -233,9 +233,9 @@ export default function(pi: ExtensionAPI) {
                                     await pi.sendUserMessage(prompt);
                                 } catch {
                                     sendToDaemon({ type: "send", chatId: msg.chatId, content: { text: "Pi 会话已失效，请执行 /feishu-im restart" } });
+                                    activeChatId = null;
+                                    forwardingCount = 0;
                                 }
-                                activeChatId = null;
-                                forwardingCount = 0;
                                 break;
                             }
 
@@ -474,6 +474,8 @@ export default function(pi: ExtensionAPI) {
         if (event.message.role !== "assistant") return;
         if (!activeChatId) return;
 
+        const chatId = activeChatId;
+
         // Extract final content as fallback in case message_update never fired
         let finalContent: string | undefined;
         try {
@@ -483,6 +485,13 @@ export default function(pi: ExtensionAPI) {
             finalContent = textContent?.text;
         } catch {}
 
-        sendToDaemon({ type: "streamEnd", chatId: activeChatId, content: finalContent });
+        // Only clear activeChatId when we have actual text content to send,
+        // not for intermediate messages like thinking blocks.
+        if (finalContent) {
+            activeChatId = null;
+            forwardingCount = 0;
+        }
+
+        sendToDaemon({ type: "streamEnd", chatId, content: finalContent });
     });
 }
