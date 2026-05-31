@@ -231,6 +231,10 @@ async function main() {
   ipcServer.on("disconnect", () => {
     log("info", "Extension disconnected");
   });
+
+  ipcServer.on("reject", () => {
+    log("info", "Rejected new connection - already connected");
+  });
 }
 
 main().catch((err) => {
