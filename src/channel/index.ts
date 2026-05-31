@@ -1,10 +1,15 @@
-import type { NormalizedMessage, CardActionEvent } from "@larksuiteoapi/node-sdk";
+import { createLarkChannel, LoggerLevel, type NormalizedMessage, type CardActionEvent } from "@larksuiteoapi/node-sdk";
 
 export type { NormalizedMessage, CardActionEvent };
 
 export interface CreateChannelOptions {
   appId: string;
   appSecret: string;
+  outbound?: {
+    streamInitialText?: string;
+    streamThrottleMs?: number;
+    streamThrottleChars?: number;
+  };
 }
 
 export interface Channel {
@@ -24,13 +29,12 @@ export interface Channel {
 }
 
 export function createFeishuChannel(options: CreateChannelOptions): Channel {
-  const { createLarkChannel, LoggerLevel } = require("@larksuiteoapi/node-sdk") as typeof import("@larksuiteoapi/node-sdk");
-
   const channel = createLarkChannel({
     appId: options.appId,
     appSecret: options.appSecret,
     loggerLevel: LoggerLevel.info,
     policy: { requireMention: true, dmMode: "open" },
+    ...(options.outbound ? { outbound: options.outbound } : {}),
   });
 
   let _connected = false;
