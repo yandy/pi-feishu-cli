@@ -1,32 +1,39 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { loadAuth, saveAuth } from "../../src/auth/index.js";
-import { AUTH_FILE } from "../../src/config.js";
+
+const TEST_DIR = "/tmp/test-pi-feishu-auth";
+const TEST_AUTH_FILE = join(TEST_DIR, "auth.json");
+
+vi.mock("../../src/config.js", () => ({
+  AUTH_FILE: "/tmp/test-pi-feishu-auth/auth.json",
+  FEISHU_IM_DIR: "/tmp/test-pi-feishu-auth",
+  SOCKET_PATH: "/tmp/test-pi-feishu-auth.sock",
+  PID_FILE: "/tmp/test-pi-feishu-auth/daemon.pid",
+  REGISTRY_FILE: "/tmp/test-pi-feishu-auth/registry.json",
+  DAEMON_LOG: "/tmp/test-pi-feishu-auth/daemon.log",
+}));
 
 describe("auth", () => {
-  const TEST_DIR = dirname(AUTH_FILE);
-
   beforeEach(() => {
-    try { rmSync(AUTH_FILE); } catch {}
     mkdirSync(TEST_DIR, { recursive: true });
   });
 
-  afterEach(() => {
-    try { rmSync(AUTH_FILE); } catch {}
+  afterAll(() => {
+    try { rmSync(TEST_DIR, { recursive: true, force: true }); } catch {}
   });
 
   it("loadAuth returns null when file does not exist", () => {
-    try { rmSync(AUTH_FILE); } catch {}
     const result = loadAuth(TEST_DIR);
     expect(result).toBeNull();
   });
 
   it("saveAuth creates auth.json with credentials", () => {
     saveAuth(TEST_DIR, "my-app-id", "my-secret");
-    expect(existsSync(AUTH_FILE)).toBe(true);
+    expect(existsSync(TEST_AUTH_FILE)).toBe(true);
 
-    const content = JSON.parse(readFileSync(AUTH_FILE, "utf-8"));
+    const content = JSON.parse(readFileSync(TEST_AUTH_FILE, "utf-8"));
     expect(content.appId).toBe("my-app-id");
     expect(content.appSecret).toBe("my-secret");
   });
@@ -38,7 +45,7 @@ describe("auth", () => {
   });
 
   it("loadAuth returns null for invalid JSON", () => {
-    writeFileSync(AUTH_FILE, "not json", "utf-8");
+    writeFileSync(TEST_AUTH_FILE, "not json", "utf-8");
     const result = loadAuth(TEST_DIR);
     expect(result).toBeNull();
   });
