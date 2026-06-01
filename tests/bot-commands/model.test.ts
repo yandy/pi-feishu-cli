@@ -64,92 +64,22 @@ describe("ModelAction JSON", () => {
 });
 
 describe("handleModelAction", () => {
-  it("switches session and calls onUpdate with fresh model data", async () => {
-    const freshModels: ModelInfo[] = [{ provider: "openai", id: "gpt-4", name: "GPT-4" }];
-    const switchSession = vi.fn().mockImplementation(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
-      await opts?.withSession?.({
-        modelRegistry: { getAvailable: () => freshModels },
-        model: { provider: "openai", id: "gpt-4" },
-      });
-    });
-    const newSession = vi.fn();
+  it("calls setModel and returns true when model found", async () => {
     const modelRegistry = { find: vi.fn().mockReturnValue({ name: "GPT-4" }) };
-    const ctx = { switchSession, newSession, modelRegistry };
-    const registry: { sessions: string[]; current?: string } = { sessions: ["/sessions/test.json"], current: "/sessions/test.json" };
     const setModel = vi.fn().mockResolvedValue(true);
-    const onUpdate = vi.fn();
-
-    const action: ModelAction = {
-      cmd: "model",
-      action: "select",
-      modelProvider: "openai",
-      modelId: "gpt-4",
-    };
-
-    const result = await handleModelAction(action, ctx, registry, setModel, onUpdate);
-
-    expect(switchSession).toHaveBeenCalledWith("/sessions/test.json", expect.objectContaining({ withSession: expect.any(Function) }));
+    const action: ModelAction = { cmd: "model", action: "select", modelProvider: "openai", modelId: "gpt-4" };
+    const result = await handleModelAction(action, modelRegistry, setModel);
     expect(modelRegistry.find).toHaveBeenCalledWith("openai", "gpt-4");
     expect(setModel).toHaveBeenCalledWith({ name: "GPT-4" });
-    expect(onUpdate).toHaveBeenCalledWith(freshModels, { provider: "openai", id: "gpt-4" });
     expect(result).toBe(true);
   });
 
-  it("creates new session and calls onUpdate with fresh model data and updates registry", async () => {
-    const freshModels: ModelInfo[] = [{ provider: "openai", id: "gpt-4", name: "GPT-4" }];
-    const switchSession = vi.fn();
-    const newSession = vi.fn().mockImplementation(async (opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
-      await opts?.withSession?.({
-        sessionManager: { getSessionFile: () => "/sessions/new.json" },
-        modelRegistry: { getAvailable: () => freshModels },
-        model: { provider: "openai", id: "gpt-4" },
-      });
-    });
-    const modelRegistry = { find: vi.fn().mockReturnValue({ name: "GPT-4" }) };
-    const ctx = { switchSession, newSession, modelRegistry };
-    const registry: { sessions: string[]; current?: string } = { sessions: [] };
-    const setModel = vi.fn().mockResolvedValue(true);
-    const onUpdate = vi.fn();
-
-    const action: ModelAction = {
-      cmd: "model",
-      action: "select",
-      modelProvider: "openai",
-      modelId: "gpt-4",
-    };
-
-    const result = await handleModelAction(action, ctx, registry, setModel, onUpdate);
-
-    expect(newSession).toHaveBeenCalledWith(expect.objectContaining({ withSession: expect.any(Function) }));
-    expect(setModel).toHaveBeenCalledWith({ name: "GPT-4" });
-    expect(registry.current).toBe("/sessions/new.json");
-    expect(registry.sessions).toContain("/sessions/new.json");
-    expect(onUpdate).toHaveBeenCalledWith(freshModels, { provider: "openai", id: "gpt-4" });
-    expect(result).toBe(true);
-  });
-
-  it("returns false and does not call onUpdate when model not found", async () => {
-    const switchSession = vi.fn();
-    const newSession = vi.fn();
+  it("returns false and does not call setModel when model not found", async () => {
     const modelRegistry = { find: vi.fn().mockReturnValue(undefined) };
-    const ctx = { switchSession, newSession, modelRegistry };
-    const registry: { sessions: string[]; current?: string } = { sessions: [] };
     const setModel = vi.fn();
-    const onUpdate = vi.fn();
-
-    const action: ModelAction = {
-      cmd: "model",
-      action: "select",
-      modelProvider: "unknown",
-      modelId: "nonexistent",
-    };
-
-    const result = await handleModelAction(action, ctx, registry, setModel, onUpdate);
-
-    expect(switchSession).not.toHaveBeenCalled();
-    expect(newSession).not.toHaveBeenCalled();
+    const action: ModelAction = { cmd: "model", action: "select", modelProvider: "unknown", modelId: "nonexistent" };
+    const result = await handleModelAction(action, modelRegistry, setModel);
     expect(setModel).not.toHaveBeenCalled();
-    expect(onUpdate).not.toHaveBeenCalled();
     expect(result).toBe(false);
   });
 });
