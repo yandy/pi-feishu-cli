@@ -197,7 +197,6 @@ describe("activeChatId forwarding", () => {
 
         const cmd = commands.get("feishu-im")!;
         const ctx = {
-            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
             ui: { notify: vi.fn(), input: vi.fn() },
             modelRegistry: { getAvailable: vi.fn(() => []) },
             model: undefined,
@@ -220,7 +219,7 @@ describe("activeChatId forwarding", () => {
 
         await messageUpdateHandler(
             { message: { role: "assistant", content: [{ type: "text", text: "reply" }] } },
-            { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
+            {},
         );
 
         const streamCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
@@ -245,7 +244,6 @@ describe("activeChatId forwarding", () => {
 
         const cmd = commands.get("feishu-im")!;
         const ctx = {
-            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
             ui: { notify: vi.fn(), input: vi.fn() },
             modelRegistry: { getAvailable: vi.fn(() => []) },
             model: undefined,
@@ -268,7 +266,7 @@ describe("activeChatId forwarding", () => {
 
         await messageEndHandler(
             { message: { role: "assistant", content: [{ type: "text", text: "final" }] } },
-            { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
+            {},
         );
 
         const streamEndCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
@@ -292,7 +290,6 @@ describe("activeChatId forwarding", () => {
 
         const cmd = commands.get("feishu-im")!;
         const ctx = {
-            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
             ui: { notify: vi.fn(), input: vi.fn() },
             modelRegistry: { getAvailable: vi.fn(() => []) },
             model: undefined,
@@ -334,7 +331,6 @@ describe("activeChatId forwarding", () => {
 
         const cmd = commands.get("feishu-im")!;
         const ctx = {
-            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
             ui: { notify: vi.fn(), input: vi.fn() },
             modelRegistry: { getAvailable: vi.fn(() => []) },
             model: undefined,
@@ -401,7 +397,6 @@ describe("activeChatId forwarding", () => {
 
         const cmd = commands.get("feishu-im")!;
         const ctx = {
-            sessionManager: { getSessionFile: vi.fn(() => "/tmp/test-session.json") },
             ui: { notify: vi.fn(), input: vi.fn() },
             modelRegistry: { getAvailable: vi.fn(() => []) },
             model: undefined,
