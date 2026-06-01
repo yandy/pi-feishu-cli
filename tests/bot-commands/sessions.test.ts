@@ -48,13 +48,21 @@ describe("buildSessionsCard", () => {
     expect(json).toContain("新建会话");
   });
 
-  it("marks current session with indicator and hides switch button", () => {
+  it("marks current session with indicator and hides switch and delete buttons", () => {
     const sessions = ["/tmp/current.json", "/tmp/other.json"];
     const card = buildSessionsCard(sessions, "/tmp/current.json");
     const json = JSON.stringify(card);
 
     expect(json).toContain("当前");
     expect(json).toContain("other");
+    // Use divider as session boundary for robust slicing
+    const firstHr = json.indexOf('"tag":"hr"');
+    const currentSection = json.slice(0, firstHr);
+    expect(currentSection).not.toContain("\"切换\"");
+    expect(currentSection).not.toContain("\"删除\"");
+    const otherSection = json.slice(firstHr);
+    expect(otherSection).toContain("\"切换\"");
+    expect(otherSection).toContain("\"删除\"");
   });
 
   it("serializes SessionsAction values in buttons", () => {

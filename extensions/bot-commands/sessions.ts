@@ -84,13 +84,15 @@ export function buildSessionsCard(
           ),
         );
       }
-      buttons.push(
-        createActionButton(
-          "删除",
-          { cmd: "sessions", action: "delete", sessionPath } satisfies SessionsAction,
-          "danger",
-        ),
-      );
+      if (!isCurrent) {
+        buttons.push(
+          createActionButton(
+            "删除",
+            { cmd: "sessions", action: "delete", sessionPath } satisfies SessionsAction,
+            "danger",
+          ),
+        );
+      }
       elements.push({ tag: "action", actions: buttons } as FeishuCardElement);
     }
   }
