@@ -6,8 +6,8 @@ describe("parseBotCommand", () => {
     expect(parseBotCommand("/help")).toBe("help");
   });
 
-  it("returns sessions for /sessions", () => {
-    expect(parseBotCommand("/sessions")).toBe("sessions");
+  it("returns null for /sessions (command removed)", () => {
+    expect(parseBotCommand("/sessions")).toBeNull();
   });
 
   it("returns model for /model", () => {
@@ -35,7 +35,6 @@ describe("parseBotCommand", () => {
   });
 
   it("ignores extra args after command", () => {
-    expect(parseBotCommand("/sessions extra")).toBe("sessions");
     expect(parseBotCommand("/model claude-3")).toBe("model");
   });
 });

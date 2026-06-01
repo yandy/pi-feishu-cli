@@ -1,6 +1,5 @@
 export const BOT_COMMANDS = {
   help: "/help",
-  sessions: "/sessions",
   model: "/model",
 } as const;
 
