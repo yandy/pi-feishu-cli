@@ -294,7 +294,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     });
 
     it("uses withSession when cardAction triggers session switch", async () => {
-        writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/card-session.json"], current: "/tmp/.pi/card-session.json" }));
+        writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/card-session.json", "/tmp/.pi/other.json"], current: "/tmp/.pi/card-session.json" }));
         const { api, commands } = setupExtension();
         const ext = await import("../../extensions/index.js");
         ext.default(api);
@@ -317,6 +317,65 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const firstCallArg = ctx.switchSession.mock.calls[0][1];
         expect(firstCallArg).toBeDefined();
         expect(firstCallArg!.withSession).toBeDefined();
+    });
+
+    it("handles sessions cardAction new command with newSession", async () => {
+        writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/card-session.json"], current: "/tmp/.pi/card-session.json" }));
+        const { api, commands } = setupExtension();
+        const ext = await import("../../extensions/index.js");
+        ext.default(api);
+
+        const cmd = commands.get("feishu-im")!;
+        const ctx = createStaleAwareCtx();
+        await cmd.handler!("start", ctx as any);
+
+        mockIPC!.emit("message", {
+            type: "cardAction",
+            chatId: "test-chat-card-new",
+            messageId: "msg-new",
+            action: { tag: "button", value: { cmd: "sessions", action: "new", sessionPath: "" } },
+        });
+
+        await vi.waitFor(() => {
+            expect(ctx.newSession).toHaveBeenCalled();
+        });
+
+        const firstCallArg = ctx.newSession.mock.calls[0][0];
+        expect(firstCallArg).toBeDefined();
+        expect(firstCallArg!.withSession).toBeDefined();
+
+        const updateCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "updateCard"
+        );
+        expect(updateCalls.length).toBeGreaterThan(0);
+    });
+
+    it("handles sessions cardAction delete of non-current session without Pi API calls", async () => {
+        writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/del-me.json", "/tmp/.pi/curr.json"], current: "/tmp/.pi/curr.json" }));
+        const { api, commands } = setupExtension();
+        const ext = await import("../../extensions/index.js");
+        ext.default(api);
+
+        const cmd = commands.get("feishu-im")!;
+        const ctx = createStaleAwareCtx();
+        await cmd.handler!("start", ctx as any);
+
+        mockIPC!.emit("message", {
+            type: "cardAction",
+            chatId: "test-chat-del",
+            messageId: "msg-del",
+            action: { tag: "button", value: { cmd: "sessions", action: "delete", sessionPath: "/tmp/.pi/del-me.json" } },
+        });
+
+        await vi.waitFor(() => {
+            const updateCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+                (call: any[]) => call[0]?.type === "updateCard"
+            );
+            expect(updateCalls.length).toBeGreaterThan(0);
+        });
+
+        expect(ctx.newSession).not.toHaveBeenCalled();
+        expect(ctx.switchSession).not.toHaveBeenCalled();
     });
 
     it("calls setModel BEFORE switchSession on cardAction model switch and avoids stale getAvailable", async () => {

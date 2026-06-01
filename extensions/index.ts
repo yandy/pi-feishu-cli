@@ -250,32 +250,21 @@ export default function(pi: ExtensionAPI) {
                                 if (parsed.cmd === "sessions") {
                                     try {
                                         const sessionsAction = parsed as unknown as import("./bot-commands/sessions.js").SessionsAction;
-                                        let afterSessionFile: string | undefined;
                                         await handleSessionsAction(
                                             sessionsAction,
                                             {
-                                                switchSession: async (p: string) => {
-                                                    await ctx.switchSession(p, { withSession: async (newCtx) => {
-                                                        afterSessionFile = newCtx.sessionManager.getSessionFile();
-                                                    }});
-                                                },
-                                                newSession: async () => {
-                                                    await ctx.newSession({ withSession: async (newCtx) => {
-                                                        afterSessionFile = newCtx.sessionManager.getSessionFile();
-                                                    }});
-                                                },
-                                                getSessionFile: () => afterSessionFile,
+                                                switchSession: ctx.switchSession,
+                                                newSession: ctx.newSession,
                                             },
                                             registry,
+                                            (updatedRegistry) => {
+                                                saveRegistry(updatedRegistry);
+                                                const card = buildSessionsCard(updatedRegistry.sessions, updatedRegistry.current || "");
+                                                sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                                            },
                                         );
-                                        if (afterSessionFile) {
-                                            registry.current = afterSessionFile;
-                                            registry.sessions = [...new Set([...registry.sessions, afterSessionFile])];
-                                        }
-                                        saveRegistry(registry);
-                                        const card = buildSessionsCard(registry.sessions, registry.current || "");
-                                        sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                    } catch {
+                                    } catch (e) {
+                                        console.error("sessions cardAction error:", e);
                                         sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildSessionsCard([], "") });
                                     }
                                 } else if (parsed.cmd === "model") {
