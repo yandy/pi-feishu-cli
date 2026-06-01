@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { rmSync } from "node:fs";
 import type { SessionsAction } from "../../extensions/bot-commands/sessions.js";
 
@@ -102,12 +102,15 @@ describe("SessionsAction JSON value", () => {
 });
 
 describe("handleSessionsAction", () => {
-  it("switch updates registry.current and calls ctx.switchSession", async () => {
-    const switchSession = vi.fn().mockResolvedValue(undefined);
+  beforeEach(() => { vi.clearAllMocks(); });
+  it("switch calls ctx.switchSession and updates registry via onUpdate", async () => {
+    const switchSession = vi.fn().mockImplementation(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
+      await opts?.withSession?.({});
+    });
     const newSession = vi.fn();
-    const getSessionFile = vi.fn();
-    const ctx = { switchSession, newSession, getSessionFile };
+    const ctx = { switchSession, newSession };
     const registry: { sessions: string[]; current?: string } = { sessions: ["/tmp/old.json"], current: "/tmp/old.json" };
+    const onUpdate = vi.fn();
 
     const action: SessionsAction = {
       cmd: "sessions",
@@ -115,42 +118,86 @@ describe("handleSessionsAction", () => {
       sessionPath: "/tmp/new.json",
     };
 
-    await handleSessionsAction(action, ctx, registry);
+    await handleSessionsAction(action, ctx, registry, onUpdate);
 
-    expect(switchSession).toHaveBeenCalledWith("/tmp/new.json");
+    expect(switchSession).toHaveBeenCalledWith("/tmp/new.json", expect.objectContaining({ withSession: expect.any(Function) }));
     expect(registry.current).toBe("/tmp/new.json");
+    expect(onUpdate).toHaveBeenCalledWith(registry);
   });
 
-  it("delete removes session from registry and deletes session file", async () => {
-    const newSession = vi.fn().mockResolvedValue(undefined);
-    const getSessionFile = vi.fn();
-    const ctx = {
-      switchSession: vi.fn(),
-      newSession,
-      getSessionFile,
+  it("switch is no-op when target is current session", async () => {
+    const switchSession = vi.fn();
+    const newSession = vi.fn();
+    const ctx = { switchSession, newSession };
+    const registry: { sessions: string[]; current?: string } = { sessions: ["/tmp/curr.json"], current: "/tmp/curr.json" };
+    const onUpdate = vi.fn();
+
+    const action: SessionsAction = {
+      cmd: "sessions",
+      action: "switch",
+      sessionPath: "/tmp/curr.json",
     };
-    const registry: { sessions: string[]; current?: string } = { sessions: ["/tmp/session.json"], current: "/tmp/session.json" };
+
+    await handleSessionsAction(action, ctx, registry, onUpdate);
+
+    expect(switchSession).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("delete removes non-current session from registry and deletes file (no Pi API)", async () => {
+    const switchSession = vi.fn();
+    const newSession = vi.fn();
+    const ctx = { switchSession, newSession };
+    const registry: { sessions: string[]; current?: string } = { sessions: ["/tmp/other.json", "/tmp/curr.json"], current: "/tmp/curr.json" };
+    const onUpdate = vi.fn();
 
     const action: SessionsAction = {
       cmd: "sessions",
       action: "delete",
-      sessionPath: "/tmp/session.json",
+      sessionPath: "/tmp/other.json",
     };
 
-    await handleSessionsAction(action, ctx, registry);
-    expect(rmSync).toHaveBeenCalledWith("/tmp/session.json", { force: true });
-    expect(registry.sessions).not.toContain("/tmp/session.json");
+    await handleSessionsAction(action, ctx, registry, onUpdate);
+
+    expect(rmSync).toHaveBeenCalledWith("/tmp/other.json", { force: true });
+    expect(registry.sessions).not.toContain("/tmp/other.json");
+    expect(registry.sessions).toContain("/tmp/curr.json");
+    expect(switchSession).not.toHaveBeenCalled();
+    expect(newSession).not.toHaveBeenCalled();
+    expect(onUpdate).toHaveBeenCalledWith(registry);
   });
 
-  it("new creates session and updates registry", async () => {
-    const newSession = vi.fn().mockResolvedValue(undefined);
-    const getSessionFile = vi.fn().mockReturnValue("/tmp/new_session.json");
-    const ctx = {
-      switchSession: vi.fn(),
-      newSession,
-      getSessionFile,
+  it("delete is no-op when target is current session", async () => {
+    const switchSession = vi.fn();
+    const newSession = vi.fn();
+    const ctx = { switchSession, newSession };
+    const registry: { sessions: string[]; current?: string } = { sessions: ["/tmp/curr.json"], current: "/tmp/curr.json" };
+    const onUpdate = vi.fn();
+
+    const action: SessionsAction = {
+      cmd: "sessions",
+      action: "delete",
+      sessionPath: "/tmp/curr.json",
     };
+
+    await handleSessionsAction(action, ctx, registry, onUpdate);
+
+    expect(rmSync).not.toHaveBeenCalled();
+    expect(switchSession).not.toHaveBeenCalled();
+    expect(newSession).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("new creates session and calls onUpdate via withSession", async () => {
+    const switchSession = vi.fn();
+    const newSession = vi.fn().mockImplementation(async (opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
+      await opts?.withSession?.({
+        sessionManager: { getSessionFile: () => "/tmp/new_session.json" },
+      });
+    });
+    const ctx = { switchSession, newSession };
     const registry: { sessions: string[]; current?: string } = { sessions: [] };
+    const onUpdate = vi.fn();
 
     const action: SessionsAction = {
       cmd: "sessions",
@@ -158,10 +205,11 @@ describe("handleSessionsAction", () => {
       sessionPath: "",
     };
 
-    await handleSessionsAction(action, ctx, registry);
-    expect(newSession).toHaveBeenCalled();
-    expect(getSessionFile).toHaveBeenCalled();
+    await handleSessionsAction(action, ctx, registry, onUpdate);
+
+    expect(newSession).toHaveBeenCalledWith(expect.objectContaining({ withSession: expect.any(Function) }));
     expect(registry.sessions).toContain("/tmp/new_session.json");
     expect(registry.current).toBe("/tmp/new_session.json");
+    expect(onUpdate).toHaveBeenCalledWith(registry);
   });
 });

@@ -115,37 +115,42 @@ export function buildSessionsCard(
 export async function handleSessionsAction(
   action: SessionsAction,
   ctx: {
-    switchSession: (path: string) => Promise<unknown>;
-    newSession: () => Promise<unknown>;
-    getSessionFile: () => string | undefined;
+    switchSession: (path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => Promise<unknown>;
+    newSession: (opts?: { withSession?: (newCtx: any) => Promise<void> }) => Promise<unknown>;
   },
   registry: { sessions: string[]; current?: string },
+  onUpdate: (registry: { sessions: string[]; current?: string }) => void,
 ): Promise<void> {
   switch (action.action) {
-    case "switch":
-      await ctx.switchSession(action.sessionPath);
-      registry.current = action.sessionPath;
+    case "switch": {
+      if (action.sessionPath === registry.current) return;
+      await ctx.switchSession(action.sessionPath, { withSession: async () => {
+        registry.current = action.sessionPath;
+        onUpdate(registry);
+      }});
       break;
-    case "delete":
-      await ctx.newSession();
-      const newSessionFile = ctx.getSessionFile();
+    }
+    case "delete": {
+      if (action.sessionPath === registry.current) return;
       rmSync(action.sessionPath, { force: true });
       registry.sessions = registry.sessions.filter(s => s !== action.sessionPath);
-      if (newSessionFile) {
-        registry.current = newSessionFile;
-        registry.sessions = [...new Set([...registry.sessions, newSessionFile])];
-      }
+      onUpdate(registry);
       break;
-    case "new":
-      await ctx.newSession();
-      const sf = ctx.getSessionFile();
-      if (sf) {
-        registry.current = sf;
-        registry.sessions = [...new Set([...registry.sessions, sf])];
-      }
+    }
+    case "new": {
+      await ctx.newSession({ withSession: async (newCtx: any) => {
+        const sf = newCtx.sessionManager.getSessionFile();
+        if (sf) {
+          registry.current = sf;
+          registry.sessions = [...new Set([...registry.sessions, sf])];
+        }
+        onUpdate(registry);
+      }});
       break;
-    default:
+    }
+    default: {
       const _exhaustive: never = action.action;
       break;
+    }
   }
 }
