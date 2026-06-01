@@ -168,17 +168,14 @@ export default function(pi: ExtensionAPI) {
                                 if (botCmd) {
                                     if (botCmd === "sessions") {
                                         try {
-                                            await ctx.newSession({ withSession: async (newCtx) => {
-                                                const sf = newCtx.sessionManager.getSessionFile();
-                                                if (sf) {
-                                                    const sessions = [...new Set([...registry.sessions, sf])];
-                                                    registry.sessions = sessions;
-                                                    registry.current = sf;
-                                                    saveRegistry(registry);
-                                                }
-                                                const card = buildSessionsCard(registry.sessions, registry.current || "");
-                                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                            }});
+                                            const sf = ctx.sessionManager.getSessionFile();
+                                            if (sf) {
+                                                registry.sessions = [...new Set([...registry.sessions, sf])];
+                                                registry.current = sf;
+                                                saveRegistry(registry);
+                                            }
+                                            const card = buildSessionsCard(registry.sessions, registry.current || "");
+                                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
                                         } catch {
                                             const card = buildSessionsCard(registry.sessions, registry.current || "");
                                             sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
@@ -188,18 +185,15 @@ export default function(pi: ExtensionAPI) {
 
                                     if (botCmd === "model") {
                                         try {
-                                            await ctx.newSession({ withSession: async (newCtx) => {
-                                                const sf = newCtx.sessionManager.getSessionFile();
-                                                if (sf) {
-                                                    const sessions = [...new Set([...registry.sessions, sf])];
-                                                    registry.sessions = sessions;
-                                                    registry.current = sf;
-                                                    saveRegistry(registry);
-                                                }
-                                                const models = newCtx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                                const card = buildModelCard(models, newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined);
-                                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                            }});
+                                            const sf = ctx.sessionManager.getSessionFile();
+                                            if (sf) {
+                                                registry.sessions = [...new Set([...registry.sessions, sf])];
+                                                registry.current = sf;
+                                                saveRegistry(registry);
+                                            }
+                                            const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                            const card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
+                                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
                                         } catch {
                                             const card = buildModelCard([], undefined);
                                             sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });

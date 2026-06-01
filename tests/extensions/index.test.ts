@@ -216,8 +216,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         return { api, commands };
     }
 
-    it("calls newSession WITH a withSession callback for bot command on new chat", async () => {
-        // Write registry BEFORE init so loadRegistry() picks it up
+    it("does NOT call newSession or switchSession for /sessions bot command", async () => {
         writeFileSync(REGISTRY_FILE, JSON.stringify({}));
         const { api, commands } = setupExtension();
         const ext = await import("../../extensions/index.js");
@@ -234,20 +233,14 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         });
 
         await vi.waitFor(() => {
-            expect(ctx.newSession).toHaveBeenCalled();
+            expect(mockIPC!.send).toHaveBeenCalled();
         });
 
-        const firstCallArg = ctx.newSession.mock.calls[0][0];
-        // RED: with current code, newSession() is called WITHOUT withSession
-        // This assertion will FAIL — which is what TDD expects
-        expect(firstCallArg).toBeDefined();
-        expect(firstCallArg!.withSession).toBeDefined();
-        expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
-        // The stale ctx's getSessionFile must NOT have been called
-        expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
+        expect(ctx.newSession).not.toHaveBeenCalled();
+        expect(ctx.switchSession).not.toHaveBeenCalled();
     });
 
-    it("calls newSession WITH a withSession callback for /sessions bot command (registry redesign)", async () => {
+    it("sends sessions card via sendToDaemon without calling newSession for /sessions", async () => {
         writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/test-session.json"], current: "/tmp/.pi/test-session.json" }));
         const { api, commands } = setupExtension();
         const ext = await import("../../extensions/index.js");
@@ -264,14 +257,16 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         });
 
         await vi.waitFor(() => {
-            expect(ctx.newSession).toHaveBeenCalled();
+            expect(mockIPC!.send).toHaveBeenCalled();
         });
 
-        const firstCallArg = ctx.newSession.mock.calls[0][0];
-        expect(firstCallArg).toBeDefined();
-        expect(firstCallArg!.withSession).toBeDefined();
-        expect(ctx._freshCtx.sessionManager.getSessionFile).toHaveBeenCalled();
-        expect(ctx.sessionManager.getSessionFile).not.toHaveBeenCalled();
+        expect(ctx.newSession).not.toHaveBeenCalled();
+        expect(ctx.switchSession).not.toHaveBeenCalled();
+
+        const sendCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "send"
+        );
+        expect(sendCalls.length).toBeGreaterThan(0);
     });
 
     it("sends user message directly via pi.sendUserMessage (simplified forwarding)", async () => {
