@@ -103,9 +103,10 @@ describe("SessionsAction JSON value", () => {
 
 describe("handleSessionsAction", () => {
   beforeEach(() => { vi.clearAllMocks(); });
-  it("switch calls ctx.switchSession and updates registry via onUpdate", async () => {
+  it("switch calls ctx.switchSession, updates registry, and calls reload", async () => {
+    const reload = vi.fn();
     const switchSession = vi.fn().mockImplementation(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
-      await opts?.withSession?.({});
+      await opts?.withSession?.({ reload });
     });
     const newSession = vi.fn();
     const ctx = { switchSession, newSession };
@@ -123,6 +124,7 @@ describe("handleSessionsAction", () => {
     expect(switchSession).toHaveBeenCalledWith("/tmp/new.json", expect.objectContaining({ withSession: expect.any(Function) }));
     expect(registry.current).toBe("/tmp/new.json");
     expect(onUpdate).toHaveBeenCalledWith(registry);
+    expect(reload).toHaveBeenCalled();
   });
 
   it("switch is no-op when target is current session", async () => {
@@ -188,12 +190,11 @@ describe("handleSessionsAction", () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
-  it("new creates session and calls onUpdate via withSession", async () => {
+  it("new creates session, calls onUpdate, and calls reload", async () => {
+    const reload = vi.fn();
     const switchSession = vi.fn();
     const newSession = vi.fn().mockImplementation(async (opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
-      await opts?.withSession?.({
-        sessionManager: { getSessionFile: () => "/tmp/new_session.json" },
-      });
+      await opts?.withSession?.({ sessionManager: { getSessionFile: () => "/tmp/new_session.json" }, reload });
     });
     const ctx = { switchSession, newSession };
     const registry: { sessions: string[]; current?: string } = { sessions: [] };
@@ -211,5 +212,6 @@ describe("handleSessionsAction", () => {
     expect(registry.sessions).toContain("/tmp/new_session.json");
     expect(registry.current).toBe("/tmp/new_session.json");
     expect(onUpdate).toHaveBeenCalledWith(registry);
+    expect(reload).toHaveBeenCalled();
   });
 });

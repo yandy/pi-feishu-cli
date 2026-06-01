@@ -124,9 +124,10 @@ export async function handleSessionsAction(
   switch (action.action) {
     case "switch": {
       if (action.sessionPath === registry.current) return;
-      await ctx.switchSession(action.sessionPath, { withSession: async () => {
+      await ctx.switchSession(action.sessionPath, { withSession: async (newCtx: any) => {
         registry.current = action.sessionPath;
         onUpdate(registry);
+        await newCtx.reload();
       }});
       break;
     }
@@ -145,6 +146,7 @@ export async function handleSessionsAction(
           registry.sessions = [...new Set([...registry.sessions, sf])];
         }
         onUpdate(registry);
+        await newCtx.reload();
       }});
       break;
     }
