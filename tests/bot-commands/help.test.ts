@@ -16,12 +16,12 @@ describe("buildHelpCard", () => {
     expect(header.title.content).toContain("Pi");
   });
 
-  it("card JSON contains /help, /sessions, /model commands", () => {
+  it("card JSON contains /help and /model but NOT /sessions", () => {
     const card = buildHelpCard();
     const json = JSON.stringify(card);
     expect(json).toContain("/help");
-    expect(json).toContain("/sessions");
     expect(json).toContain("/model");
+    expect(json).not.toContain("/sessions");
   });
 
   it("first element contains Pi in its markdown content", () => {
