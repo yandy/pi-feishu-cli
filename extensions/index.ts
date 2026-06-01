@@ -1,38 +1,16 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync } from "node:fs";
 import { createIPCClient, type IPCClient } from "../src/ipc/client.js";
-import { FEISHU_IM_DIR, PID_FILE, SOCKET_PATH, REGISTRY_FILE } from "../src/config.js";
+import { FEISHU_IM_DIR, PID_FILE, SOCKET_PATH } from "../src/config.js";
 import type { DaemonMessage, ExtensionMessage } from "../src/ipc/protocol.js";
 import { parseBotCommand } from "./bot-commands/router.js";
 import { buildHelpCard } from "./bot-commands/help.js";
-import { buildSessionsCard, handleSessionsAction } from "./bot-commands/sessions.js";
 import { buildModelCard, handleModelAction } from "./bot-commands/model.js";
 
 // Package root directory — used as cwd when spawning the daemon so that jiti
 // resolves from the package's own node_modules regardless of process.cwd().
 const PACKAGE_DIR = new URL("..", import.meta.url).pathname;
-
-export interface Registry {
-    sessions: string[];
-    current?: string;
-}
-
-function loadRegistry(): Registry {
-    try {
-        if (!existsSync(REGISTRY_FILE)) return { sessions: [] };
-        const data = JSON.parse(readFileSync(REGISTRY_FILE, "utf-8"));
-        return { sessions: data.sessions || [], current: data.current };
-    } catch {
-        return { sessions: [] };
-    }
-}
-
-function saveRegistry(reg: Registry): void {
-    mkdirSync(FEISHU_IM_DIR, { recursive: true });
-    const sessions = [...new Set(reg.sessions)];
-    writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions, current: reg.current }, null, 2), "utf-8");
-}
 
 function isDaemonRunning(): boolean {
     try {
@@ -76,7 +54,6 @@ async function waitForSocket(timeoutMs: number = 5000): Promise<boolean> {
 let ipcClient: IPCClient | null = null;
 
 export default function(pi: ExtensionAPI) {
-    const registry = loadRegistry();
     let activeChatId: string | null = null;
     let forwardingCount = 0;
 
@@ -130,7 +107,7 @@ export default function(pi: ExtensionAPI) {
         ipcClient.send(msg);
     }
 
-    function attachHandler(client: IPCClient, piExt: ExtensionAPI, ctxExt: any): void {
+    function attachHandler(client: IPCClient, piExt: ExtensionAPI, ctxExt: ExtensionContext): void {
         client.removeAllListeners("message");
         client.on("message", async (msg: DaemonMessage) => {
             switch (msg.type) {
@@ -150,37 +127,10 @@ export default function(pi: ExtensionAPI) {
                 case "message": {
                     const botCmd = parseBotCommand(msg.content);
                     if (botCmd) {
-                        if (botCmd === "sessions") {
-                            try {
-                                const sf = ctxExt.sessionManager.getSessionFile();
-                                if (sf) {
-                                    registry.sessions = [...new Set([...registry.sessions, sf])];
-                                    registry.current = sf;
-                                    saveRegistry(registry);
-                                }
-                                const card = buildSessionsCard(registry.sessions, registry.current || "");
-                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                            } catch {
-                                const card = buildSessionsCard(registry.sessions, registry.current || "");
-                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                            }
-                            return;
-                        }
                         if (botCmd === "model") {
-                            try {
-                                const sf = ctxExt.sessionManager.getSessionFile();
-                                if (sf) {
-                                    registry.sessions = [...new Set([...registry.sessions, sf])];
-                                    registry.current = sf;
-                                    saveRegistry(registry);
-                                }
-                                const models = ctxExt.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                const card = buildModelCard(models, ctxExt.model ? { provider: ctxExt.model.provider, id: ctxExt.model.id } : undefined);
-                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                            } catch {
-                                const card = buildModelCard([], undefined);
-                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                            }
+                            const models = ctxExt.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                            const card = buildModelCard(models, ctxExt.model ? { provider: ctxExt.model.provider, id: ctxExt.model.id } : undefined);
+                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
                             return;
                         }
                         const card = buildHelpCard();
@@ -193,17 +143,9 @@ export default function(pi: ExtensionAPI) {
                     activeChatId = msg.chatId;
                     forwardingCount++;
                     try {
-                        const currentSession = ctxExt.sessionManager.getSessionFile();
-                        if (currentSession && !registry.sessions.includes(currentSession)) {
-                            registry.sessions = [...new Set([...registry.sessions, currentSession])];
-                            registry.current = currentSession;
-                            saveRegistry(registry);
-                        }
-                    } catch {}
-                    try {
                         await piExt.sendUserMessage(prompt);
                     } catch {
-                        sendToDaemon({ type: "send", chatId: msg.chatId, content: { text: "Pi 会话已失效，请执行 /feishu-im restart" } });
+                        sendToDaemon({ type: "send", chatId: msg.chatId, content: { text: "Pi 会话已失效，请执行 /feishu-im start" } });
                         activeChatId = null;
                         forwardingCount = 0;
                     }
@@ -219,24 +161,7 @@ export default function(pi: ExtensionAPI) {
                         try { parsed = JSON.parse(rawAction.option as string); } catch {}
                     }
                     if (!parsed) return;
-                    if (parsed.cmd === "sessions") {
-                        try {
-                            const sessionsAction = parsed as unknown as import("./bot-commands/sessions.js").SessionsAction;
-                            await handleSessionsAction(
-                                sessionsAction,
-                                { switchSession: ctxExt.switchSession, newSession: ctxExt.newSession },
-                                registry,
-                                (updatedRegistry) => {
-                                    saveRegistry(updatedRegistry);
-                                    const card = buildSessionsCard(updatedRegistry.sessions, updatedRegistry.current || "");
-                                    sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                },
-                            );
-                        } catch (e) {
-                            console.error("sessions cardAction error:", e);
-                            sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildSessionsCard([], "") });
-                        }
-                    } else if (parsed.cmd === "model") {
+                    if (parsed.cmd === "model") {
                         try {
                             const modelAction = parsed as unknown as import("./bot-commands/model.js").ModelAction;
                             const modelSet = await handleModelAction(
@@ -244,7 +169,6 @@ export default function(pi: ExtensionAPI) {
                                 ctxExt.modelRegistry,
                                 (m: any) => piExt.setModel(m),
                             );
-                            saveRegistry(registry);
                             if (modelSet) {
                                 const models = ctxExt.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
                                 const card = buildModelCard(models, ctxExt.model ? { provider: ctxExt.model.provider, id: ctxExt.model.id } : undefined);
