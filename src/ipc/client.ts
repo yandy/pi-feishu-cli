@@ -21,6 +21,10 @@ export class IPCClient {
     this.listeners.get(event)!.add(handler);
   }
 
+  removeAllListeners(event: string): void {
+    this.listeners.get(event)?.clear();
+  }
+
   private emit(event: string, ...args: any[]): void {
     this.listeners.get(event)?.forEach((h) => h(...args));
   }

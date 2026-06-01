@@ -9,8 +9,6 @@ import { FEISHU_IM_DIR, PID_FILE, REGISTRY_FILE } from "../../src/config.js";
 
 // ---- Mock IPC client so getClient() doesn't need a real daemon ----
 
-let mockIPC: MockIPCClient | null = null;
-
 class MockIPCClient extends EventEmitter {
     connected = true;
     connect = vi.fn<() => Promise<true>>().mockResolvedValue(true);
@@ -18,11 +16,13 @@ class MockIPCClient extends EventEmitter {
     disconnect = vi.fn();
 }
 
+/** Shared singleton — createIPCClient always returns this, so ipcClient at
+ *  module scope (extensions/index.ts) is always the same mock object.
+ *  Tests must call mockIPC.clear() in beforeEach to reset call history. */
+const mockIPC = new MockIPCClient();
+
 vi.mock("../../src/ipc/client.js", () => ({
-    createIPCClient: vi.fn(() => {
-        mockIPC = new MockIPCClient();
-        return mockIPC;
-    }),
+    createIPCClient: vi.fn(() => mockIPC),
 }));
 
 function createFreshSessionCtx(overrides: Record<string, unknown> = {}) {
@@ -199,12 +199,14 @@ describe("stale ctx prevention after newSession / switchSession", () => {
     });
 
     beforeEach(() => {
-        mockIPC = null;
+        mockIPC.send.mockClear();
+        mockIPC.removeAllListeners();
         try { unlinkSync(REGISTRY_FILE); } catch { }
     });
 
     afterEach(async () => {
-        mockIPC = null;
+        mockIPC.send.mockClear();
+        mockIPC.removeAllListeners();
         // Drain pending rejections from async handlers that crashed
         await new Promise((r) => setTimeout(r, 30));
     });
@@ -226,14 +228,14 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const ctx = createStaleAwareCtx();
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "test-chat-new",
             content: "/sessions",
         });
 
         await vi.waitFor(() => {
-            expect(mockIPC!.send).toHaveBeenCalled();
+            expect(mockIPC.send).toHaveBeenCalled();
         });
 
         expect(ctx.newSession).not.toHaveBeenCalled();
@@ -250,20 +252,20 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const ctx = createStaleAwareCtx();
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "test-chat-ex",
             content: "/sessions",
         });
 
         await vi.waitFor(() => {
-            expect(mockIPC!.send).toHaveBeenCalled();
+            expect(mockIPC.send).toHaveBeenCalled();
         });
 
         expect(ctx.newSession).not.toHaveBeenCalled();
         expect(ctx.switchSession).not.toHaveBeenCalled();
 
-        const sendCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const sendCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "send"
         );
         expect(sendCalls.length).toBeGreaterThan(0);
@@ -279,7 +281,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const ctx = createStaleAwareCtx();
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "test-chat-msg",
             content: "hello world",
@@ -303,7 +305,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const ctx = createStaleAwareCtx();
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "cardAction",
             chatId: "test-chat-card",
             messageId: "msg-1",
@@ -329,7 +331,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const ctx = createStaleAwareCtx();
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "cardAction",
             chatId: "test-chat-card-new",
             messageId: "msg-new",
@@ -344,7 +346,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         expect(firstCallArg).toBeDefined();
         expect(firstCallArg!.withSession).toBeDefined();
 
-        const updateCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const updateCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "updateCard"
         );
         expect(updateCalls.length).toBeGreaterThan(0);
@@ -360,7 +362,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         const ctx = createStaleAwareCtx();
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "cardAction",
             chatId: "test-chat-del",
             messageId: "msg-del",
@@ -368,7 +370,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         });
 
         await vi.waitFor(() => {
-            const updateCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            const updateCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
                 (call: any[]) => call[0]?.type === "updateCard"
             );
             expect(updateCalls.length).toBeGreaterThan(0);
@@ -378,7 +380,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         expect(ctx.switchSession).not.toHaveBeenCalled();
     });
 
-    it("calls setModel BEFORE switchSession and avoids stale getAvailable", async () => {
+    it("calls setModel via handleModelAction (simplified) and updates card", async () => {
         writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/model-session.json"], current: "/tmp/.pi/model-session.json" }));
         const { api, commands } = setupExtension();
         const ext = await import("../../extensions/index.js");
@@ -389,18 +391,9 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         ctx.modelRegistry.find = vi.fn(() => ({ provider: "openai", id: "gpt-4" })) as any;
         await cmd.handler!("start", ctx as any);
 
-        const callOrder: string[] = [];
-        (api as any).setModel = vi.fn(async () => { callOrder.push("setModel"); return true; });
-        const mockFreshModels = [{ provider: "openai", id: "gpt-4", name: "GPT-4" }];
-        ctx.switchSession = vi.fn(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
-            callOrder.push("switchSession");
-            await opts?.withSession?.({
-                modelRegistry: { getAvailable: vi.fn(() => mockFreshModels) },
-                model: { provider: "openai", id: "gpt-4" },
-            });
-        });
+        (api as any).setModel = vi.fn(async () => true);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "cardAction",
             chatId: "test-chat-model",
             messageId: "msg-model",
@@ -408,20 +401,62 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         });
 
         await vi.waitFor(() => {
-            expect(callOrder.length).toBe(2);
+            expect((api as any).setModel).toHaveBeenCalled();
         });
 
-        expect(callOrder[0]).toBe("switchSession");
-        expect(callOrder[1]).toBe("setModel");
-
-        // The stale ctx's getAvailable must NOT have been called
-        expect(ctx.modelRegistry.getAvailable).not.toHaveBeenCalled();
-
         // The card should have been updated via IPC
-        const updateCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
-            (call: any[]) => call[0]?.type === "updateCard"
-        );
-        expect(updateCalls.length).toBeGreaterThan(0);
+        await vi.waitFor(() => {
+            const updateCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+                (call: any[]) => call[0]?.type === "updateCard"
+            );
+            expect(updateCalls.length).toBeGreaterThan(0);
+        });
+
+        // Model selection does NOT trigger session switch
+        expect(ctx.switchSession).not.toHaveBeenCalled();
+        expect(ctx.newSession).not.toHaveBeenCalled();
+    });
+
+    it("re-binds IPC handler on session_start so pi.sendUserMessage works after reload", async () => {
+        writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/card-session.json"], current: "/tmp/.pi/card-session.json" }));
+        const { api, commands, handlers } = createMockAPI();
+        const ext = await import("../../extensions/index.js");
+        ext.default(api);
+
+        const cmd = commands.get("feishu-im")!;
+        const ctx = createStaleAwareCtx();
+        await cmd.handler!("start", ctx as any);
+
+        const sessionStartHandler = handlers.get("session_start");
+        expect(sessionStartHandler).toBeDefined();
+
+        // Simulate cardAction switch
+        mockIPC.emit("message", {
+            type: "cardAction",
+            chatId: "test-chat-card",
+            messageId: "msg-rebind",
+            action: { tag: "button", value: { cmd: "sessions", action: "switch", sessionPath: "/tmp/.pi/other.json" } },
+        });
+
+        await vi.waitFor(() => {
+            expect(ctx.switchSession).toHaveBeenCalled();
+        });
+
+        // Simulate session_start with fresh ctx
+        const freshCtx = createFreshSessionCtx();
+        sessionStartHandler!({}, freshCtx);
+
+        // Send a normal message — should work
+        (api as any).sendUserMessage = vi.fn().mockResolvedValue(undefined);
+        mockIPC.emit("message", {
+            type: "message",
+            chatId: "test-chat-after",
+            content: "hello after reload",
+        });
+
+        await vi.waitFor(() => {
+            expect((api as any).sendUserMessage).toHaveBeenCalledWith("hello after reload");
+        });
     });
 
 });
@@ -483,11 +518,13 @@ describe("activeChatId forwarding", () => {
     });
 
     beforeEach(() => {
-        mockIPC = null;
+        mockIPC.send.mockClear();
+        mockIPC.removeAllListeners();
     });
 
     afterEach(async () => {
-        mockIPC = null;
+        mockIPC.send.mockClear();
+        mockIPC.removeAllListeners();
         await new Promise((r) => setTimeout(r, 30));
     });
 
@@ -514,7 +551,7 @@ describe("activeChatId forwarding", () => {
         };
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "oc-test-forward",
             content: "hello",
@@ -533,7 +570,7 @@ describe("activeChatId forwarding", () => {
             { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
         );
 
-        const streamCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const streamCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "stream"
         );
         expect(streamCalls.length).toBeGreaterThan(0);
@@ -562,7 +599,7 @@ describe("activeChatId forwarding", () => {
         };
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "oc-test-end",
             content: "hello",
@@ -581,7 +618,7 @@ describe("activeChatId forwarding", () => {
             { sessionManager: { getSessionFile: () => "/tmp/test-session.json" } },
         );
 
-        const streamEndCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const streamEndCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "streamEnd"
         );
         expect(streamEndCalls.length).toBeGreaterThan(0);
@@ -609,7 +646,7 @@ describe("activeChatId forwarding", () => {
         };
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "oc-stale",
             content: "hello",
@@ -617,7 +654,7 @@ describe("activeChatId forwarding", () => {
 
         // Should not throw — catch should send error message to daemon
         await vi.waitFor(() => {
-            const sendCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            const sendCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
                 (call: any[]) => call[0]?.type === "send" && (call[0] as any)?.content?.text?.includes("restart")
             );
             expect(sendCalls.length).toBeGreaterThan(0);
@@ -651,7 +688,7 @@ describe("activeChatId forwarding", () => {
         };
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "oc-agent-end",
             content: "hello",
@@ -667,11 +704,11 @@ describe("activeChatId forwarding", () => {
         )?.[1];
         expect(agentEndHandler).toBeDefined();
 
-        (mockIPC!.send as ReturnType<typeof vi.fn>).mockClear();
+        (mockIPC.send as ReturnType<typeof vi.fn>).mockClear();
 
         await agentEndHandler?.({ messages: [] }, {});
 
-        const streamEndCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const streamEndCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "streamEnd"
         );
         // After agent_end, streamEnd should be sent with end: true
@@ -687,14 +724,14 @@ describe("activeChatId forwarding", () => {
             (call: any[]) => call[0] === "message_update"
         )?.[1];
 
-        (mockIPC!.send as ReturnType<typeof vi.fn>).mockClear();
+        (mockIPC.send as ReturnType<typeof vi.fn>).mockClear();
 
         await messageUpdateHandler?.(
             { message: { role: "assistant", content: [{ type: "text", text: "late reply" }] } },
             {},
         );
 
-        const streamCallsAfterEnd = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const streamCallsAfterEnd = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "stream"
         );
         expect(streamCallsAfterEnd.length).toBe(0);
@@ -718,7 +755,7 @@ describe("activeChatId forwarding", () => {
         };
         await cmd.handler!("start", ctx as any);
 
-        mockIPC!.emit("message", {
+        mockIPC.emit("message", {
             type: "message",
             chatId: "oc-multi-msg",
             content: "hello",
@@ -742,7 +779,7 @@ describe("activeChatId forwarding", () => {
         );
 
         // Check that the streamEnd sent with end=false (not end=true)
-        const streamEndCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const streamEndCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "streamEnd"
         );
         expect(streamEndCalls.length).toBe(1);
@@ -752,7 +789,7 @@ describe("activeChatId forwarding", () => {
             end: false,
         });
 
-        (mockIPC!.send as ReturnType<typeof vi.fn>).mockClear();
+        (mockIPC.send as ReturnType<typeof vi.fn>).mockClear();
 
         // Second assistant message arrives (e.g., after tool call)
         // activeChatId should still be set, so message_update should forward
@@ -761,7 +798,7 @@ describe("activeChatId forwarding", () => {
             {},
         );
 
-        const streamCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+        const streamCalls = (mockIPC.send as ReturnType<typeof vi.fn>).mock.calls.filter(
             (call: any[]) => call[0]?.type === "stream"
         );
         // Bug: with current code, this would be 0 because activeChatId was cleared

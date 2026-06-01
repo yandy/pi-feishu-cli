@@ -73,20 +73,18 @@ async function waitForSocket(timeoutMs: number = 5000): Promise<boolean> {
     return false;
 }
 
+let ipcClient: IPCClient | null = null;
+
 export default function(pi: ExtensionAPI) {
     const registry = loadRegistry();
-    let ipcClient: IPCClient | null = null;
     let activeChatId: string | null = null;
     let forwardingCount = 0;
 
     type NotifyFn = (msg: string, level?: "error" | "info" | "warning") => void;
-    type OnMessageFn = (msg: DaemonMessage) => void;
     async function getClient(
         ctx: { ui: { notify: NotifyFn } },
-        onMessage?: OnMessageFn,
     ): Promise<IPCClient | null> {
         if (ipcClient?.connected) {
-            if (onMessage) ipcClient.on("message", onMessage);
             return ipcClient;
         }
 
@@ -112,10 +110,6 @@ export default function(pi: ExtensionAPI) {
 
         ipcClient = createIPCClient(SOCKET_PATH);
 
-        if (onMessage) {
-            ipcClient.on("message", onMessage);
-        }
-
         try {
             await ipcClient.connect();
         } catch (err) {
@@ -136,6 +130,155 @@ export default function(pi: ExtensionAPI) {
         ipcClient.send(msg);
     }
 
+    function attachHandler(client: IPCClient, piExt: ExtensionAPI, ctxExt: any): void {
+        client.removeAllListeners("message");
+        client.on("message", async (msg: DaemonMessage) => {
+            switch (msg.type) {
+                case "ready": {
+                    ctxExt.ui.notify(`Feishu bot online: ${msg.botIdentity.name}`, "info");
+                    break;
+                }
+                case "needAuth": {
+                    ctxExt.ui.notify(msg.message, "warning");
+                    const appId = await ctxExt.ui.input("Enter Feishu App ID");
+                    if (!appId) return;
+                    const appSecret = await ctxExt.ui.input("Enter Feishu App Secret");
+                    if (!appSecret) return;
+                    sendToDaemon({ type: "auth", appId, appSecret });
+                    break;
+                }
+                case "message": {
+                    const botCmd = parseBotCommand(msg.content);
+                    if (botCmd) {
+                        if (botCmd === "sessions") {
+                            try {
+                                const sf = ctxExt.sessionManager.getSessionFile();
+                                if (sf) {
+                                    registry.sessions = [...new Set([...registry.sessions, sf])];
+                                    registry.current = sf;
+                                    saveRegistry(registry);
+                                }
+                                const card = buildSessionsCard(registry.sessions, registry.current || "");
+                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                            } catch {
+                                const card = buildSessionsCard(registry.sessions, registry.current || "");
+                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                            }
+                            return;
+                        }
+                        if (botCmd === "model") {
+                            try {
+                                const sf = ctxExt.sessionManager.getSessionFile();
+                                if (sf) {
+                                    registry.sessions = [...new Set([...registry.sessions, sf])];
+                                    registry.current = sf;
+                                    saveRegistry(registry);
+                                }
+                                const models = ctxExt.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                const card = buildModelCard(models, ctxExt.model ? { provider: ctxExt.model.provider, id: ctxExt.model.id } : undefined);
+                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                            } catch {
+                                const card = buildModelCard([], undefined);
+                                sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                            }
+                            return;
+                        }
+                        const card = buildHelpCard();
+                        sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
+                        return;
+                    }
+                    const prompt = msg.content + (msg.resources?.length
+                        ? "\n\nAttachments: " + msg.resources.map((r: any) => `${r.type}${r.fileName ? ` ${r.fileName}` : ""}`).join(", ")
+                        : "");
+                    activeChatId = msg.chatId;
+                    forwardingCount++;
+                    try {
+                        const currentSession = ctxExt.sessionManager.getSessionFile();
+                        if (currentSession && !registry.sessions.includes(currentSession)) {
+                            registry.sessions = [...new Set([...registry.sessions, currentSession])];
+                            registry.current = currentSession;
+                            saveRegistry(registry);
+                        }
+                    } catch {}
+                    try {
+                        await piExt.sendUserMessage(prompt);
+                    } catch {
+                        sendToDaemon({ type: "send", chatId: msg.chatId, content: { text: "Pi 会话已失效，请执行 /feishu-im restart" } });
+                        activeChatId = null;
+                        forwardingCount = 0;
+                    }
+                    break;
+                }
+                case "cardAction": {
+                    const rawAction = msg.action as Record<string, unknown> | undefined;
+                    if (!rawAction) return;
+                    let parsed: Record<string, string> | null = null;
+                    if (rawAction.tag === "button") {
+                        parsed = rawAction.value as Record<string, string>;
+                    } else if (rawAction.tag === "select_static") {
+                        try { parsed = JSON.parse(rawAction.option as string); } catch {}
+                    }
+                    if (!parsed) return;
+                    if (parsed.cmd === "sessions") {
+                        try {
+                            const sessionsAction = parsed as unknown as import("./bot-commands/sessions.js").SessionsAction;
+                            await handleSessionsAction(
+                                sessionsAction,
+                                { switchSession: ctxExt.switchSession, newSession: ctxExt.newSession },
+                                registry,
+                                (updatedRegistry) => {
+                                    saveRegistry(updatedRegistry);
+                                    const card = buildSessionsCard(updatedRegistry.sessions, updatedRegistry.current || "");
+                                    sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                                },
+                            );
+                        } catch (e) {
+                            console.error("sessions cardAction error:", e);
+                            sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildSessionsCard([], "") });
+                        }
+                    } else if (parsed.cmd === "model") {
+                        try {
+                            const modelAction = parsed as unknown as import("./bot-commands/model.js").ModelAction;
+                            const modelSet = await handleModelAction(
+                                modelAction,
+                                ctxExt.modelRegistry,
+                                (m: any) => piExt.setModel(m),
+                            );
+                            saveRegistry(registry);
+                            if (modelSet) {
+                                const models = ctxExt.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
+                                const card = buildModelCard(models, ctxExt.model ? { provider: ctxExt.model.provider, id: ctxExt.model.id } : undefined);
+                                sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
+                            } else {
+                                sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildModelCard([], undefined) });
+                            }
+                        } catch (e) {
+                            console.error("model cardAction error:", e);
+                            sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildModelCard([], undefined) });
+                        }
+                    }
+                    break;
+                }
+                case "error": {
+                    ctxExt.ui.notify(`Feishu error: ${msg.message}`, "error");
+                    break;
+                }
+                case "status": {
+                    ctxExt.ui.notify(`PID: ${msg.pid}, Uptime: ${Math.round(msg.uptime / 1000)}s, WS: ${msg.wsConnected ? "connected" : "disconnected"}`, "info");
+                    break;
+                }
+                case "bye": {
+                    ctxExt.ui.notify("Connection rejected: daemon already has an active client", "warning");
+                    break;
+                }
+                case "reaction": {
+                    ctxExt.ui.notify(`用户 ${msg.userId} ${msg.added ? "添加" : "移除"}了表情 ${msg.emoji}`, "info");
+                    break;
+                }
+            }
+        });
+    }
+
     // ---- Commands ----
 
     pi.registerCommand("feishu-im", {
@@ -145,188 +288,12 @@ export default function(pi: ExtensionAPI) {
 
             switch (subcommand) {
                 case "start": {
-                    const client = await getClient(ctx, async (msg) => {
-                        switch (msg.type) {
-                            case "ready": {
-                                ctx.ui.notify(`Feishu bot online: ${msg.botIdentity.name}`, "info");
-                                break;
-                            }
-
-                            case "needAuth": {
-                                ctx.ui.notify(msg.message, "warning");
-                                const appId = await ctx.ui.input("Enter Feishu App ID");
-                                if (!appId) return;
-                                const appSecret = await ctx.ui.input("Enter Feishu App Secret");
-                                if (!appSecret) return;
-                                sendToDaemon({ type: "auth", appId, appSecret });
-                                break;
-                            }
-
-                            case "message": {
-                                const botCmd = parseBotCommand(msg.content);
-
-                                if (botCmd) {
-                                    if (botCmd === "sessions") {
-                                        try {
-                                            const sf = ctx.sessionManager.getSessionFile();
-                                            if (sf) {
-                                                registry.sessions = [...new Set([...registry.sessions, sf])];
-                                                registry.current = sf;
-                                                saveRegistry(registry);
-                                            }
-                                            const card = buildSessionsCard(registry.sessions, registry.current || "");
-                                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                        } catch {
-                                            const card = buildSessionsCard(registry.sessions, registry.current || "");
-                                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                        }
-                                        return;
-                                    }
-
-                                    if (botCmd === "model") {
-                                        try {
-                                            const sf = ctx.sessionManager.getSessionFile();
-                                            if (sf) {
-                                                registry.sessions = [...new Set([...registry.sessions, sf])];
-                                                registry.current = sf;
-                                                saveRegistry(registry);
-                                            }
-                                            const models = ctx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                            const card = buildModelCard(models, ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined);
-                                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                        } catch {
-                                            const card = buildModelCard([], undefined);
-                                            sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                        }
-                                        return;
-                                    }
-
-                                    const card = buildHelpCard();
-                                    sendToDaemon({ type: "send", chatId: msg.chatId, content: { card } });
-                                    return;
-                                }
-
-                                const prompt = msg.content + (msg.resources?.length
-                                    ? "\n\nAttachments: " + msg.resources
-                                        .map((r) => `${r.type}${r.fileName ? ` ${r.fileName}` : ""}`)
-                                        .join(", ")
-                                    : "");
-
-                                activeChatId = msg.chatId;
-                                forwardingCount++;
-                                // Ensure current session is registered
-                                try {
-                                    const currentSession = ctx.sessionManager.getSessionFile();
-                                    if (currentSession && !registry.sessions.includes(currentSession)) {
-                                        registry.sessions = [...new Set([...registry.sessions, currentSession])];
-                                        registry.current = currentSession;
-                                        saveRegistry(registry);
-                                    }
-                                } catch {}
-                                try {
-                                    await pi.sendUserMessage(prompt);
-                                } catch {
-                                    sendToDaemon({ type: "send", chatId: msg.chatId, content: { text: "Pi 会话已失效，请执行 /feishu-im restart" } });
-                                    activeChatId = null;
-                                    forwardingCount = 0;
-                                }
-                                break;
-                            }
-
-                            case "cardAction": {
-                                const rawAction = msg.action as Record<string, unknown> | undefined;
-                                if (!rawAction) return;
-
-                                let parsed: Record<string, string> | null = null;
-                                if (rawAction.tag === "button") {
-                                    parsed = rawAction.value as Record<string, string>;
-                                } else if (rawAction.tag === "select_static") {
-                                    try {
-                                        parsed = JSON.parse(rawAction.option as string);
-                                    } catch {}
-                                }
-                                if (!parsed) return;
-
-                                if (parsed.cmd === "sessions") {
-                                    try {
-                                        const sessionsAction = parsed as unknown as import("./bot-commands/sessions.js").SessionsAction;
-                                        await handleSessionsAction(
-                                            sessionsAction,
-                                            {
-                                                switchSession: ctx.switchSession,
-                                                newSession: ctx.newSession,
-                                            },
-                                            registry,
-                                            (updatedRegistry) => {
-                                                saveRegistry(updatedRegistry);
-                                                const card = buildSessionsCard(updatedRegistry.sessions, updatedRegistry.current || "");
-                                                sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                            },
-                                        );
-                                    } catch (e) {
-                                        console.error("sessions cardAction error:", e);
-                                        sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildSessionsCard([], "") });
-                                    }
-                                } else if (parsed.cmd === "model") {
-                                    try {
-                                        const modelAction = parsed as unknown as import("./bot-commands/model.js").ModelAction;
-                                        const modelSet = await handleModelAction(
-                                            modelAction,
-                                            {
-                                                switchSession: ctx.switchSession,
-                                                newSession: ctx.newSession,
-                                                modelRegistry: ctx.modelRegistry,
-                                            },
-                                            registry,
-                                            (m) => pi.setModel(m as any),
-                                            (models, currentModel) => {
-                                                saveRegistry(registry);
-                                                const card = buildModelCard(models, currentModel);
-                                                sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                            },
-                                        );
-                                        if (!modelSet) {
-                                            sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildModelCard([], undefined) });
-                                        }
-                                    } catch (e) {
-                                        console.error("model cardAction error:", e);
-                                        sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildModelCard([], undefined) });
-                                    }
-                                }
-                                break;
-                            }
-
-                            case "error": {
-                                ctx.ui.notify(`Feishu error: ${msg.message}`, "error");
-                                break;
-                            }
-
-                            case "status": {
-                                ctx.ui.notify(
-                                    `PID: ${msg.pid}, Uptime: ${Math.round(msg.uptime / 1000)}s, WS: ${msg.wsConnected ? "connected" : "disconnected"}`,
-                                    "info",
-                                );
-                                break;
-                            }
-
-                            case "bye": {
-                                ctx.ui.notify("Connection rejected: daemon already has an active client", "warning");
-                                break;
-                            }
-
-                            case "reaction": {
-                                ctx.ui.notify(
-                                    `用户 ${msg.userId} ${msg.added ? "添加" : "移除"}了表情 ${msg.emoji}`,
-                                    "info",
-                                );
-                                break;
-                            }
-                        }
-                    });
-                    if (!client) return;
-
-                    ctx.ui.notify("Connected to daemon", "info");
-                    client.send({ type: "status" });
+                    const client = await getClient(ctx);
+                    if (client) {
+                        attachHandler(client, pi, ctx);
+                        ctx.ui.notify("Connected to daemon", "info");
+                        client.send({ type: "status" });
+                    }
                     break;
                 }
 
@@ -470,5 +437,13 @@ export default function(pi: ExtensionAPI) {
         sendToDaemon({ type: "streamEnd", chatId, end: true });
         activeChatId = null;
         forwardingCount = 0;
+    });
+
+    // ---- Re-bind on reload ----
+
+    pi.on("session_start", (_event: any, sessionCtx: any) => {
+        if (ipcClient?.connected) {
+            attachHandler(ipcClient, pi, sessionCtx);
+        }
     });
 }
