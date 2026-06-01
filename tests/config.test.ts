@@ -5,7 +5,6 @@ import {
   FEISHU_IM_DIR,
   PID_FILE,
   AUTH_FILE,
-  REGISTRY_FILE,
   DAEMON_LOG,
   SOCKET_PATH,
 } from "../src/config.js";
@@ -23,10 +22,6 @@ describe("config", () => {
 
   it("AUTH_FILE points to auth.json in feishu-im dir", () => {
     expect(AUTH_FILE).toBe(join(baseDir, "auth.json"));
-  });
-
-  it("REGISTRY_FILE points to registry.json in feishu-im dir", () => {
-    expect(REGISTRY_FILE).toBe(join(baseDir, "registry.json"));
   });
 
   it("DAEMON_LOG points to daemon.log in feishu-im dir", () => {
