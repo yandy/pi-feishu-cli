@@ -278,20 +278,18 @@ export default function(pi: ExtensionAPI) {
                                                 modelRegistry: ctx.modelRegistry,
                                             },
                                             registry,
-                                            msg.chatId,
                                             (m) => pi.setModel(m as any),
-                                        );
-                                        saveRegistry(registry);
-                                        try {
-                                            await ctx.newSession({ withSession: async (newCtx: any) => {
-                                                const models = newCtx.modelRegistry.getAvailable() as Array<{ provider: string; id: string; name: string }>;
-                                                const card = buildModelCard(models, newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined);
+                                            (models, currentModel) => {
+                                                saveRegistry(registry);
+                                                const card = buildModelCard(models, currentModel);
                                                 sendToDaemon({ type: "updateCard", messageId: msg.messageId, card });
-                                            }});
-                                        } catch {
+                                            },
+                                        );
+                                        if (!modelSet) {
                                             sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildModelCard([], undefined) });
                                         }
-                                    } catch {
+                                    } catch (e) {
+                                        console.error("model cardAction error:", e);
                                         sendToDaemon({ type: "updateCard", messageId: msg.messageId, card: buildModelCard([], undefined) });
                                     }
                                 }

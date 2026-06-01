@@ -378,7 +378,7 @@ describe("stale ctx prevention after newSession / switchSession", () => {
         expect(ctx.switchSession).not.toHaveBeenCalled();
     });
 
-    it("calls setModel BEFORE switchSession on cardAction model switch and avoids stale getAvailable", async () => {
+    it("calls setModel BEFORE switchSession and avoids stale getAvailable", async () => {
         writeFileSync(REGISTRY_FILE, JSON.stringify({ sessions: ["/tmp/.pi/model-session.json"], current: "/tmp/.pi/model-session.json" }));
         const { api, commands } = setupExtension();
         const ext = await import("../../extensions/index.js");
@@ -391,9 +391,13 @@ describe("stale ctx prevention after newSession / switchSession", () => {
 
         const callOrder: string[] = [];
         (api as any).setModel = vi.fn(async () => { callOrder.push("setModel"); return true; });
+        const mockFreshModels = [{ provider: "openai", id: "gpt-4", name: "GPT-4" }];
         ctx.switchSession = vi.fn(async (_path: string, opts?: { withSession?: (newCtx: any) => Promise<void> }) => {
             callOrder.push("switchSession");
-            await opts?.withSession?.({ modelRegistry: ctx.modelRegistry, model: ctx.model, ui: ctx.ui });
+            await opts?.withSession?.({
+                modelRegistry: { getAvailable: vi.fn(() => mockFreshModels) },
+                model: { provider: "openai", id: "gpt-4" },
+            });
         });
 
         mockIPC!.emit("message", {
@@ -407,11 +411,17 @@ describe("stale ctx prevention after newSession / switchSession", () => {
             expect(callOrder.length).toBe(2);
         });
 
-        // switchSession called first to enter session context, then setModel inside withSession
         expect(callOrder[0]).toBe("switchSession");
         expect(callOrder[1]).toBe("setModel");
+
         // The stale ctx's getAvailable must NOT have been called
         expect(ctx.modelRegistry.getAvailable).not.toHaveBeenCalled();
+
+        // The card should have been updated via IPC
+        const updateCalls = (mockIPC!.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+            (call: any[]) => call[0]?.type === "updateCard"
+        );
+        expect(updateCalls.length).toBeGreaterThan(0);
     });
 
 });
