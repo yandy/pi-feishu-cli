@@ -83,16 +83,19 @@ export async function handleModelAction(
     modelRegistry: { find: (provider: string, id: string) => unknown };
   },
   registry: { sessions: string[]; current?: string },
-  _chatId: string,
   setModel: (model: unknown) => Promise<boolean>,
+  onUpdate: (models: ModelInfo[], currentModel: { provider: string; id: string } | undefined) => void,
 ): Promise<boolean> {
   const model = ctx.modelRegistry.find(action.modelProvider, action.modelId);
   if (!model) return false;
 
   const sessionPath = registry.current;
   if (sessionPath) {
-    await ctx.switchSession(sessionPath, { withSession: async () => {
+    await ctx.switchSession(sessionPath, { withSession: async (newCtx: any) => {
       await setModel(model);
+      const models = newCtx.modelRegistry.getAvailable() as ModelInfo[];
+      const cm = newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined;
+      onUpdate(models, cm);
     }});
   } else {
     await ctx.newSession({ withSession: async (newCtx: any) => {
@@ -102,6 +105,9 @@ export async function handleModelAction(
         registry.current = sf;
         registry.sessions = [...new Set([...registry.sessions, sf])];
       }
+      const models = newCtx.modelRegistry.getAvailable() as ModelInfo[];
+      const cm = newCtx.model ? { provider: newCtx.model.provider, id: newCtx.model.id } : undefined;
+      onUpdate(models, cm);
     }});
   }
   return true;
