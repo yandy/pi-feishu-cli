@@ -7,6 +7,8 @@ import { createChannel, type Channel, type NormalizedMessage } from "./feishu/ch
 import { createMessageHandler } from "./feishu/handler.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
 import { buildModelsCard, type ModelCardOptions } from "./feishu/cards/models.js";
+import { buildHelpCard } from "./feishu/cards/help.js";
+import type { FeishuCommandHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 
 export async function resumeMostRecentSession(runtime: AgentSessionRuntime, cwd: string): Promise<boolean> {
@@ -102,12 +104,17 @@ function setupFeishuHandlers(
     await channel.send(chatId, { card });
   };
 
-  const messageHandler = createMessageHandler(runtime, handleSessions, handleModels);
+  const handleHelp = async (chatId: string) => {
+    const card = buildHelpCard(botName);
+    await channel.send(chatId, { card });
+  };
+
+  const messageHandler = createMessageHandler(runtime, handleSessions, handleModels, handleHelp);
 
   channel.on("message", async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
     // Commands send cards directly without streaming
-    if (content.startsWith("/sessions") || content.startsWith("/models")) {
+    if (content.startsWith("/sessions") || content.startsWith("/models") || content.startsWith("/help")) {
       await messageHandler(msg);
       return;
     }
@@ -129,7 +136,7 @@ function setupFeishuHandlers(
     const messageId: string | undefined = evt?.messageId;
     const chatId: string | undefined = evt?.chatId;
     try {
-      await handleCardAction(value, messageId, chatId, runtime, cwd, channel);
+      await handleCardAction(value, messageId, chatId, runtime, cwd, channel, handleSessions, handleModels);
     } catch (err) {
       console.error("Card action failed:", err);
     }
@@ -149,8 +156,19 @@ async function handleCardAction(
   runtime: AgentSessionRuntime,
   cwd: string,
   channel: Channel,
+  handleSessions: FeishuCommandHandler,
+  handleModels: FeishuCommandHandler,
 ): Promise<void> {
   const { cmd, action } = value;
+
+  if (cmd === "help") {
+    if (action === "sessions" && chatId) {
+      await handleSessions(chatId);
+    } else if (action === "models" && chatId) {
+      await handleModels(chatId);
+    }
+    return;
+  }
 
   if (cmd === "session") {
     if (action === "new") {
