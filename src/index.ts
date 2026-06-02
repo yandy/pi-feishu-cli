@@ -1,5 +1,6 @@
 import { InteractiveMode, type AgentSessionRuntime, AuthStorage, ModelRegistry, SessionManager } from "@earendil-works/pi-coding-agent";
 import { unlink } from "node:fs/promises";
+import { rmSync } from "node:fs";
 import { loadConfig, promptAndSaveCredentials, type ConfigOptions } from "./config.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
@@ -123,6 +124,7 @@ export function setupFeishuHandlers(
 
   channel.on("message", async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
+    // Commands send cards directly without streaming
     if (content.startsWith("/sessions") || content.startsWith("/models") || content.startsWith("/help")) {
       await messageHandler(msg);
       return;
@@ -167,12 +169,14 @@ export function setupFeishuHandlers(
   });
 
   const exitDir = join(tmpdir(), "pi-feishu");
-  process.on("exit", () => {
-    const { rmSync } = require("node:fs");
+  const exitCleanup = () => {
     try { rmSync(exitDir, { recursive: true, force: true }); } catch {}
-  });
+  };
+  process.on("exit", exitCleanup);
 
-  return () => {};
+  return () => {
+    process.off("exit", exitCleanup);
+  };
 }
 
 async function handleCardAction(
