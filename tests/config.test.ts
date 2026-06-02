@@ -74,6 +74,31 @@ describe("loadConfig", () => {
     cleanup();
   });
 
+  it("reads botName from FEISHU_BOT_NAME env var", () => {
+    const prev = process.env.FEISHU_BOT_NAME;
+    process.env.FEISHU_BOT_NAME = "My Bot";
+    try {
+      const cfg = loadConfig({ appId: "x", appSecret: "x" });
+      expect(cfg.botName).toBe("My Bot");
+    } finally {
+      process.env.FEISHU_BOT_NAME = prev;
+    }
+  });
+
+  it("reads botName from config file", () => {
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(
+      join(tmpDir, "feishu.json"),
+      JSON.stringify({ appId: "file-id", appSecret: "file-secret", botName: "File Bot" }),
+    );
+    try {
+      const cfg = loadConfig({ config: join(tmpDir, "feishu.json") });
+      expect(cfg.botName).toBe("File Bot");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("throws when no credentials found", () => {
     const prevId = process.env.FEISHU_APP_ID;
     const prevSecret = process.env.FEISHU_APP_SECRET;

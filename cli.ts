@@ -16,6 +16,7 @@ interface CliArgs {
   appSecret?: string;
   config?: string;
   logLevel?: string;
+  botName?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -36,6 +37,9 @@ function parseArgs(argv: string[]): CliArgs {
       case "--log-level":
         if (i + 1 < argv.length) result.logLevel = argv[++i];
         break;
+      case "--bot-name":
+        if (i + 1 < argv.length) result.botName = argv[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -54,6 +58,7 @@ Options:
   --app-secret <key>  Feishu app secret
   --config <path>     Path to config JSON file
   --log-level <level> Log level (fatal|error|warn|info|debug|trace, default: warn)
+  --bot-name <name>   Bot display name (default: PI Agent)
   --help, -h          Show this help
 
 Configuration priority: CLI args > config file > environment variables
@@ -74,6 +79,7 @@ main({
   appSecret: cliArgs.appSecret,
   config: cliArgs.config,
   logLevel: cliArgs.logLevel,
+  botName: cliArgs.botName,
   packageRoot,
 }).catch((err) => {
   console.error("Fatal error:", err instanceof Error ? err.message : String(err));

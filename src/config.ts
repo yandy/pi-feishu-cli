@@ -27,7 +27,11 @@ function loadFileConfig(path: string): FeishuConfig | null {
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw);
     if (parsed.appId && typeof parsed.appId === "string" && parsed.appSecret && typeof parsed.appSecret === "string") {
-      return { appId: parsed.appId, appSecret: parsed.appSecret };
+      return {
+        appId: parsed.appId,
+        appSecret: parsed.appSecret,
+        ...(parsed.botName ? { botName: parsed.botName } : {}),
+      };
     }
     return null;
   } catch {
@@ -39,6 +43,7 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   const envConfig: Partial<FeishuConfig> = {};
   if (process.env.FEISHU_APP_ID) envConfig.appId = process.env.FEISHU_APP_ID;
   if (process.env.FEISHU_APP_SECRET) envConfig.appSecret = process.env.FEISHU_APP_SECRET;
+  if (process.env.FEISHU_BOT_NAME) envConfig.botName = process.env.FEISHU_BOT_NAME;
 
   let fileConfig: FeishuConfig | null = null;
   const configPath = options.config ?? findConfigFile(options.cwd ?? process.cwd());
@@ -60,7 +65,11 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
     );
   }
 
-  return { appId, appSecret };
+  return {
+    appId,
+    appSecret,
+    botName: fileConfig?.botName ?? envConfig.botName,
+  };
 }
 
 export function saveCredentials(path: string, config: FeishuConfig): void {

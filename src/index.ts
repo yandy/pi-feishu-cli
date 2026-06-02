@@ -25,6 +25,7 @@ export interface MainOptions {
   cwd?: string;
   logLevel?: string;
   packageRoot?: string;
+  botName?: string;
 }
 
 export async function main(options: MainOptions = {}): Promise<void> {
@@ -43,6 +44,8 @@ export async function main(options: MainOptions = {}): Promise<void> {
     feishuConfig = await promptAndSaveCredentials();
   }
 
+  const botName = options.botName ?? feishuConfig.botName ?? process.env.FEISHU_BOT_NAME ?? "PI Agent";
+
   const { runtime } = await initRuntime({ cwd, packageRoot: options.packageRoot });
 
   await resumeMostRecentSession(runtime, cwd);
@@ -51,7 +54,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
 
   let cleanup: (() => void) | null = null;
   if (channel) {
-    cleanup = setupFeishuHandlers(channel, runtime, cwd);
+    cleanup = setupFeishuHandlers(channel, runtime, cwd, botName);
   }
 
   try {
@@ -81,6 +84,7 @@ function setupFeishuHandlers(
   channel: Channel,
   runtime: AgentSessionRuntime,
   cwd: string,
+  botName: string,
 ): () => void {
   const handleSessions = async (chatId: string) => {
     const card = await buildSessionsCard({ runtime, cwd });
