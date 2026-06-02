@@ -28,7 +28,10 @@ export function createMessageHandler(
       return;
     }
 
-    const textParts = [content];
+    const textParts: string[] = [];
+    if (content) {
+      textParts.push(content);
+    }
     if (attachments?.text) {
       textParts.push(attachments.text);
     }
