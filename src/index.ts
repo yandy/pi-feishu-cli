@@ -28,6 +28,7 @@ export interface MainOptions {
   logLevel?: string;
   packageRoot?: string;
   botName?: string;
+  noBundleFeishuSkills?: boolean;
 }
 
 export async function main(options: MainOptions = {}): Promise<void> {
@@ -40,6 +41,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
       appSecret: options.appSecret,
       config: options.config,
       cwd,
+      noBundleFeishuSkills: options.noBundleFeishuSkills,
     });
   } catch {
     console.error("未找到飞书凭证，请输入：");
@@ -48,7 +50,11 @@ export async function main(options: MainOptions = {}): Promise<void> {
 
   const botName = options.botName ?? feishuConfig.botName ?? process.env.FEISHU_BOT_NAME ?? "PI Agent";
 
-  const { runtime } = await initRuntime({ cwd, packageRoot: options.packageRoot });
+  const { runtime } = await initRuntime({
+    cwd,
+    packageRoot: options.packageRoot,
+    noBundleFeishuSkills: feishuConfig.noBundleFeishuSkills,
+  });
 
   await resumeMostRecentSession(runtime, cwd);
 
