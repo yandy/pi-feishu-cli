@@ -39,6 +39,7 @@ export interface Channel {
   on(event: "cardAction", handler: (evt: any) => void): void;
   on(event: "error", handler: (err: Error) => void): void;
   on(event: "reconnecting" | "reconnected" | "botAdded", handler: () => void): void;
+  onRawEvent(type: string, handler: (...args: any[]) => any): void;
   send(chatId: string, content: { text?: string; markdown?: string; card?: unknown }, options?: { replyTo?: string }): Promise<void>;
   stream(chatId: string, producer: StreamProducer, options?: { replyTo?: string }): Promise<void>;
   updateCard(messageId: string, card: unknown): Promise<void>;
@@ -58,6 +59,10 @@ export function createChannel(options: ChannelOptions): Channel {
   let _connected = false;
 
   const channel: Channel = {
+    onRawEvent(type: string, handler: (...args: any[]) => any) {
+      (raw as any).dispatcher.register({ [type]: handler });
+    },
+
     async connect() {
       await (raw as any).connect();
       _connected = true;
@@ -92,6 +97,8 @@ export function createChannel(options: ChannelOptions): Channel {
       return _connected;
     },
   };
+
+  channel.onRawEvent("im.message.message_read_v1", () => {});
 
   return channel;
 }
