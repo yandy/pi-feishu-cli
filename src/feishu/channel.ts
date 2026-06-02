@@ -41,6 +41,7 @@ export interface Channel {
   on(event: "reconnecting" | "reconnected" | "botAdded", handler: () => void): void;
   onRawEvent(type: string, handler: (...args: any[]) => any): void;
   send(chatId: string, content: { text?: string; markdown?: string; card?: unknown }, options?: { replyTo?: string }): Promise<void>;
+  downloadMessageResource(messageId: string, fileKey: string, type: string): Promise<Buffer>;
   stream(chatId: string, producer: StreamProducer, options?: { replyTo?: string }): Promise<void>;
   updateCard(messageId: string, card: unknown): Promise<void>;
   get botIdentity(): { name: string } | undefined;
@@ -79,6 +80,18 @@ export function createChannel(options: ChannelOptions): Channel {
 
     async send(chatId, content, options) {
       await (raw as any).send(chatId, content, options);
+    },
+
+    async downloadMessageResource(messageId, fileKey, type) {
+      const res = await (raw as any).rawClient.im.v1.messageResource.get({
+        path: { message_id: messageId, file_key: fileKey },
+        params: { type },
+      });
+      const chunks: Buffer[] = [];
+      for await (const chunk of res.getReadableStream()) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
     },
 
     async stream(chatId, producer, options) {

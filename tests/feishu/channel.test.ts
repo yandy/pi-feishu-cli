@@ -12,6 +12,9 @@ const mockRawChannel = {
   updateCard: vi.fn(),
   get connected() { return false; },
   dispatcher: mockDispatcher,
+  rawClient: {
+    im: { v1: { messageResource: { get: vi.fn() } } },
+  },
 };
 
 vi.mock("@larksuiteoapi/node-sdk", () => ({
@@ -64,5 +67,39 @@ describe("createChannel", () => {
     expect(mockDispatcher.register).toHaveBeenCalledWith(
       { "im.message.message_read_v1": expect.any(Function) },
     );
+  });
+
+  describe("downloadMessageResource", () => {
+    it("calls messageResource.get and returns Buffer from stream", async () => {
+      const channel = createChannel({ appId: "test", appSecret: "secret" });
+      const mockStream = async function*() {
+        yield Buffer.from("hello");
+        yield Buffer.from("world");
+      }();
+      mockRawChannel.rawClient.im.v1.messageResource.get.mockResolvedValue({
+        getReadableStream: () => mockStream,
+      });
+
+      const result = await channel.downloadMessageResource("msg-1", "file-1", "image");
+      expect(mockRawChannel.rawClient.im.v1.messageResource.get).toHaveBeenCalledWith({
+        path: { message_id: "msg-1", file_key: "file-1" },
+        params: { type: "image" },
+      });
+      expect(result).toBeInstanceOf(Buffer);
+      expect(result.toString()).toBe("helloworld");
+    });
+
+    it("handles non-Buffer chunks from stream", async () => {
+      const channel = createChannel({ appId: "test", appSecret: "secret" });
+      const mockStream = async function*() {
+        yield "string-chunk";
+      }();
+      mockRawChannel.rawClient.im.v1.messageResource.get.mockResolvedValue({
+        getReadableStream: () => mockStream,
+      });
+
+      const result = await channel.downloadMessageResource("msg-2", "file-2", "file");
+      expect(result.toString()).toBe("string-chunk");
+    });
   });
 });
