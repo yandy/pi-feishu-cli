@@ -10,6 +10,10 @@ import { buildModelsCard, type ModelCardOptions } from "./feishu/cards/models.js
 import { buildHelpCard } from "./feishu/cards/help.js";
 import type { FeishuCommandHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
+import { processAttachments, type ProcessedAttachments } from "./feishu/attachments.js";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 export async function resumeMostRecentSession(runtime: AgentSessionRuntime, cwd: string): Promise<boolean> {
   const sessions = await SessionManager.list(cwd);
@@ -88,7 +92,7 @@ async function connectFeishu(config: { appId: string; appSecret: string }, logLe
   }
 }
 
-function setupFeishuHandlers(
+export function setupFeishuHandlers(
   channel: Channel,
   runtime: AgentSessionRuntime,
   cwd: string,
@@ -119,19 +123,29 @@ function setupFeishuHandlers(
 
   channel.on("message", async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
-    // Commands send cards directly without streaming
     if (content.startsWith("/sessions") || content.startsWith("/models") || content.startsWith("/help")) {
       await messageHandler(msg);
       return;
+    }
+
+    let attachments: ProcessedAttachments | undefined;
+    let downloadDir: string | undefined;
+
+    if (msg.resources.length > 0) {
+      downloadDir = join(tmpdir(), "pi-feishu", runtime.session.sessionId ?? "unknown");
+      attachments = await processAttachments(channel, msg, downloadDir);
     }
 
     await channel.stream(msg.chatId, {
       markdown: async (s) => {
         const unbind = createStreamingHandler(runtime.session, s);
         try {
-          await messageHandler(msg);
+          await messageHandler(msg, attachments);
         } finally {
           unbind();
+          if (downloadDir) {
+            rm(downloadDir, { recursive: true, force: true }).catch(() => {});
+          }
         }
       },
     }, { replyTo: msg.messageId });
@@ -150,6 +164,12 @@ function setupFeishuHandlers(
 
   channel.on("error", (err: Error) => {
     console.error("Feishu channel error:", err.message);
+  });
+
+  const exitDir = join(tmpdir(), "pi-feishu");
+  process.on("exit", () => {
+    const { rmSync } = require("node:fs");
+    try { rmSync(exitDir, { recursive: true, force: true }); } catch {}
   });
 
   return () => {};
