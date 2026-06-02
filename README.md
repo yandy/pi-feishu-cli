@@ -37,6 +37,7 @@ If credentials are missing, the CLI prompts you to enter them interactively and 
 | `--config <path>` | — | Path to JSON config file |
 | `--log-level <level>` | `warn` | One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace` |
 | `--bot-name <name>` | `PI Agent` | Bot display name in help card |
+| `--no-bundle-feishu-skills` | — | Skip loading project `skills/` directory |
 | `--help`, `-h` | — | Show help and exit |
 
 ## Configuration
@@ -47,12 +48,12 @@ Feishu credentials are resolved with the following priority (higher overrides lo
 |----------|--------|---------|
 | 1 (highest) | CLI args | `pi-feishu --app-id xxx --app-secret xxx` |
 | 2 | Config file | `.pi/feishu.json` or `~/.pi/agent/feishu.json` (searched in order) |
-| 3 (lowest) | Env vars | `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `FEISHU_BOT_NAME` |
+| 3 (lowest) | Env vars | `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `FEISHU_BOT_NAME`, `FEISHU_NO_BUNDLE_SKILLS` |
 
 Config file format:
 
 ```json
-{ "appId": "cli_xxx", "appSecret": "xxx", "botName": "My Bot" }
+{ "appId": "cli_xxx", "appSecret": "xxx", "botName": "My Bot", "noBundleFeishuSkills": true }
 ```
 
 Override config file path with `--config`:
