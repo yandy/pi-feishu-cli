@@ -7,6 +7,7 @@ import {
   createNoteBlock,
   buildCard,
 } from "../../src/feishu/cards/helpers.js";
+import { buildHelpCard } from "../../src/feishu/cards/help.js";
 
 describe("card helpers", () => {
   it("createCardHeader returns header with title", () => {
@@ -50,5 +51,28 @@ describe("card helpers", () => {
     expect(card.config).toEqual({ wide_screen_mode: true, update_multi: true });
     expect(card.header).toBe(header);
     expect(card.elements).toBe(elements);
+  });
+});
+
+describe("help card", () => {
+  it("buildHelpCard returns card with bot name in content", () => {
+    const card = buildHelpCard("TestBot");
+    expect(card.header).toBeDefined();
+    expect(card.elements).toBeDefined();
+    expect((card.header as any).title.content).toBe("使用帮助");
+    const markdownBlocks = (card.elements as any[]).filter(
+      (e: any) => e.tag === "div" && e.text?.tag === "lark_md",
+    );
+    expect(markdownBlocks.some((b: any) => b.text.content.includes("TestBot"))).toBe(true);
+  });
+
+  it("help card has session and model action buttons", () => {
+    const card = buildHelpCard("Bot");
+    const actionBlocks = (card.elements as any[]).filter(
+      (e: any) => e.tag === "action",
+    );
+    expect(actionBlocks.length).toBeGreaterThanOrEqual(2);
+    expect(actionBlocks[0].actions[0].value).toMatchObject({ cmd: "help", action: "sessions" });
+    expect(actionBlocks[1].actions[0].value).toMatchObject({ cmd: "help", action: "models" });
   });
 });
