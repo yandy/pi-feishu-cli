@@ -27,6 +27,42 @@ describe("initRuntime", () => {
     expect(skillDirs.length).toBeGreaterThan(0);
   }, 30000);
 
+  it("skips loading bundled skills when noBundleFeishuSkills is true", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
+    try {
+      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
+      mkdirSync(dirname(skillPath), { recursive: true });
+      writeFileSync(skillPath, "# Test Skill\n");
+
+      const cwd = process.cwd();
+      const result = await initRuntime({ cwd, packageRoot: tmpDir, noBundleFeishuSkills: true });
+
+      const loaded = result.runtime.services.resourceLoader.getSkills();
+      const skillNames = loaded.skills.map(s => s.name);
+      expect(skillNames).not.toContain("test-skill");
+    } finally {
+      rmSync(tmpDir, { recursive: true });
+    }
+  }, 30000);
+
+  it("loads bundled skills when noBundleFeishuSkills is false", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
+    try {
+      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
+      mkdirSync(dirname(skillPath), { recursive: true });
+      writeFileSync(skillPath, "# Test Skill\n");
+
+      const cwd = process.cwd();
+      const result = await initRuntime({ cwd, packageRoot: tmpDir, noBundleFeishuSkills: false });
+
+      const loaded = result.runtime.services.resourceLoader.getSkills();
+      const skillNames = loaded.skills.map(s => s.name);
+      expect(skillNames).toContain("test-skill");
+    } finally {
+      rmSync(tmpDir, { recursive: true });
+    }
+  }, 30000);
+
   it("loads bundled skills from packageRoot, not from cwd", async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
     try {

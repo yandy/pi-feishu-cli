@@ -17,6 +17,7 @@ export interface InitRuntimeOptions {
   cwd: string;
   agentDir?: string;
   packageRoot?: string;
+  noBundleFeishuSkills?: boolean;
 }
 
 export interface InitRuntimeResult {
@@ -55,8 +56,9 @@ export async function initRuntime(options: InitRuntimeOptions): Promise<InitRunt
   const agentDir = options.agentDir ?? getAgentDir();
 
   const packageRoot = options.packageRoot ?? cwd;
+  const noBundle = options.noBundleFeishuSkills ?? false;
   const skillsDir = join(packageRoot, "skills");
-  const customSkills = loadSkillsFromDir(skillsDir);
+  const customSkills = noBundle ? [] : loadSkillsFromDir(skillsDir);
 
   const skillsOverride = (current: { skills: Skill[]; diagnostics: ResourceDiagnostic[] }) => ({
     skills: [...current.skills, ...customSkills],
