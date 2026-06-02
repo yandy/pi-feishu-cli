@@ -64,7 +64,7 @@ describe("processAttachments", () => {
         { type: "image", fileKey: "k", fileName },
       ]);
       const result = await processAttachments(channel as any, msg, "/tmp/test");
-      expect(result.images[0].mimeType).toBe(expectedMime, `Failed for ${fileName}`);
+      expect(result.images[0].mimeType).toBe(expectedMime);
     }
   });
 
