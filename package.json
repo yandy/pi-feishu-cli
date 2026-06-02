@@ -1,8 +1,8 @@
 {
   "name": "pi-feishu-cli",
-  "version": "0.5.0",
-  "description": "Feishu IM integration for Pi - converse with Pi from Feishu",
-  "keywords": ["pi-package", "pi", "feishu", "lark", "extension"],
+  "version": "1.0.0",
+  "description": "Pi AI agent with Feishu bot integration",
+  "keywords": ["pi", "feishu", "lark", "ai", "agent", "cli"],
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -13,16 +13,12 @@
   "bugs": {
     "url": "https://github.com/yandy/pi-feishu-cli/issues"
   },
-  "pi": {
-    "extensions": ["./extensions"],
-    "skills": ["./skills"]
+  "bin": {
+    "pi-feishu": "./dist/cli.js"
   },
   "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.66.0",
-    "jiti": "^2.0.0"
-  },
-  "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
+    "@larksuiteoapi/node-sdk": "^1.66.0",
     "typebox": "*"
   },
   "devDependencies": {
@@ -31,8 +27,14 @@
     "vitest": "^3.0.0"
   },
   "scripts": {
+    "build": "tsc",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
-  }
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist/",
+    "skills/"
+  ]
 }
