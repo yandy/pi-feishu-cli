@@ -99,6 +99,62 @@ describe("loadConfig", () => {
     }
   });
 
+  it("reads noBundleFeishuSkills from FEISHU_NO_BUNDLE_SKILLS env var", () => {
+    const prev = process.env.FEISHU_NO_BUNDLE_SKILLS;
+    process.env.FEISHU_NO_BUNDLE_SKILLS = "true";
+    try {
+      const cfg = loadConfig({ appId: "x", appSecret: "x" });
+      expect(cfg.noBundleFeishuSkills).toBe(true);
+    } finally {
+      process.env.FEISHU_NO_BUNDLE_SKILLS = prev;
+    }
+  });
+
+  it("reads noBundleFeishuSkills from config file", () => {
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(
+      join(tmpDir, "feishu.json"),
+      JSON.stringify({ appId: "file-id", appSecret: "file-secret", noBundleFeishuSkills: true }),
+    );
+    try {
+      const cfg = loadConfig({ config: join(tmpDir, "feishu.json") });
+      expect(cfg.noBundleFeishuSkills).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("config file noBundleFeishuSkills overrides env var", () => {
+    const prev = process.env.FEISHU_NO_BUNDLE_SKILLS;
+    process.env.FEISHU_NO_BUNDLE_SKILLS = "true";
+    try {
+      mkdirSync(tmpDir, { recursive: true });
+      writeFileSync(
+        join(tmpDir, "feishu.json"),
+        JSON.stringify({ appId: "file-id", appSecret: "file-secret", noBundleFeishuSkills: false }),
+      );
+      const cfg = loadConfig({ config: join(tmpDir, "feishu.json") });
+      expect(cfg.noBundleFeishuSkills).toBe(false);
+    } finally {
+      process.env.FEISHU_NO_BUNDLE_SKILLS = prev;
+      cleanup();
+    }
+  });
+
+  it("CLI noBundleFeishuSkills overrides config file", () => {
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(
+      join(tmpDir, "feishu.json"),
+      JSON.stringify({ appId: "file-id", appSecret: "file-secret", noBundleFeishuSkills: true }),
+    );
+    const cfg = loadConfig({
+      config: join(tmpDir, "feishu.json"),
+      noBundleFeishuSkills: false,
+    });
+    expect(cfg.noBundleFeishuSkills).toBe(false);
+    cleanup();
+  });
+
   it("throws when no credentials found", () => {
     const prevId = process.env.FEISHU_APP_ID;
     const prevSecret = process.env.FEISHU_APP_SECRET;
