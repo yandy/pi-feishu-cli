@@ -38,7 +38,7 @@ describe("createMessageHandler", () => {
     const runtime = createMockRuntime();
     const sessionsFn = vi.fn().mockResolvedValue(undefined);
     const modelsFn = vi.fn();
-    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, vi.fn());
     await handler(makeMsg("/sessions"));
     expect(sessionsFn).toHaveBeenCalledWith("chat-1");
     expect(runtime.session.prompt).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe("createMessageHandler", () => {
     const runtime = createMockRuntime();
     const sessionsFn = vi.fn();
     const modelsFn = vi.fn().mockResolvedValue(undefined);
-    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, vi.fn());
     await handler(makeMsg("/models"));
     expect(modelsFn).toHaveBeenCalledWith("chat-1");
     expect(runtime.session.prompt).not.toHaveBeenCalled();
@@ -56,8 +56,19 @@ describe("createMessageHandler", () => {
 
   it("routes normal messages to session.prompt with steer", async () => {
     const runtime = createMockRuntime();
-    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn());
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
     await handler(makeMsg("hello world"));
     expect(runtime.session.prompt).toHaveBeenCalledWith("hello world", { streamingBehavior: "steer" });
+  });
+
+  it("routes /help command to help handler", async () => {
+    const runtime = createMockRuntime();
+    const sessionsFn = vi.fn();
+    const modelsFn = vi.fn();
+    const helpFn = vi.fn().mockResolvedValue(undefined);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, helpFn);
+    await handler(makeMsg("/help"));
+    expect(helpFn).toHaveBeenCalledWith("chat-1");
+    expect(runtime.session.prompt).not.toHaveBeenCalled();
   });
 });

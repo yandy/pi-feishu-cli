@@ -7,6 +7,7 @@ export function createMessageHandler(
   runtime: AgentSessionRuntime,
   handleSessions: FeishuCommandHandler,
   handleModels: FeishuCommandHandler,
+  handleHelp: FeishuCommandHandler,
 ): (msg: NormalizedMessage) => Promise<void> {
   return async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
@@ -18,6 +19,11 @@ export function createMessageHandler(
 
     if (content.startsWith("/models")) {
       await handleModels(msg.chatId);
+      return;
+    }
+
+    if (content.startsWith("/help")) {
+      await handleHelp(msg.chatId);
       return;
     }
 
