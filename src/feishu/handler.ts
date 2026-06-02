@@ -1,5 +1,6 @@
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
 import type { NormalizedMessage } from "./channel.js";
+import type { ProcessedAttachments } from "./attachments.js";
 
 export type FeishuCommandHandler = (chatId: string) => Promise<void>;
 
@@ -8,8 +9,8 @@ export function createMessageHandler(
   handleSessions: FeishuCommandHandler,
   handleModels: FeishuCommandHandler,
   handleHelp: FeishuCommandHandler,
-): (msg: NormalizedMessage) => Promise<void> {
-  return async (msg: NormalizedMessage) => {
+): (msg: NormalizedMessage, attachments?: ProcessedAttachments) => Promise<void> {
+  return async (msg: NormalizedMessage, attachments?: ProcessedAttachments) => {
     const content = msg.content.trim();
 
     if (content.startsWith("/sessions")) {
@@ -27,6 +28,15 @@ export function createMessageHandler(
       return;
     }
 
-    await runtime.session.prompt(content, { streamingBehavior: "steer" });
+    const textParts = [content];
+    if (attachments?.text) {
+      textParts.push(attachments.text);
+    }
+    const fullText = textParts.join("\n\n");
+
+    await runtime.session.prompt(fullText, {
+      streamingBehavior: "steer",
+      images: attachments?.images && attachments.images.length > 0 ? attachments.images : undefined,
+    });
   };
 }

@@ -38,7 +38,8 @@ describe("createMessageHandler", () => {
     const runtime = createMockRuntime();
     const sessionsFn = vi.fn().mockResolvedValue(undefined);
     const modelsFn = vi.fn();
-    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, vi.fn());
+    const helpFn = vi.fn().mockResolvedValue(undefined);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, helpFn);
     await handler(makeMsg("/sessions"));
     expect(sessionsFn).toHaveBeenCalledWith("chat-1");
     expect(runtime.session.prompt).not.toHaveBeenCalled();
@@ -48,17 +49,21 @@ describe("createMessageHandler", () => {
     const runtime = createMockRuntime();
     const sessionsFn = vi.fn();
     const modelsFn = vi.fn().mockResolvedValue(undefined);
-    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, vi.fn());
+    const helpFn = vi.fn().mockResolvedValue(undefined);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, helpFn);
     await handler(makeMsg("/models"));
     expect(modelsFn).toHaveBeenCalledWith("chat-1");
     expect(runtime.session.prompt).not.toHaveBeenCalled();
   });
 
-  it("routes normal messages to session.prompt with steer", async () => {
+  it("routes normal messages to session.prompt with steer (no attachments)", async () => {
     const runtime = createMockRuntime();
     const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
     await handler(makeMsg("hello world"));
-    expect(runtime.session.prompt).toHaveBeenCalledWith("hello world", { streamingBehavior: "steer" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("hello world", {
+      streamingBehavior: "steer",
+      images: undefined,
+    });
   });
 
   it("routes /help command to help handler", async () => {
@@ -70,5 +75,46 @@ describe("createMessageHandler", () => {
     await handler(makeMsg("/help"));
     expect(helpFn).toHaveBeenCalledWith("chat-1");
     expect(runtime.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("appends attachment text to prompt content", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("hello"), { images: [], text: "[文件内容: code.js]\nconst x = 1;" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith(
+      "hello\n\n[文件内容: code.js]\nconst x = 1;",
+      { streamingBehavior: "steer", images: undefined },
+    );
+  });
+
+  it("passes images to prompt when attachments include images", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    const images = [{ type: "image" as const, data: "base64data", mimeType: "image/png" }];
+    await handler(makeMsg("check this"), { images, text: "" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("check this", {
+      streamingBehavior: "steer",
+      images,
+    });
+  });
+
+  it("skips images option when images array is empty", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("hello"), { images: [], text: "" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("hello", {
+      streamingBehavior: "steer",
+      images: undefined,
+    });
+  });
+
+  it("only uses user text when attachments has no text", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("plain text"), { images: [], text: "" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("plain text", {
+      streamingBehavior: "steer",
+      images: undefined,
+    });
   });
 });
