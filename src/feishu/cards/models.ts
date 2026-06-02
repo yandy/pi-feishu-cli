@@ -21,6 +21,15 @@ export interface ModelCardOptions {
 
 const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
+const THINKING_LABELS: Record<ThinkingLevel, string> = {
+  off: "off",
+  minimal: "min",
+  low: "low",
+  medium: "med",
+  high: "high",
+  xhigh: "xhigh",
+};
+
 function modelKey(model: Model): string {
   return `${model.provider}/${model.id}`;
 }
@@ -34,7 +43,7 @@ export async function buildModelsCard(options: ModelCardOptions): Promise<Record
   const elements: CardElement[] = [];
 
   const currentLabel = currentModel
-    ? `${currentModel.provider}/${currentModel.id} · Thinking: ${currentThink}`
+    ? `${currentModel.provider}/${currentModel.id} · ${THINKING_LABELS[currentThink]}`
     : "(未选择)";
   elements.push(createMarkdownBlock("**当前**"));
   elements.push(createMarkdownBlock(currentLabel));
@@ -44,12 +53,13 @@ export async function buildModelsCard(options: ModelCardOptions): Promise<Record
 
   for (const model of availableModels) {
     const key = modelKey(model);
-    elements.push(createMarkdownBlock(key));
+    elements.push(createDividerBlock());
+    elements.push(createMarkdownBlock(`**${key}**`));
     elements.push({
       tag: "action",
       actions: THINKING_LEVELS.map((level) => ({
         tag: "button" as const,
-        text: { tag: "plain_text" as const, content: `Think:${level}` },
+        text: { tag: "plain_text" as const, content: THINKING_LABELS[level] },
         type: (level === currentThink ? "primary" : "default") as "primary" | "default",
         value: { cmd: "model", action: "select", provider: model.provider, modelId: model.id, thinkingLevel: level },
       })),
