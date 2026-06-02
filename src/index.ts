@@ -1,6 +1,7 @@
 import { InteractiveMode, type AgentSessionRuntime, AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { loadConfig, type ConfigOptions } from "./config.js";
+import { loadConfig, promptAndSaveCredentials, type ConfigOptions } from "./config.js";
 import { initRuntime } from "./runtime.js";
+import type { FeishuConfig } from "./types.js";
 import { createChannel, type Channel, type NormalizedMessage } from "./feishu/channel.js";
 import { createMessageHandler } from "./feishu/handler.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
@@ -17,12 +18,18 @@ export interface MainOptions {
 export async function main(options: MainOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
-  const feishuConfig = loadConfig({
-    appId: options.appId,
-    appSecret: options.appSecret,
-    config: options.config,
-    cwd,
-  });
+  let feishuConfig: FeishuConfig;
+  try {
+    feishuConfig = loadConfig({
+      appId: options.appId,
+      appSecret: options.appSecret,
+      config: options.config,
+      cwd,
+    });
+  } catch {
+    console.error("未找到飞书凭证，请输入：");
+    feishuConfig = await promptAndSaveCredentials();
+  }
 
   const { runtime } = await initRuntime({ cwd });
 

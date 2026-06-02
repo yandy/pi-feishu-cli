@@ -1,6 +1,7 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { createInterface } from "node:readline/promises";
 import type { FeishuConfig } from "./types.js";
 
 export interface ConfigOptions {
@@ -60,4 +61,27 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   }
 
   return { appId, appSecret };
+}
+
+export function saveCredentials(path: string, config: FeishuConfig): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
+}
+
+const DEFAULT_SAVE_PATH = join(homedir(), ".pi", "agent", "feishu.json");
+
+export async function promptAndSaveCredentials(savePath?: string): Promise<FeishuConfig> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  const appId = await rl.question("Feishu App ID: ");
+  const appSecret = await rl.question("Feishu App Secret: ");
+
+  rl.close();
+
+  const config: FeishuConfig = { appId, appSecret };
+  const path = savePath ?? DEFAULT_SAVE_PATH;
+  saveCredentials(path, config);
+  console.error(`Credentials saved to ${path}`);
+
+  return config;
 }

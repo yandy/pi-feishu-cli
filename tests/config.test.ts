@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { join } from "node:path";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { loadConfig } from "../src/config.js";
+import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { loadConfig, saveCredentials } from "../src/config.js";
 
 const tmpDir = join(process.cwd(), "tests", "__tmp_config__");
 
@@ -83,6 +84,33 @@ describe("loadConfig", () => {
     } finally {
       process.env.FEISHU_APP_ID = prevId;
       process.env.FEISHU_APP_SECRET = prevSecret;
+    }
+  });
+});
+
+describe("saveCredentials", () => {
+  it("writes appId and appSecret to JSON file", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
+    const configPath = join(tmpDir, "feishu.json");
+    try {
+      saveCredentials(configPath, { appId: "test-id", appSecret: "test-secret" });
+      const raw = readFileSync(configPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      expect(parsed.appId).toBe("test-id");
+      expect(parsed.appSecret).toBe("test-secret");
+    } finally {
+      rmSync(tmpDir, { recursive: true });
+    }
+  });
+
+  it("creates parent directory if it doesn't exist", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
+    const nestedPath = join(tmpDir, "a", "b", "feishu.json");
+    try {
+      saveCredentials(nestedPath, { appId: "id", appSecret: "secret" });
+      expect(existsSync(nestedPath)).toBe(true);
+    } finally {
+      rmSync(tmpDir, { recursive: true });
     }
   });
 });
