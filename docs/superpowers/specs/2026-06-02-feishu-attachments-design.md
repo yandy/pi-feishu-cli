@@ -86,7 +86,17 @@ export function createMessageHandler(
 ): (msg: NormalizedMessage, attachments?: ProcessedAttachments) => Promise<void>;
 ```
 
-内部将 `attachments.text` 拼入 `msg.content`，`attachments.images` 传入 `session.prompt(text, { images })`。
+内部将 `attachments.text` 拼入 `msg.content`，`attachments.images` 传入 `session.prompt(text, { images })`：
+
+```typescript
+const promptText = msg.content.trim();
+const fullText = text ? `${promptText}\n\n${text}` : promptText;
+
+await runtime.session.prompt(fullText, {
+  streamingBehavior: "steer",
+  images: images.length > 0 ? images : undefined,
+});
+```
 
 ### 4. `src/index.ts` — 组装依赖
 
