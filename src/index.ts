@@ -1,4 +1,5 @@
 import { InteractiveMode, type AgentSessionRuntime, AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { unlink } from "node:fs/promises";
 import { loadConfig, promptAndSaveCredentials, type ConfigOptions } from "./config.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
@@ -107,9 +108,11 @@ function setupFeishuHandlers(
   });
 
   channel.on("cardAction", async (evt: any) => {
-    const value = evt?.value ?? evt;
+    const value = evt?.action?.value ?? evt;
+    const messageId: string | undefined = evt?.messageId;
+    const chatId: string | undefined = evt?.chatId;
     try {
-      await handleCardAction(value, runtime, cwd, channel);
+      await handleCardAction(value, messageId, chatId, runtime, cwd, channel);
     } catch (err) {
       console.error("Card action failed:", err);
     }
@@ -124,6 +127,8 @@ function setupFeishuHandlers(
 
 async function handleCardAction(
   value: Record<string, any>,
+  _messageId: string | undefined,
+  chatId: string | undefined,
   runtime: AgentSessionRuntime,
   cwd: string,
   channel: Channel,
@@ -135,10 +140,14 @@ async function handleCardAction(
       await runtime.newSession();
     } else if (action === "switch" && value.sessionPath) {
       await runtime.switchSession(value.sessionPath);
+    } else if (action === "delete" && value.sessionPath) {
+      if (value.sessionPath !== runtime.session.sessionFile) {
+        await unlink(value.sessionPath);
+      }
     }
     const card = await buildSessionsCard({ runtime, cwd });
-    if (value.openMessageId) {
-      await channel.updateCard(value.openMessageId, card);
+    if (chatId) {
+      await channel.send(chatId, { card }, { replyTo: _messageId });
     }
   } else if (cmd === "model" && action === "select") {
     const { provider, modelId, thinkingLevel } = value;
@@ -154,8 +163,8 @@ async function handleCardAction(
       session: runtime.session,
       availableModels: available.filter((m): m is NonNullable<typeof m> => m != null),
     });
-    if (value.openMessageId) {
-      await channel.updateCard(value.openMessageId, card);
+    if (chatId) {
+      await channel.send(chatId, { card }, { replyTo: _messageId });
     }
   }
 }

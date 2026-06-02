@@ -5,7 +5,6 @@ import {
   buildCard,
   createCardHeader,
   createMarkdownBlock,
-  createActionButton,
   createDividerBlock,
   type CardElement,
 } from "./helpers.js";
@@ -24,9 +23,10 @@ export async function buildSessionsCard(options: SessionCardOptions): Promise<Re
   const projectSessions = await SessionManager.list(cwd);
   const allSessions = await SessionManager.listAll(cwd);
 
-  const elements: Record<string, unknown>[] = [];
+  const elements: (CardElement | Record<string, unknown>)[] = [];
 
-  elements.push(createMarkdownBlock(`**当前 Session**\n\`${currentId}\``));
+  elements.push(createMarkdownBlock("**当前 Session**"));
+  elements.push(createMarkdownBlock(currentId));
 
   if (projectSessions.length > 0 || allSessions.length > 0) {
     elements.push(createDividerBlock());
@@ -39,12 +39,12 @@ export async function buildSessionsCard(options: SessionCardOptions): Promise<Re
       if (seen.has(name) || name === currentId) continue;
       seen.add(name);
 
+      elements.push(createMarkdownBlock(name));
       elements.push({
-        tag: "action" as const,
+        tag: "action",
         actions: [
-          createMarkdownBlock(`\`${name}\``) as any,
-          createActionButton("切换", { cmd: "session", action: "switch", sessionPath: s.path }, "default"),
-          createActionButton("删除", { cmd: "session", action: "delete", sessionPath: s.path }, "danger"),
+          { tag: "button", text: { tag: "plain_text", content: "切换" }, type: "default", value: { cmd: "session", action: "switch", sessionPath: s.path } },
+          { tag: "button", text: { tag: "plain_text", content: "删除" }, type: "danger", value: { cmd: "session", action: "delete", sessionPath: s.path } },
         ],
       });
     }
@@ -52,9 +52,9 @@ export async function buildSessionsCard(options: SessionCardOptions): Promise<Re
 
   elements.push(createDividerBlock());
   elements.push({
-    tag: "action" as const,
+    tag: "action",
     actions: [
-      createActionButton("新建 Session", { cmd: "session", action: "new" }, "primary"),
+      { tag: "button", text: { tag: "plain_text", content: "新建 Session" }, type: "primary", value: { cmd: "session", action: "new" } },
     ],
   });
 

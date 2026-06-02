@@ -47,7 +47,7 @@ describe("card helpers", () => {
     const header = createCardHeader("Test");
     const elements = [createMarkdownBlock("hello")];
     const card = buildCard(header, elements);
-    expect(card.config).toEqual({ wide_screen_mode: true });
+    expect(card.config).toEqual({ wide_screen_mode: true, update_multi: true });
     expect(card.header).toBe(header);
     expect(card.elements).toBe(elements);
   });

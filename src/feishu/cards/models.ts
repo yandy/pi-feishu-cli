@@ -3,7 +3,6 @@ import {
   buildCard,
   createCardHeader,
   createMarkdownBlock,
-  createActionButton,
   createDividerBlock,
   type CardElement,
 } from "./helpers.js";
@@ -32,32 +31,30 @@ export async function buildModelsCard(options: ModelCardOptions): Promise<Record
   const currentModel = session.model;
   const currentThink = session.thinkingLevel;
 
-  const elements: Record<string, unknown>[] = [];
+  const elements: CardElement[] = [];
 
   const currentLabel = currentModel
     ? `${currentModel.provider}/${currentModel.id} · Thinking: ${currentThink}`
     : "(未选择)";
-  elements.push(createMarkdownBlock(`**当前**\n${currentLabel}`));
+  elements.push(createMarkdownBlock("**当前**"));
+  elements.push(createMarkdownBlock(currentLabel));
 
   elements.push(createDividerBlock());
   elements.push(createMarkdownBlock("**可用 Models**"));
 
   for (const model of availableModels) {
     const key = modelKey(model);
+    elements.push(createMarkdownBlock(key));
     elements.push({
-      tag: "action" as const,
-      actions: [
-        createMarkdownBlock(`\`${key}\``) as any,
-        ...THINKING_LEVELS.map((level) =>
-          createActionButton(
-            `Think:${level}`,
-            { cmd: "model", action: "select", provider: model.provider, modelId: model.id, thinkingLevel: level },
-            level === currentThink ? "primary" : "default",
-          ),
-        ),
-      ],
+      tag: "action",
+      actions: THINKING_LEVELS.map((level) => ({
+        tag: "button" as const,
+        text: { tag: "plain_text" as const, content: `Think:${level}` },
+        type: (level === currentThink ? "primary" : "default") as "primary" | "default",
+        value: { cmd: "model", action: "select", provider: model.provider, modelId: model.id, thinkingLevel: level },
+      })),
     });
   }
 
-  return buildCard(createCardHeader("Model 管理", "blue"), elements as CardElement[]);
+  return buildCard(createCardHeader("Model 管理", "blue"), elements);
 }

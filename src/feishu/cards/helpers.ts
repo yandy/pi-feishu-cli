@@ -64,7 +64,7 @@ export function buildCard(
   elements: CardElement[],
 ): Record<string, unknown> {
   return {
-    config: { wide_screen_mode: true },
+    config: { wide_screen_mode: true, update_multi: true },
     header,
     elements,
   };
