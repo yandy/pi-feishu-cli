@@ -7,10 +7,21 @@ import {
 
 export type { CardActionEvent };
 export type NormalizedMessage = LarkNormalizedMessage;
+export { LoggerLevel };
+
+export const LOG_LEVEL_MAP: Record<string, LoggerLevel | undefined> = {
+  fatal: LoggerLevel.fatal,
+  error: LoggerLevel.error,
+  warn: LoggerLevel.warn,
+  info: LoggerLevel.info,
+  debug: LoggerLevel.debug,
+  trace: LoggerLevel.trace,
+};
 
 export interface ChannelOptions {
   appId: string;
   appSecret: string;
+  logLevel?: string;
 }
 
 export interface StreamController {
@@ -36,10 +47,11 @@ export interface Channel {
 }
 
 export function createChannel(options: ChannelOptions): Channel {
+  const loggerLevel = LOG_LEVEL_MAP[options.logLevel?.toLowerCase() ?? ""] ?? LoggerLevel.warn;
   const raw = createLarkChannel({
     appId: options.appId,
     appSecret: options.appSecret,
-    loggerLevel: LoggerLevel.info,
+    loggerLevel,
     policy: { requireMention: true, dmMode: "open" },
   });
 

@@ -10,6 +10,7 @@ interface CliArgs {
   appId?: string;
   appSecret?: string;
   config?: string;
+  logLevel?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -26,6 +27,9 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case "--config":
         if (i + 1 < argv.length) result.config = argv[++i];
+        break;
+      case "--log-level":
+        if (i + 1 < argv.length) result.logLevel = argv[++i];
         break;
       case "--help":
       case "-h":
@@ -44,6 +48,7 @@ Options:
   --app-id <id>       Feishu app ID
   --app-secret <key>  Feishu app secret
   --config <path>     Path to config JSON file
+  --log-level <level> Log level (fatal|error|warn|info|debug|trace, default: warn)
   --help, -h          Show this help
 
 Configuration priority: CLI args > config file > environment variables
@@ -63,6 +68,7 @@ main({
   appId: cliArgs.appId,
   appSecret: cliArgs.appSecret,
   config: cliArgs.config,
+  logLevel: cliArgs.logLevel,
 }).catch((err) => {
   console.error("Fatal error:", err instanceof Error ? err.message : String(err));
   process.exit(1);

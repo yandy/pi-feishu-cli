@@ -1,4 +1,4 @@
-import { InteractiveMode, type AgentSessionRuntime, AuthStorage, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { InteractiveMode, type AgentSessionRuntime, AuthStorage, ModelRegistry, SessionManager } from "@earendil-works/pi-coding-agent";
 import { unlink } from "node:fs/promises";
 import { loadConfig, promptAndSaveCredentials, type ConfigOptions } from "./config.js";
 import { initRuntime } from "./runtime.js";
@@ -9,11 +9,21 @@ import { buildSessionsCard } from "./feishu/cards/sessions.js";
 import { buildModelsCard, type ModelCardOptions } from "./feishu/cards/models.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 
+export async function resumeMostRecentSession(runtime: AgentSessionRuntime, cwd: string): Promise<boolean> {
+  const sessions = await SessionManager.list(cwd);
+  const activePath = runtime.session.sessionFile;
+  const target = sessions.find(s => s.path !== activePath);
+  if (!target) return false;
+  await runtime.switchSession(target.path, { cwdOverride: cwd });
+  return true;
+}
+
 export interface MainOptions {
   appId?: string;
   appSecret?: string;
   config?: string;
   cwd?: string;
+  logLevel?: string;
 }
 
 export async function main(options: MainOptions = {}): Promise<void> {
@@ -34,7 +44,9 @@ export async function main(options: MainOptions = {}): Promise<void> {
 
   const { runtime } = await initRuntime({ cwd });
 
-  const channel: Channel | null = await connectFeishu(feishuConfig);
+  await resumeMostRecentSession(runtime, cwd);
+
+  const channel: Channel | null = await connectFeishu(feishuConfig, options.logLevel);
 
   let cleanup: (() => void) | null = null;
   if (channel) {
@@ -52,8 +64,8 @@ export async function main(options: MainOptions = {}): Promise<void> {
   }
 }
 
-async function connectFeishu(config: { appId: string; appSecret: string }): Promise<Channel | null> {
-  const channel = createChannel(config);
+async function connectFeishu(config: { appId: string; appSecret: string }, logLevel?: string): Promise<Channel | null> {
+  const channel = createChannel({ ...config, logLevel });
   try {
     await channel.connect();
     console.error(`Feishu bot connected as ${channel.botIdentity?.name ?? "unknown"}`);
