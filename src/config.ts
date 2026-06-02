@@ -55,7 +55,7 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   if (!appId || !appSecret) {
     throw new Error(
       "Feishu credentials not configured. Set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, " +
-      "create ~/.pi/agent/feishu.json, or pass --app-id/--app-secret CLI args.",
+      "create .pi/feishu.json or ~/.pi/agent/feishu.json, or pass --app-id/--app-secret CLI args.",
     );
   }
 
