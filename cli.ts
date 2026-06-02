@@ -17,6 +17,7 @@ interface CliArgs {
   config?: string;
   logLevel?: string;
   botName?: string;
+  noBundleFeishuSkills?: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -40,6 +41,9 @@ function parseArgs(argv: string[]): CliArgs {
       case "--bot-name":
         if (i + 1 < argv.length) result.botName = argv[++i];
         break;
+      case "--no-bundle-feishu-skills":
+        result.noBundleFeishuSkills = true;
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -59,6 +63,7 @@ Options:
   --config <path>     Path to config JSON file
   --log-level <level> Log level (fatal|error|warn|info|debug|trace, default: warn)
   --bot-name <name>   Bot display name (default: PI Agent)
+  --no-bundle-feishu-skills  Skip loading project skills/ directory
   --help, -h          Show this help
 
 Configuration priority: CLI args > config file > environment variables
@@ -80,6 +85,7 @@ main({
   config: cliArgs.config,
   logLevel: cliArgs.logLevel,
   botName: cliArgs.botName,
+  noBundleFeishuSkills: cliArgs.noBundleFeishuSkills,
   packageRoot,
 }).catch((err) => {
   console.error("Fatal error:", err instanceof Error ? err.message : String(err));
