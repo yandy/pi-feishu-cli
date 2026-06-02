@@ -24,6 +24,7 @@ export interface MainOptions {
   config?: string;
   cwd?: string;
   logLevel?: string;
+  packageRoot?: string;
 }
 
 export async function main(options: MainOptions = {}): Promise<void> {
@@ -42,7 +43,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
     feishuConfig = await promptAndSaveCredentials();
   }
 
-  const { runtime } = await initRuntime({ cwd });
+  const { runtime } = await initRuntime({ cwd, packageRoot: options.packageRoot });
 
   await resumeMostRecentSession(runtime, cwd);
 

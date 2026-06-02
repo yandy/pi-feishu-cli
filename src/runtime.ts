@@ -4,11 +4,11 @@ import {
   createAgentSessionRuntime,
   createAgentSessionServices,
   getAgentDir,
-  DefaultResourceLoader,
   SessionManager,
   type AgentSessionRuntime,
   createSyntheticSourceInfo,
   type Skill,
+  type ResourceDiagnostic,
 } from "@earendil-works/pi-coding-agent";
 import { readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 export interface InitRuntimeOptions {
   cwd: string;
   agentDir?: string;
+  packageRoot?: string;
 }
 
 export interface InitRuntimeResult {
@@ -53,21 +54,20 @@ export async function initRuntime(options: InitRuntimeOptions): Promise<InitRunt
   const cwd = resolve(options.cwd);
   const agentDir = options.agentDir ?? getAgentDir();
 
-  const skillsDir = join(cwd, "skills");
+  const packageRoot = options.packageRoot ?? cwd;
+  const skillsDir = join(packageRoot, "skills");
   const customSkills = loadSkillsFromDir(skillsDir);
 
-  const loader = new DefaultResourceLoader({
-    cwd,
-    agentDir,
-    skillsOverride: (current) => ({
-      skills: [...current.skills, ...customSkills],
-      diagnostics: current.diagnostics,
-    }),
+  const skillsOverride = (current: { skills: Skill[]; diagnostics: ResourceDiagnostic[] }) => ({
+    skills: [...current.skills, ...customSkills],
+    diagnostics: current.diagnostics,
   });
-  await loader.reload();
 
   const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd: runtimeCwd, sessionManager, sessionStartEvent }) => {
-    const services = await createAgentSessionServices({ cwd: runtimeCwd });
+    const services = await createAgentSessionServices({
+      cwd: runtimeCwd,
+      resourceLoaderOptions: { skillsOverride },
+    });
     return {
       ...(await createAgentSessionFromServices({ services, sessionManager, sessionStartEvent })),
       services,
