@@ -4,9 +4,7 @@ import {
   createAgentSessionRuntime,
   createAgentSessionServices,
   getAgentDir,
-  AuthStorage,
   DefaultResourceLoader,
-  ModelRegistry,
   SessionManager,
   type AgentSessionRuntime,
   createSyntheticSourceInfo,
@@ -54,9 +52,6 @@ function loadSkillsFromDir(skillsDir: string): Skill[] {
 export async function initRuntime(options: InitRuntimeOptions): Promise<InitRuntimeResult> {
   const cwd = resolve(options.cwd);
   const agentDir = options.agentDir ?? getAgentDir();
-
-  const authStorage = AuthStorage.create();
-  ModelRegistry.create(authStorage);
 
   const skillsDir = join(cwd, "skills");
   const customSkills = loadSkillsFromDir(skillsDir);
