@@ -70,13 +70,22 @@ export function saveCredentials(path: string, config: FeishuConfig): void {
 
 const DEFAULT_SAVE_PATH = join(homedir(), ".pi", "agent", "feishu.json");
 
-export async function promptAndSaveCredentials(savePath?: string): Promise<FeishuConfig> {
+async function readNonEmpty(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    for (;;) {
+      const answer = (await rl.question(question)).trim();
+      if (answer.length > 0) return answer;
+      console.error("输入不能为空，请重新输入。");
+    }
+  } finally {
+    rl.close();
+  }
+}
 
-  const appId = await rl.question("Feishu App ID: ");
-  const appSecret = await rl.question("Feishu App Secret: ");
-
-  rl.close();
+export async function promptAndSaveCredentials(savePath?: string): Promise<FeishuConfig> {
+  const appId = await readNonEmpty("Feishu App ID: ");
+  const appSecret = await readNonEmpty("Feishu App Secret: ");
 
   const config: FeishuConfig = { appId, appSecret };
   const path = savePath ?? DEFAULT_SAVE_PATH;
