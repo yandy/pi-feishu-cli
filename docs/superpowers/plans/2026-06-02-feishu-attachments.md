@@ -15,36 +15,99 @@
 | 文件 | 职责 | 变更 |
 |------|------|------|
 | `src/feishu/channel.ts` | Channel 接口 + Lark SDK 封装 | 修改：新增 `downloadMessageResource` 方法 |
+| `tests/feishu/channel.test.ts` | Channel 测试 | 修改：新增下载方法测试 |
 | `src/feishu/attachments.ts` | 附件下载/分类/转换 | 新建 |
 | `tests/feishu/attachments.test.ts` | 附件模块单元测试 | 新建 |
 | `src/feishu/handler.ts` | 消息处理 | 修改：接收 `ProcessedAttachments` |
 | `tests/feishu/handler.test.ts` | handler 测试 | 修改：适配新参数和附件逻辑 |
-| `src/index.ts` | 主入口组装 | 修改：消息回调中调用附件处理 |
+| `src/index.ts` | 主入口组装 | 修改：消息回调中调用附件处理，导出 setupFeishuHandlers |
+| `tests/feishu/wiring.test.ts` | 组装逻辑集成测试 | 新建 |
 
 ---
 
 ### Task 1: Channel 接口新增 downloadMessageResource
 
 **Files:**
-- Modify: `src/feishu/channel.ts:35-48`
-- Modify: `src/feishu/channel.ts:61-84`
+- Modify: `src/feishu/channel.ts:35-48` (接口声明)
+- Modify: `src/feishu/channel.ts:61-84` (createChannel 实现)
+- Modify: `tests/feishu/channel.test.ts`
 
-- [ ] **Step 1: 在 Channel 接口声明新方法**
+- [ ] **Step 1: 编写 Channel 下载方法测试**
+
+在 `tests/feishu/channel.test.ts` 的 `describe("createChannel")` block 内新增测试。mock 需要增加 `rawClient` 属性：
+
+更新第 4 行的 mock 对象，在 `dispatcher: mockDispatcher` 之后追加 `rawClient`：
 
 ```typescript
-// 在 Channel 接口中新增（downloadResource 方法声明区）
-downloadMessageResource(messageId: string, fileKey: string, type: string): Promise<Buffer>;
+const mockRawChannel = {
+  on: vi.fn(),
+  botIdentity: undefined,
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  send: vi.fn(),
+  stream: vi.fn(),
+  updateCard: vi.fn(),
+  get connected() { return false; },
+  dispatcher: mockDispatcher,
+  rawClient: {
+    im: { v1: { messageResource: { get: vi.fn() } } },
+  },
+};
 ```
 
-在 `src/feishu/channel.ts` 第 43 行 `send(...)` 之前插入：
+在 `describe("createChannel")` block 末尾（最后一个 `it` 之后，`})` 之前）新增测试用例：
+
+```typescript
+  describe("downloadMessageResource", () => {
+    it("calls messageResource.get and returns Buffer from stream", async () => {
+      const channel = createChannel({ appId: "test", appSecret: "secret" });
+      const mockStream = async function*() {
+        yield Buffer.from("hello");
+        yield Buffer.from("world");
+      }();
+      mockRawChannel.rawClient.im.v1.messageResource.get.mockResolvedValue({
+        getReadableStream: () => mockStream,
+      });
+
+      const result = await channel.downloadMessageResource("msg-1", "file-1", "image");
+      expect(mockRawChannel.rawClient.im.v1.messageResource.get).toHaveBeenCalledWith({
+        path: { message_id: "msg-1", file_key: "file-1" },
+        params: { type: "image" },
+      });
+      expect(result).toBeInstanceOf(Buffer);
+      expect(result.toString()).toBe("helloworld");
+    });
+
+    it("handles non-Buffer chunks from stream", async () => {
+      // 需在 each { beforeEach } 中重置 mock，但 vitest 的 `vi.clearAllMocks()` 已在 beforeEach 中
+      const channel = createChannel({ appId: "test", appSecret: "secret" });
+      const mockStream = async function*() {
+        yield "string-chunk";
+      }();
+      mockRawChannel.rawClient.im.v1.messageResource.get.mockResolvedValue({
+        getReadableStream: () => mockStream,
+      });
+
+      const result = await channel.downloadMessageResource("msg-2", "file-2", "file");
+      expect(result.toString()).toBe("string-chunk");
+    });
+  });
+```
+
+- [ ] **Step 2: 运行测试确认失败**
+
+Run: `npx vitest run tests/feishu/channel.test.ts`
+Expected: 新增的 `downloadMessageResource` 测试 FAIL（方法未声明/未实现）
+
+- [ ] **Step 3: 在 Channel 接口中声明并实现新方法**
+
+在 `Channel` 接口中（约第 43 行，`send(...)` 之前）插入：
 
 ```typescript
   downloadMessageResource(messageId: string, fileKey: string, type: string): Promise<Buffer>;
 ```
 
-- [ ] **Step 2: 在 createChannel 中实现新方法**
-
-在 `createChannel` 函数中，`send` 方法实现之后（约第 80 行 `async send` 之后）插入 `downloadMessageResource` 的转发实现。实现需构造 `rawClient.im.v1.messageResource.get` 调用并攒流：
+在 `createChannel` 函数中，`send` 方法实现之后插入实现：
 
 ```typescript
     async downloadMessageResource(messageId: string, fileKey: string, type: string) {
@@ -60,17 +123,17 @@ downloadMessageResource(messageId: string, fileKey: string, type: string): Promi
     },
 ```
 
-注意：`raw` 当前类型为 `any`（由 `createLarkChannel` 推断为 `LarkChannel` 但未声明类型标注），`rawClient` 在 `LarkChannel` 上是 `public readonly` 属性，通过 `(raw as any).rawClient` 安全访问。
+注意：`raw` 当前类型为 `any`（由 `createLarkChannel` 推断为 `LarkChannel`），`rawClient` 在 `LarkChannel` 上是 `public readonly`，通过 `(raw as any).rawClient` 安全访问。
 
-- [ ] **Step 3: 运行现有测试确保不破坏**
+- [ ] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run tests/feishu/channel.test.ts`
-Expected: All existing tests PASS
+Expected: All tests PASS
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/feishu/channel.ts
+git add src/feishu/channel.ts tests/feishu/channel.test.ts
 git commit -m "feat: add downloadMessageResource to Channel interface"
 ```
 
@@ -424,7 +487,137 @@ git commit -m "feat: add attachment processing module"
 - Modify: `src/feishu/handler.ts`
 - Modify: `tests/feishu/handler.test.ts`
 
-- [ ] **Step 1: 更新 handler 实现**
+- [ ] **Step 1: 编写 handler 附件参数测试（先写测试）**
+
+`tests/feishu/handler.test.ts` 完整替换为：
+
+```typescript
+import { describe, it, expect, vi } from "vitest";
+import { createMessageHandler } from "../../src/feishu/handler.js";
+import type { NormalizedMessage } from "../../src/feishu/channel.js";
+
+function createMockRuntime() {
+  return {
+    session: {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      model: { provider: "test", id: "test-model" },
+      thinkingLevel: "off" as const,
+      setModel: vi.fn().mockResolvedValue(undefined),
+      setThinkingLevel: vi.fn(),
+      sessionFile: "/tmp/session.jsonl",
+    },
+    newSession: vi.fn().mockResolvedValue(undefined),
+    switchSession: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeMsg(content: string): NormalizedMessage {
+  return {
+    messageId: "msg-1",
+    chatId: "chat-1",
+    chatType: "p2p",
+    senderId: "user-1",
+    content,
+    rawContentType: "text",
+    resources: [],
+    mentions: [],
+    mentionAll: false,
+    mentionedBot: false,
+    createTime: Date.now(),
+  };
+}
+
+describe("createMessageHandler", () => {
+  it("routes /sessions command to sessions handler", async () => {
+    const runtime = createMockRuntime();
+    const sessionsFn = vi.fn().mockResolvedValue(undefined);
+    const modelsFn = vi.fn();
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, vi.fn());
+    await handler(makeMsg("/sessions"));
+    expect(sessionsFn).toHaveBeenCalledWith("chat-1");
+    expect(runtime.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("routes /models command to models handler", async () => {
+    const runtime = createMockRuntime();
+    const sessionsFn = vi.fn();
+    const modelsFn = vi.fn().mockResolvedValue(undefined);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, vi.fn());
+    await handler(makeMsg("/models"));
+    expect(modelsFn).toHaveBeenCalledWith("chat-1");
+    expect(runtime.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("routes normal messages to session.prompt with steer (no attachments)", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("hello world"));
+    expect(runtime.session.prompt).toHaveBeenCalledWith("hello world", {
+      streamingBehavior: "steer",
+      images: undefined,
+    });
+  });
+
+  it("routes /help command to help handler", async () => {
+    const runtime = createMockRuntime();
+    const sessionsFn = vi.fn();
+    const modelsFn = vi.fn();
+    const helpFn = vi.fn().mockResolvedValue(undefined);
+    const handler = createMessageHandler(runtime as any, sessionsFn, modelsFn, helpFn);
+    await handler(makeMsg("/help"));
+    expect(helpFn).toHaveBeenCalledWith("chat-1");
+    expect(runtime.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("appends attachment text to prompt content", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("hello"), { images: [], text: "[文件内容: code.js]\nconst x = 1;" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith(
+      "hello\n\n[文件内容: code.js]\nconst x = 1;",
+      { streamingBehavior: "steer", images: undefined },
+    );
+  });
+
+  it("passes images to prompt when attachments include images", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    const images = [{ type: "image" as const, data: "base64data", mimeType: "image/png" }];
+    await handler(makeMsg("check this"), { images, text: "" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("check this", {
+      streamingBehavior: "steer",
+      images,
+    });
+  });
+
+  it("skips images option when images array is empty", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("hello"), { images: [], text: "" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("hello", {
+      streamingBehavior: "steer",
+      images: undefined,
+    });
+  });
+
+  it("only uses user text when attachments has no text", async () => {
+    const runtime = createMockRuntime();
+    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
+    await handler(makeMsg("plain text"), { images: [], text: "" });
+    expect(runtime.session.prompt).toHaveBeenCalledWith("plain text", {
+      streamingBehavior: "steer",
+      images: undefined,
+    });
+  });
+});
+```
+
+- [ ] **Step 2: 运行测试确认失败**
+
+Run: `npx vitest run tests/feishu/handler.test.ts`
+Expected: 新增的附件相关测试 FAIL（`createMessageHandler` 当前不接受 attachments 参数），旧测试中的 `images: undefined` 断言可能也 FAIL（当前 prompt 调用不含 images 参数）
+
+- [ ] **Step 3: 更新 handler 实现使测试通过**
 
 修改 `src/feishu/handler.ts`：
 
@@ -473,73 +666,12 @@ export function createMessageHandler(
 }
 ```
 
-- [ ] **Step 2: 更新 handler 测试用例**
-
-`tests/feishu/handler.test.ts` 需要更新以匹配新签名。首先更新测试的 import：
-
-```typescript
-import { describe, it, expect, vi } from "vitest";
-import { createMessageHandler } from "../../src/feishu/handler.js";
-import type { NormalizedMessage } from "../../src/feishu/channel.js";
-```
-
-更新 prompt 相关的测试用例，增加对 `images` 参数的断言：
-
-重写第 57-62 行的 normal message 测试：
-
-```typescript
-  it("routes normal messages to session.prompt with steer (no attachments)", async () => {
-    const runtime = createMockRuntime();
-    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
-    await handler(makeMsg("hello world"));
-    expect(runtime.session.prompt).toHaveBeenCalledWith("hello world", {
-      streamingBehavior: "steer",
-      images: undefined,
-    });
-  });
-```
-
-在 `describe("createMessageHandler")` block 内，最后一个 `it` 之后新增附件的测试：
-
-```typescript
-  it("appends attachment text to prompt content", async () => {
-    const runtime = createMockRuntime();
-    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
-    await handler(makeMsg("hello"), { images: [], text: "[文件内容: code.js]\nconst x = 1;" });
-    expect(runtime.session.prompt).toHaveBeenCalledWith(
-      "hello\n\n[文件内容: code.js]\nconst x = 1;",
-      { streamingBehavior: "steer", images: undefined },
-    );
-  });
-
-  it("passes images to prompt when attachments include images", async () => {
-    const runtime = createMockRuntime();
-    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
-    const images = [{ type: "image" as const, data: "base64data", mimeType: "image/png" }];
-    await handler(makeMsg("check this"), { images, text: "" });
-    expect(runtime.session.prompt).toHaveBeenCalledWith("check this", {
-      streamingBehavior: "steer",
-      images,
-    });
-  });
-
-  it("skips images option when images array is empty", async () => {
-    const runtime = createMockRuntime();
-    const handler = createMessageHandler(runtime as any, vi.fn(), vi.fn(), vi.fn());
-    await handler(makeMsg("hello"), { images: [], text: "" });
-    expect(runtime.session.prompt).toHaveBeenCalledWith("hello", {
-      streamingBehavior: "steer",
-      images: undefined,
-    });
-  });
-```
-
-- [ ] **Step 3: 运行 handler 测试确认通过**
+- [ ] **Step 4: 运行测试确认通过**
 
 Run: `npx vitest run tests/feishu/handler.test.ts`
 Expected: All tests PASS
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/feishu/handler.ts tests/feishu/handler.test.ts
@@ -551,49 +683,181 @@ git commit -m "feat: add attachment support to message handler"
 ### Task 4: index.ts 组装附件处理逻辑
 
 **Files:**
+- Create: `tests/feishu/wiring.test.ts` (集成测试)
 - Modify: `src/index.ts`
 
-- [ ] **Step 1: 更新 index.ts 的 import 和消息回调**
+- [ ] **Step 1: 编写组装逻辑的集成测试**
 
-在 `src/index.ts` 顶部新增 import：
+创建 `tests/feishu/wiring.test.ts`。用 vi.mock 劫持 `processAttachments`，模拟 channel/runtime/feishu handler，触发 message 事件，验证附件处理流程已正确接入：
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockProcessAttachments = vi.fn().mockResolvedValue({
+  images: [{ type: "image" as const, data: "base64", mimeType: "image/png" }],
+  text: "[文件: test.txt 已保存到 /tmp/pi-feishu/test/test.txt]",
+});
+
+const mockCreateStreamingHandler = vi.fn(() => vi.fn());
+
+vi.mock("../../src/feishu/attachments.js", () => ({
+  processAttachments: mockProcessAttachments,
+}));
+
+vi.mock("../../src/feishu/streaming.js", () => ({
+  createStreamingHandler: mockCreateStreamingHandler,
+}));
+
+const mockChannelStream = vi.fn();
+const mockChannelSend = vi.fn();
+const mockSessionPrompt = vi.fn().mockResolvedValue(undefined);
+
+function createMockChannel() {
+  return {
+    on: vi.fn((event: string, handler: Function) => {
+      if (event === "message") (createMockChannel as any)._messageHandler = handler;
+    }),
+    send: mockChannelSend,
+    stream: mockChannelStream.mockImplementation(async (_chatId, _producer, _opts) => {}),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    onRawEvent: vi.fn(),
+    updateCard: vi.fn(),
+    botIdentity: { name: "test-bot" },
+    connected: true,
+    downloadMessageResource: vi.fn(),
+  };
+}
+
+function createMockRuntime() {
+  return {
+    session: {
+      prompt: mockSessionPrompt,
+      subscribe: vi.fn(() => vi.fn()),
+      sessionId: "session-test-123",
+    },
+    newSession: vi.fn(),
+    switchSession: vi.fn(),
+  };
+}
+
+import { setupFeishuHandlers } from "../../src/index.js";
+
+// setupFeishuHandlers 不是导出的函数，需要确认导出。
+// 如果未导出，需要先在 index.ts 中导出该函数。
+// 此处假定 Task 4 的 Step 3 会同时导出 setupFeishuHandlers（或提取消息处理逻辑为可测试函数）。
+
+describe("attachment wiring in message handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete (createMockChannel as any)._messageHandler;
+  });
+
+  it("processes attachments when message has resources", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
+
+    const handler = (createMockChannel as any)._messageHandler;
+    expect(handler).toBeDefined();
+
+    const msg = {
+      messageId: "msg-1",
+      chatId: "chat-1",
+      content: "check my files",
+      rawContentType: "text",
+      resources: [
+        { type: "image", fileKey: "img-1", fileName: "photo.png" },
+      ],
+      mentions: [],
+      mentionAll: false,
+      mentionedBot: false,
+    };
+
+    await handler(msg);
+
+    expect(mockProcessAttachments).toHaveBeenCalledWith(
+      channel,
+      msg,
+      expect.stringContaining("pi-feishu"),
+    );
+    expect(mockChannelStream).toHaveBeenCalled();
+  });
+
+  it("skips attachments for command messages", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
+
+    const handler = (createMockChannel as any)._messageHandler;
+    const msg = {
+      messageId: "msg-2",
+      chatId: "chat-1",
+      content: "/help",
+      rawContentType: "text",
+      resources: [{ type: "image", fileKey: "img-1", fileName: "photo.png" }],
+      mentions: [],
+      mentionAll: false,
+      mentionedBot: false,
+    };
+
+    await handler(msg);
+
+    expect(mockProcessAttachments).not.toHaveBeenCalled();
+  });
+
+  it("does not call processAttachments when msg has no resources", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
+
+    const handler = (createMockChannel as any)._messageHandler;
+    const msg = {
+      messageId: "msg-3",
+      chatId: "chat-1",
+      content: "hello",
+      rawContentType: "text",
+      resources: [],
+      mentions: [],
+      mentionAll: false,
+      mentionedBot: false,
+    };
+
+    await handler(msg);
+
+    expect(mockProcessAttachments).not.toHaveBeenCalled();
+  });
+});
+```
+
+- [ ] **Step 2: 运行集成测试确认失败**
+
+Run: `npx vitest run tests/feishu/wiring.test.ts`
+Expected: FAIL（index.ts 尚未导入 processAttachments，或 setupFeishuHandlers 未导出）
+
+- [ ] **Step 3: 更新 index.ts 使测试通过**
+
+3a. 在 `src/index.ts` 顶部新增 import：
 
 ```typescript
 import { processAttachments, type ProcessedAttachments } from "./feishu/attachments.js";
-import { rm, mkdir } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 ```
 
-修改 `setupFeishuHandlers` 中的消息回调（第 120-138 行区域）。将原代码块：
+3b. 将 `function setupFeishuHandlers` 改为 `export function setupFeishuHandlers`（测试需要直接调用它）
+
+3c. 修改 `setupFeishuHandlers` 中的消息回调（第 120-138 行区域）：
+
+将原代码块替换为：
 
 ```typescript
   channel.on("message", async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
-    // Commands send cards directly without streaming
-    if (content.startsWith("/sessions") || content.startsWith("/models") || content.startsWith("/help")) {
-      await messageHandler(msg);
-      return;
-    }
-
-    await channel.stream(msg.chatId, {
-      markdown: async (s) => {
-        const unbind = createStreamingHandler(runtime.session, s);
-        try {
-          await messageHandler(msg);
-        } finally {
-          unbind();
-        }
-      },
-    }, { replyTo: msg.messageId });
-  });
-```
-
-替换为：
-
-```typescript
-  channel.on("message", async (msg: NormalizedMessage) => {
-    const content = msg.content.trim();
-    // Commands send cards directly without streaming, ignore attachments
     if (content.startsWith("/sessions") || content.startsWith("/models") || content.startsWith("/help")) {
       await messageHandler(msg);
       return;
@@ -623,33 +887,33 @@ import { tmpdir } from "node:os";
   });
 ```
 
-- [ ] **Step 2: 注册 process.on("exit") 兜底清理**
-
-在 `setupFeishuHandlers` 函数末尾（`return () => {};` 之前），注册 exit 清理回调：
+3d. 在 `setupFeishuHandlers` 函数末尾（`return () => {};` 之前）注册 exit 兜底清理：
 
 ```typescript
   const exitDir = join(tmpdir(), "pi-feishu");
   process.on("exit", () => {
-    // sync fallback: best-effort cleanup
     const { rmSync } = require("node:fs");
     try { rmSync(exitDir, { recursive: true, force: true }); } catch {}
   });
 ```
 
-- [ ] **Step 3: 运行所有测试确认不破坏**
+- [ ] **Step 4: 运行测试 + 类型检查确认通过**
 
-Run: `npx vitest run`
-Expected: All existing tests PASS
-
-- [ ] **Step 4: 运行类型检查**
+Run: `npx vitest run tests/feishu/wiring.test.ts`
+Expected: All tests PASS
 
 Run: `npx tsc --noEmit`
 Expected: No type errors
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: 运行全部已有测试确保不破坏**
+
+Run: `npx vitest run`
+Expected: All tests PASS
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/index.ts
+git add src/index.ts tests/feishu/wiring.test.ts
 git commit -m "feat: wire attachment processing into main message loop"
 ```
 
