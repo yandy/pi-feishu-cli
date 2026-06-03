@@ -61,7 +61,7 @@ export function buildCard(
 ): Record<string, unknown> {
   return {
     schema: "2.0",
-    config: { update_multi: true, width_mode: "full" },
+    config: { update_multi: true, width_mode: "fill" },
     header,
     body: { elements },
   };

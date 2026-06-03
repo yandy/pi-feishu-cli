@@ -49,7 +49,7 @@ describe("card helpers", () => {
     const header = createCardHeader("Test");
     const elements = [createMarkdownBlock("hello")];
     const card = buildCard(header, elements);
-    expect(card.config).toEqual({ update_multi: true, width_mode: "full" });
+    expect(card.config).toEqual({ update_multi: true, width_mode: "fill" });
     expect(card.header).toBe(header);
     expect((card as any).body.elements).toBe(elements);
     expect(card).toMatchObject({ schema: "2.0" });

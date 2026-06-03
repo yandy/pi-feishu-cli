@@ -5,7 +5,6 @@ import {
   createCardHeader,
   createDividerBlock,
   createMarkdownBlock,
-  createNoteBlock,
 } from "./helpers.js";
 
 export function buildHelpCard(botName: string): Record<string, unknown> {
@@ -31,7 +30,7 @@ export function buildHelpCard(botName: string): Record<string, unknown> {
       "primary",
     ),
     createMarkdownBlock("/help · 显示此帮助"),
-    createNoteBlock("💡 对话历史自动保存，可随时点击上方按钮管理"),
+    createMarkdownBlock("💡 对话历史自动保存，可随时点击上方按钮管理"),
   ];
 
   return buildCard(createCardHeader("使用帮助", "blue"), elements);
