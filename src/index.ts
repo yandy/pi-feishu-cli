@@ -246,7 +246,7 @@ export function setupFeishuHandlers(
 
 async function handleCardAction(
   value: Record<string, any>,
-  _messageId: string | undefined,
+  messageId: string | undefined,
   chatId: string | undefined,
   runtime: AgentSessionRuntime,
   cwd: string,
@@ -276,8 +276,15 @@ async function handleCardAction(
       }
     }
     const card = await buildSessionsCard({ runtime, cwd });
-    if (chatId) {
-      await channel.send(chatId, { card }, { replyTo: _messageId });
+    if (messageId) {
+      try {
+        await channel.updateCard(messageId, card);
+      } catch (err) {
+        console.error("updateCard failed, sending reply:", (err as Error).message);
+        if (chatId) await channel.send(chatId, { card }, { replyTo: messageId });
+      }
+    } else if (chatId) {
+      await channel.send(chatId, { card });
     }
   } else if (cmd === "model" && action === "select") {
     const { provider, modelId, thinkingLevel } = value;
@@ -295,8 +302,15 @@ async function handleCardAction(
         (m): m is NonNullable<typeof m> => m != null,
       ),
     });
-    if (chatId) {
-      await channel.send(chatId, { card }, { replyTo: _messageId });
+    if (messageId) {
+      try {
+        await channel.updateCard(messageId, card);
+      } catch (err) {
+        console.error("updateCard failed, sending reply:", (err as Error).message);
+        if (chatId) await channel.send(chatId, { card }, { replyTo: messageId });
+      }
+    } else if (chatId) {
+      await channel.send(chatId, { card });
     }
   }
 }
