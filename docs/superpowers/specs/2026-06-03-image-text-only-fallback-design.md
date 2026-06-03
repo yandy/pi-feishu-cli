@@ -3,6 +3,8 @@
 **日期：** 2026-06-03
 **目标：** 当模型 `input` 不包含 `"image"` 时，图片附件走文件保存路径而非 base64，确保 text-only 模型也能感知到图片文件存在。
 
+`SupportedInput` 类型定义为 `("text" | "image" | "video")[]`，`"video"` 为向前兼容预留。
+
 ## 背景
 
 当前 `processAttachments` 对所有模型一律将图片转为 base64 `ImageContent`，通过 `session.prompt({ images })` 传入。对于 `input` 仅为 `["text"]` 的模型（如 `amazon.nova-micro-v1:0`），base64 图片无法被模型处理，用户发图后 LLM 完全不知道有附件。
@@ -38,7 +40,7 @@ runtime.session.model?.input ──────►  processAttachments(channel,
 新增类型导出和函数签名：
 
 ```typescript
-export type SupportedInput = ("text" | "image")[];
+export type SupportedInput = ("text" | "image" | "video")[];
 
 export async function processAttachments(
   channel: Pick<Channel, "downloadMessageResource">,
@@ -78,7 +80,7 @@ attachments = await processAttachments(
 );
 ```
 
-`model?.input` 类型为 `("text" | "image")[]`，与 `supportedInput` 直接匹配。未知模型时 `undefined` 走默认值 `["text", "image"]`。
+`model?.input` 类型为 `("text" | "image" | "video")[]`，与 `supportedInput` 直接匹配。未知模型时 `undefined` 走默认值 `["text", "image"]`。
 
 ### 3. `src/feishu/handler.ts`
 
@@ -98,4 +100,4 @@ attachments = await processAttachments(
 ## 约束
 
 - `supportedInput` 默认值 `["text", "image"]` 确保未知模型保持现有行为
-- 类型与 `model.input` 完全对齐，未来新增模态（如 `"audio"`）无需改签名
+- 类型包含 `"video"` 为向前兼容预留，后续视频处理逻辑可直接复用此类型
