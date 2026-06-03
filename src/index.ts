@@ -135,7 +135,7 @@ export function setupFeishuHandlers(
 
     if (msg.resources.length > 0) {
       downloadDir = join(tmpdir(), "pi-feishu", runtime.session.sessionId ?? "unknown");
-      attachments = await processAttachments(channel, msg, downloadDir);
+      attachments = await processAttachments(channel, msg, downloadDir, runtime.session.model?.input);
     }
 
     await channel.stream(msg.chatId, {

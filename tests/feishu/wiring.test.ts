@@ -85,6 +85,7 @@ describe("attachment wiring in message handler", () => {
       channel,
       msg,
       expect.stringContaining("pi-feishu"),
+      undefined,
     );
     expect(mockChannelStream).toHaveBeenCalled();
   });
