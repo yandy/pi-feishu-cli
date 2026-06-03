@@ -24,17 +24,9 @@ describe("card builders format", () => {
     const cwd = process.cwd();
     const { runtime } = await initRuntime({ cwd });
     const card = await buildSessionsCard({ runtime, cwd });
-    const elements = (card as any).elements ?? [];
-    let actionCount = 0;
-    for (const el of elements) {
-      if (el.tag === "action") {
-        actionCount++;
-        for (const action of el.actions ?? []) {
-          expect(action.tag).toBe("button");
-        }
-      }
-    }
-    expect(actionCount).toBeGreaterThan(0);
+    const elements = (card as any).body?.elements ?? [];
+    const buttonCount = elements.filter((el: any) => el.tag === "button").length;
+    expect(buttonCount).toBeGreaterThan(0);
   }, 30000);
 
   // Feishu card action 元素内反引号会导致渲染错误
@@ -56,17 +48,9 @@ describe("card builders format", () => {
       session: runtime.session,
       availableModels: [{ provider: "test", id: "test-model" }],
     });
-    const elements = (card as any).elements ?? [];
-    let actionCount = 0;
-    for (const el of elements) {
-      if (el.tag === "action") {
-        actionCount++;
-        for (const action of el.actions ?? []) {
-          expect(action.tag).toBe("button");
-        }
-      }
-    }
-    expect(actionCount).toBeGreaterThan(0);
+    const elements = (card as any).body?.elements ?? [];
+    const buttonCount = elements.filter((el: any) => el.tag === "button").length;
+    expect(buttonCount).toBeGreaterThan(0);
   }, 30000);
 });
 
@@ -175,10 +159,10 @@ describe("startup session resume", () => {
 
     const { runtime } = await initRuntime({ cwd });
     const card = await buildSessionsCard({ runtime, cwd });
-    const elements = (card as any).elements ?? [];
+    const elements = (card as any).body?.elements ?? [];
     const divTexts = elements
-      .filter((el: any) => el.tag === "div")
-      .map((el: any) => el.text?.content ?? "");
+      .filter((el: any) => el.tag === "markdown")
+      .map((el: any) => el.content ?? "");
 
     expect(divTexts.some((t: string) => t.includes("我的会话"))).toBe(true);
     expect(divTexts.some((t: string) => t.includes("条"))).toBe(true);

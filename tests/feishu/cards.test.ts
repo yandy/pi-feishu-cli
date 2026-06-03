@@ -16,12 +16,9 @@ describe("card helpers", () => {
     expect(h.template).toBe("blue");
   });
 
-  it("createMarkdownBlock returns div with lark_md", () => {
+  it("createMarkdownBlock returns markdown block", () => {
     const b = createMarkdownBlock("**bold**");
-    expect(b).toEqual({
-      tag: "div",
-      text: { tag: "lark_md", content: "**bold**" },
-    });
+    expect(b).toEqual({ tag: "markdown", content: "**bold**" });
   });
 
   it("createActionButton returns button with value", () => {
@@ -33,28 +30,28 @@ describe("card helpers", () => {
     expect(b.tag).toBe("button");
     expect(b.text).toEqual({ tag: "plain_text", content: "Click" });
     expect(b.type).toBe("primary");
-    expect(b.value).toEqual({ cmd: "test", action: "go" });
+    expect(b.behaviors).toEqual([
+      { type: "callback", value: { cmd: "test", action: "go" } },
+    ]);
   });
 
   it("createDividerBlock returns hr", () => {
     expect(createDividerBlock()).toEqual({ tag: "hr" });
   });
 
-  it("createNoteBlock returns note element", () => {
+  it("createNoteBlock returns markdown element", () => {
     const n = createNoteBlock("footer text");
-    expect(n).toEqual({
-      tag: "note",
-      elements: [{ tag: "plain_text", content: "footer text" }],
-    });
+    expect(n).toEqual({ tag: "markdown", content: "footer text" });
   });
 
   it("buildCard assembles header + elements", () => {
     const header = createCardHeader("Test");
     const elements = [createMarkdownBlock("hello")];
     const card = buildCard(header, elements);
-    expect(card.config).toEqual({ wide_screen_mode: true, update_multi: true });
+    expect(card.config).toEqual({ update_multi: true, width_mode: "full" });
     expect(card.header).toBe(header);
-    expect(card.elements).toBe(elements);
+    expect((card as any).body.elements).toBe(elements);
+    expect(card).toMatchObject({ schema: "2.0" });
   });
 });
 
@@ -62,27 +59,27 @@ describe("help card", () => {
   it("buildHelpCard returns card with bot name in content", () => {
     const card = buildHelpCard("TestBot");
     expect(card.header).toBeDefined();
-    expect(card.elements).toBeDefined();
+    expect((card as any).body.elements).toBeDefined();
     expect((card.header as any).title.content).toBe("使用帮助");
-    const markdownBlocks = (card.elements as any[]).filter(
-      (e: any) => e.tag === "div" && e.text?.tag === "lark_md",
+    const markdownBlocks = ((card as any).body.elements as any[]).filter(
+      (e: any) => e.tag === "markdown",
     );
     expect(
-      markdownBlocks.some((b: any) => b.text.content.includes("TestBot")),
+      markdownBlocks.some((b: any) => b.content.includes("TestBot")),
     ).toBe(true);
   });
 
   it("help card has session and model action buttons", () => {
     const card = buildHelpCard("Bot");
-    const actionBlocks = (card.elements as any[]).filter(
-      (e: any) => e.tag === "action",
+    const buttons = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "button",
     );
-    expect(actionBlocks.length).toBeGreaterThanOrEqual(2);
-    expect(actionBlocks[0].actions[0].value).toMatchObject({
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
+    expect(buttons[0].behaviors[0].value).toMatchObject({
       cmd: "help",
       action: "sessions",
     });
-    expect(actionBlocks[1].actions[0].value).toMatchObject({
+    expect(buttons[1].behaviors[0].value).toMatchObject({
       cmd: "help",
       action: "models",
     });
@@ -106,11 +103,13 @@ describe("models card", () => {
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const divs = (card.elements as any[]).filter((e: any) => e.tag === "div");
-    const currentDiv = divs.find((d: any) =>
-      d.text?.content?.includes("test/gpt-4"),
+    const divs = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "markdown",
     );
-    expect(currentDiv?.text?.content).not.toContain("Thinking:");
+    const currentDiv = divs.find((d: any) =>
+      d.content?.includes("test/gpt-4"),
+    );
+    expect(currentDiv?.content).not.toContain("Thinking:");
   });
 
   it("action buttons use short labels", async () => {
@@ -118,11 +117,10 @@ describe("models card", () => {
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const actions = (card.elements as any[]).filter(
-      (e: any) => e.tag === "action",
+    const buttons = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "button",
     );
-    expect(actions.length).toBeGreaterThan(0);
-    const buttons = actions[0].actions;
+    expect(buttons.length).toBeGreaterThan(0);
     const buttonTexts = buttons.map((b: any) => b.text.content);
     expect(buttonTexts.some((t: string) => t.startsWith("Think:"))).toBe(false);
     expect(buttonTexts).toContain("high");
@@ -136,7 +134,7 @@ describe("models card", () => {
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const hrs = (card.elements as any[]).filter((e: any) => e.tag === "hr");
+    const hrs = ((card as any).body?.elements ?? []).filter((e: any) => e.tag === "hr");
     expect(hrs.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -145,9 +143,11 @@ describe("models card", () => {
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const divs = (card.elements as any[]).filter((e: any) => e.tag === "div");
+    const divs = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "markdown",
+    );
     const boldModelNames = divs.filter((d: any) => {
-      const c = d.text?.content || "";
+      const c = d.content || "";
       return (
         c.includes("**openai/gpt-4**") || c.includes("**anthropic/claude-3**")
       );
