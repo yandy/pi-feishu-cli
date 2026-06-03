@@ -1,3 +1,34 @@
+# Think Blockquote Tracking Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Replace the naive `stream.append(`> ${delta}`)` in `thinking_delta` handling with a state machine that correctly tracks line boundaries across chunks, producing contiguous blockquotes for think blocks and plain text for text blocks.
+
+**Architecture:** Three boolean state variables in `createStreamingHandler` closure (`inThinkBlock`, `needsQuotePrefix`, `needLineBreak`) drive a character-level state machine for `thinking_delta` content and boundary-aware appends for `text_delta`/think transitions.
+
+**Tech Stack:** TypeScript, Vitest
+
+---
+
+## File Structure
+
+| File | Action | Responsibility |
+|------|--------|----------------|
+| `tests/feishu/streaming.test.ts` | Modify | Add 8 new test cases covering all think/text transition scenarios |
+| `src/feishu/streaming.ts` | Modify | Replace `thinking_delta` handler with state machine, enhance `text_delta` |
+
+---
+
+### Task 1: Write all new failing tests
+
+**Files:**
+- Modify: `tests/feishu/streaming.test.ts`
+
+- [ ] **Step 1: Replace test file with complete version containing all new tests**
+
+Remove the unused `_events` parameter from `createMockSession`. Insert 8 new test cases after the existing `streams thinking_delta as blockquote` test. The full test file:
+
+```typescript
 import { describe, expect, it, vi } from "vitest";
 import { createStreamingHandler } from "../../src/feishu/streaming.js";
 
@@ -157,7 +188,7 @@ describe("createStreamingHandler", () => {
       },
     });
 
-    expect(stream.chunks).toEqual(["> think", "\nanswer"]);
+    expect(stream.chunks).toEqual(["> think\n", "answer"]);
     unsub();
   });
 
@@ -331,3 +362,176 @@ describe("createStreamingHandler", () => {
     unsub();
   });
 });
+```
+
+### Task 2: Run tests and verify 8 failures
+
+**Files:** None (verification only)
+
+- [ ] **Step 1: Run the streaming tests**
+
+```bash
+npx vitest run tests/feishu/streaming.test.ts
+```
+
+Expected: 8 new tests FAIL, 7 existing tests PASS (15 total, 8 failed).
+
+Key failures to confirm:
+- `streams multi-line thinking_delta`: only `> ` at start, missing on subsequent lines
+- `streams consecutive think chunks`: second chunk gets redundant `> `
+- `closes blockquote when text follows think`: think doesn't end with `\n`, no blockquote break added
+- `adds newline before new think block`: text→think transition missing `\n`
+
+---
+
+### Task 3: Implement the state machine
+
+**Files:**
+- Modify: `src/feishu/streaming.ts`
+
+- [ ] **Step 1: Replace `createStreamingHandler` body with state machine implementation**
+
+Replace the entire function body of `createStreamingHandler`. The complete file:
+
+```typescript
+export interface StreamWriter {
+  append(chunk: string): Promise<void>;
+}
+
+interface AssistantMessageEvent {
+  type: string;
+  delta?: string;
+  error?: unknown;
+}
+
+interface StreamEvent {
+  type: string;
+  assistantMessageEvent?: AssistantMessageEvent;
+  toolName?: string;
+  partialResult?: unknown;
+  isError?: boolean;
+  attempt?: number;
+  maxAttempts?: number;
+  success?: boolean;
+}
+
+export function createStreamingHandler(
+  session: {
+    subscribe: (listener: (event: StreamEvent) => void) => () => void;
+  },
+  stream: StreamWriter,
+): () => void {
+  let inThinkBlock = false;
+  let needsQuotePrefix = true;
+  let needLineBreak = false;
+
+  return session.subscribe((event: StreamEvent) => {
+    switch (event.type) {
+      case "message_update": {
+        const sub = event.assistantMessageEvent;
+        if (!sub) break;
+        if (sub.type === "text_delta") {
+          if (inThinkBlock && !needsQuotePrefix) {
+            stream.append("\n");
+          }
+          inThinkBlock = false;
+          needsQuotePrefix = true;
+          const delta = sub.delta ?? "";
+          stream.append(delta);
+          needLineBreak = !delta.endsWith("\n");
+        } else if (sub.type === "thinking_delta") {
+          if (needLineBreak) {
+            stream.append("\n");
+            needLineBreak = false;
+          }
+          const delta = sub.delta ?? "";
+          let out = "";
+          for (let i = 0; i < delta.length; i++) {
+            if (needsQuotePrefix) {
+              out += "> ";
+              needsQuotePrefix = false;
+            }
+            const ch = delta[i];
+            out += ch;
+            if (ch === "\n") {
+              needsQuotePrefix = true;
+            }
+          }
+          stream.append(out);
+          inThinkBlock = true;
+        } else if (sub.type === "error") {
+          stream.append("— 模型返回错误 —");
+        }
+        break;
+      }
+
+      case "tool_execution_start":
+        stream.append(`🔧 ${event.toolName ?? ""}`);
+        break;
+
+      case "tool_execution_update":
+        stream.append(String(event.partialResult ?? ""));
+        break;
+
+      case "tool_execution_end":
+        stream.append(event.isError ? "❌" : "✅");
+        break;
+
+      case "queue_update":
+        stream.append("— 消息已排队 —");
+        break;
+
+      case "compaction_start":
+        stream.append("— 压缩中... —");
+        break;
+
+      case "compaction_end":
+        stream.append("— 压缩完成 —");
+        break;
+
+      case "auto_retry_start":
+        stream.append(
+          `— 自动重试 (${event.attempt}/${event.maxAttempts})... —`,
+        );
+        break;
+
+      case "auto_retry_end":
+        stream.append(event.success ? "✅ 重试成功" : "❌ 重试失败");
+        break;
+    }
+  });
+}
+```
+
+### Task 4: Run tests and verify all pass
+
+**Files:** None (verification only)
+
+- [ ] **Step 1: Run streaming tests**
+
+```bash
+npx vitest run tests/feishu/streaming.test.ts
+```
+
+Expected: 15 tests PASS, 0 failures.
+
+- [ ] **Step 2: Run full test suite**
+
+```bash
+npx vitest run
+```
+
+Expected: All tests pass except the pre-existing `tests/runtime.test.ts > loads bundled skills from packageRoot, not from cwd` failure (unrelated environment issue).
+
+### Task 5: Commit
+
+**Files:**
+- `src/feishu/streaming.ts` (modified)
+- `tests/feishu/streaming.test.ts` (modified)
+
+- [ ] **Step 1: Stage and commit**
+
+```bash
+git add src/feishu/streaming.ts tests/feishu/streaming.test.ts
+git commit -m "feat: state-machine think blockquote tracking across chunk boundaries"
+```

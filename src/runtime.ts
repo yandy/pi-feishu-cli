@@ -74,7 +74,7 @@ export async function initRuntime(
     skills: Skill[];
     diagnostics: ResourceDiagnostic[];
   }) => ({
-    skills: [...current.skills, ...customSkills],
+    skills: customSkills,
     diagnostics: current.diagnostics,
   });
 
