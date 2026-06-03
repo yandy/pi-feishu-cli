@@ -41,6 +41,7 @@
     "lint": "biome check --write",
     "test": "vitest run",
     "test:watch": "vitest",
+    "update-skills": "node scripts/update-skills.mjs",
     "prepare": "npm run build"
   },
   "files": [

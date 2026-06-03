@@ -4,3 +4,4 @@ dist/
 *.sock
 .DS_Store
 .pi/
+.skills-cache.json
