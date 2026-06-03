@@ -1,198 +1,216 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="favicon.ico" />
-  <title></title>
-  <style>
-      * {
-          box-sizing: border-box;
-          padding: 0;
-          margin: 0;
-      }
+# 矩形树图 (Treemap)
 
-      .open-platform-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          background-color: #ffffff;
-      }
+## Content 约束
 
-      .open-platform-icon {
-          width: 120px;
-          height: 120px;
-          display: block;
-      }
+- 分类 3-5 个，每个分类下子项 2-4 个
+- 总面积比例需预先计算：每个矩形面积 = 父矩形面积 * (本项数值 / 同级总数值)
+- 每个叶子节点标签必须包含数值（如 "{{LABEL}} ({{VALUE}})"）
 
-      .open-platform-desc {
-          margin-top: 16px;
-          line-height: 22px;
-          font-size: 14px;
-          color: #646a73;
-          text-align: center
-      }
+## Layout 选型
 
-      .open-platform-back {
-          border-radius: 6px;
-          font-size: 14px;
-          height: 32px;
-          line-height: 22px;
-          min-width: 80px;
-          padding: 4px 11px;
-          text-align: center;
-          text-decoration: none;
-          touch-action: manipulation;
-          transition: color .1s ease-in, background-color .1s ease-in, border-color .1s ease-in, width .2s ease-in;
-          user-select: none;
-          white-space: nowrap;
-          background: #1456f0;
-          border: 1px solid #1456f0;
-          color: #ffffff;
-          margin-top: 16px;
-      }
-  </style>
-</head>
-<body>
-<div class="open-platform-wrapper">
-  <img class="open-platform-icon"
-       src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyLjkxMyA1NS4yNDRjLTUuNjMyIDIuOTUtOC4yNDYgNi4yODQtOC4yNDYgOS40NHY5LjcyYzAtMy4xNTYgMi42MTQtNi40OSA4LjI0Ni05LjQ0di05LjcyWm05NC4xNjMtMTIuMDg0di05LjcyNmM1LjkzNC0zLjE5IDguOTgxLTYuODkxIDguOTgxLTEwLjcyNXY5LjcyYzAgMy44NC0zLjA0NyA3LjU0My04Ljk4MSAxMC43MzJaIiBmaWxsPSIjMEMyOTZFIi8+PHBhdGggZD0iTTYwLjIyOSAxOS4wNTkgNDguNzMgNDkuOTIyIDYwLjM2NSA3Mi45MmwtOC40NzQgMjMuODczSDE2LjkyM2E0IDQgMCAwIDEtNC00VjIzLjA2YTQgNCAwIDAgMSA0LTRINjAuMjNaIiBmaWxsPSIjQkJCRkM0IiBmaWxsLW9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik03MS40MDggMTkuMDU5IDYwLjAxMyA0OS45MjIgNzEuNDYgNzIuOTJsLTguMzI1IDIzLjg3M2gzOS45NDNhNCA0IDAgMCAwIDQtNFYyMy4wNmE0IDQgMCAwIDAtNC00aC0zMS42N1oiIGZpbGw9IiNCQkJGQzQiIGZpbGwtb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTIxLjkyMyAyNi4xYTIgMiAwIDEgMSAwIDQgMiAyIDAgMCAxIDAtNFptMyAyYTMgMyAwIDEgMC02IDAgMyAzIDAgMCAwIDYgMFptNi45MTUtMmEyIDIgMCAxIDEgMCA0IDIgMiAwIDAgMSAwLTRabTMgMmEzIDMgMCAxIDAtNiAwIDMgMyAwIDAgMCA2IDBabS0xNS43NjMgNy4zOTRhLjUuNSAwIDAgMSAuNS0uNWgzMS41ODFhLjUuNSAwIDAgMSAwIDFIMTkuNTc1YS41LjUgMCAwIDEtLjUtLjVabTQ4LjQ3NyAwYS41LjUgMCAwIDEgLjUtLjVoMzIuNDY1YS41LjUgMCAwIDEgMCAxSDY4LjA1MmEuNS41IDAgMCAxLS41LS41WiIgZmlsbD0iIzhGOTU5RSIvPjxwYXRoIGQ9Ik05OCAxMTFjOS45NDEgMCAxOC04LjA1OSAxOC0xOHMtOC4wNTktMTgtMTgtMThjLTkuOTQyIDAtMTggOC4wNTktMTggMThzOC4wNTggMTggMTggMThaIiBmaWxsPSIjRjgwIi8+PHBhdGggZD0iTTk3LjE4MSA4NC44MThhLjgxOC44MTggMCAwIDAtLjgxOC44MTl2OS44MThjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTkuODE5YS44MTguODE4IDAgMCAwLS44MTgtLjgxOEg5Ny4xOFptMCAxMy4wOTJhLjgxOC44MTggMCAwIDAtLjgxOC44MTh2MS42MzZjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTEuNjM2YS44MTguODE4IDAgMCAwLS44MTgtLjgxOUg5Ny4xOFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNC4wMjcgODUuMzFjMi40OSA1LjUxIDE0Ljc3IDkuOTQgNDEuNDUgOS45M3Y5LjcyMWMtMjYuNjguMDEtMzguOTYtNC40Mi00MS40NS05Ljkzdi05LjcyWm04NC44MS0yNy4yN2MxNy41Mi0yLjY5IDI1LjgwNy03LjAyNiAyNy4yLTExLjcxdjkuNzJjLS4zMyA0LjY3LTkuNjggOS4wMi0yNy4yIDExLjcxdi05LjcyWiIgZmlsbD0iIzMzNzBGRiIvPjxwYXRoIGQ9Ik04OS4yMzcgMTMuMDFjMTguMDU4IDAgMjYuOCAzLjI1IDI2LjggOS43MnY5LjcyYzAtNi40Ny04Ljc0Mi05LjcyLTI2LjgtOS43MnYtOS43MlptLTg0LjU3IDUxLjdjMCA2LjYgMTEuMzcgMTIuNDUgMzAuNDcgMTIuNDR2OS43MmMtMTkuMSAwLTMwLjQ3LTUuODQtMzAuNDctMTIuNDR2LTkuNzJaIiBmaWxsPSIjMDBENkI5Ii8+PC9zdmc+"
-       alt="">
-  <div class="open-platform-desc">The page does not exist.</div>
-  <a class="open-platform-back" href="/">Go to homepage</a>
-</div>
-<script>window.gfdatav1={"env":"prod","ver":"1.0.0.13","canary":0,"garrModules":null,"envName":"prod","region":"CN","idc":"hl","webServerCodeType":"DeployServerlessWebServer","runtime":"node","extra":{"canaryType":null}}</script><script>
+- **脚本生成坐标**（推荐）：Treemap 需要精确的面积比例计算，用 .cjs 脚本递归切分矩形，脚本输出 JSON 文件后调用 `npx -y @larksuite/whiteboard-cli@^0.2.11` 渲染
+- 不适合手动心算坐标
 
-  function parseQueryString(queryString) {
-    // 移除开头的 "?"
-    if (queryString.charAt(0) === '?') {
-      queryString = queryString.substring(1);
-    }
+## Layout 规则
 
-    var params = {};
-    if (!queryString) return params;
+- 使用交替切分法（Slice-and-Dice）：奇数层水平切分 width，偶数层垂直切分 height
+- 父矩形内必须为标题预留 30-40px 顶部空间，子矩形从 y + 35 开始放置
+- 子节点必须完全落在父矩形范围内
+- 水平切分时：子 width = 父 width * (子数值 / 父总数值)，子 x 依次累加
+- 垂直切分时：子 height = (父 height - 35) * (子数值 / 父总数值)，子 y 依次累加（注意扣除父标签预留的 35px）
 
-    // 分割参数对
-    var paramPairs = queryString.split('&');
+### 面积比例计算规则
 
-    for (var i = 0; i < paramPairs.length; i++) {
-      var paramPair = paramPairs[i].split('=');
-      var key = decodeURIComponent(paramPair[0]);
-      var value = paramPair.length > 1 ? decodeURIComponent(paramPair[1]) : '';
+1. **面积与数值严格成正比**：任何层级的节点，其矩形面积 `width * height` 必须与数值成比例
+2. **奇数层水平切分**（如第一层分类）：
+   - 父矩形的 `height` 和 `y` 坐标传给所有子节点（扣除标签预留空间后）
+   - 按子节点数值占父节点的比例切分父矩形的 `width`：`子width = 父width * (子数值 / 父总数值)`
+   - 子节点的 `x` 坐标依次向右累加
+3. **偶数层垂直切分**（如第二层子项）：
+   - 父矩形的 `width` 和 `x` 坐标传给所有子节点
+   - 按子节点数值占父节点的比例切分父矩形的 `height`：`子height = 父height * (子数值 / 父总数值)`
+   - 子节点的 `y` 坐标依次向下累加
+4. **层层递归**：不断交替水平和垂直切分方向，直到所有叶子节点都被分配了精确的坐标和宽高
 
-      // 处理重复参数（转为数组）
-      if (params[key] === undefined) {
-        params[key] = value;
-      } else if (!Array.isArray(params[key])) {
-        params[key] = [params[key], value];
-      } else {
-        params[key].push(value);
-      }
-    }
+### 父标签预留空间
 
-    return params;
-  }
+每个非叶子节点的矩形，顶部必须预留 30-40px 放置分类标签。子矩形从父矩形的 `y + 35` 开始放置，可用高度为 `父height - 35`。
 
-  function getLocale() {
-    var zhLang = 'zh-CN';
-    var enLang = 'en-US';
+示例：父矩形 `{ x: 40, y: 40, height: 700 }`，则：
+- 父标签放在 `y: 46`（留 6px 上边距）
+- 子矩形从 `y: 75` 开始放置（40 + 35）
+- 子矩形可用高度为 `700 - 35 = 665`
 
-    var queryLang = parseQueryString(window.location.search).lang;
-    var cookieLang = getCookieLocale();
-    var lang = enLang;
+## 骨架示例
 
-    <!--从cookie中取值-->
-    function getCookieLocale() {
-      var locale = '';
-      var cookies = document.cookie.split('; ');
-      var loclaeKey = 'open_locale';
+2 层 treemap：3 个分类（硬件 40、软件 35、服务 25），各含 2 个子项。
 
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        var cookieArr = cookie.split('=');
-        if (cookieArr[0] === loclaeKey) {
-          locale = cookieArr[1];
-          break;
-        }
-      }
-      return locale;
-    }
+根矩形 1100x700，第一层水平切分 width，第二层垂直切分 height。
 
-    function setLocaleCookie(lang) {
-      var date = new Date();
-      // 300天到期
-      date.setTime(date.getTime() + (300 * 24 * 60 * 60 * 1000));
-      var expires = 'expires=' + date.toUTCString();
-      document.cookie = 'open_locale=' + lang + '; ' + expires + '; path=/;';
-    }
-
-    // 获取浏览器默认语言
-    if (navigator.language.indexOf('en') !== -1) {
-      lang = enLang;
-    } else if (navigator.language.indexOf('zh') !== -1) {
-      lang = zhLang;
-    }
-    if (cookieLang === enLang) {
-      lang = enLang;
-    } else if (cookieLang === zhLang) {
-      lang = zhLang;
-    }
-    if (queryLang === enLang) {
-      lang = enLang;
-    } else if (queryLang === zhLang) {
-      lang = zhLang;
-    }
-    // 设置cookie
-    setLocaleCookie(lang);
-    return lang;
-  }
-
-  // 根据域名获取当前brand
-  function isLarkDomain() {
-    var defaultBrandMap = {
-      lark: ['larksuite'],
-      feishu: ['feishu', 'larkoffice', 'larkenterprise'],
-    };
-    const { hostname } = window.location;
-
-    if (defaultBrandMap.feishu.some((item) => hostname.includes(item))) {
-      return false;
-    }
-
-    if (defaultBrandMap.lark.some((item) => hostname.includes(item))) {
-      return true;
-    }
-
-    if (window.domainBrand) {
-      return window.domainBrand === 'lark';
-    }
-
-    return false;
-  }
-
-  var isLarkBrand = isLarkDomain();
-
-  var config = {
-    'zh-CN': {
-      'desc': '抱歉，您访问的页面不存在',
-      'back': '返回首页',
-      'title': (isLarkBrand ? 'Lark' : '飞书') + '开放平台',
+```json
+{
+  "version": 2,
+  "nodes": [
+    {
+      "type": "rect",
+      "id": "root",
+      "x": 40, "y": 40,
+      "width": 1100, "height": 700,
+      "borderWidth": 2, "borderRadius": 6
     },
-    'en-US': {
-      'desc': 'The page does not exist.',
-      'back': 'Go to homepage',
-      'title': (isLarkBrand ? 'Lark': 'Feishu') + ' Open Platform',
+    {
+      "type": "text",
+      "x": 48, "y": 46,
+      "width": 1084, "height": 24,
+      "text": "{{ROOT_TITLE}}",
+      "fontSize": 14
     },
-  };
-  var locale = getLocale();
-  var descObj = document.querySelector('.open-platform-desc');
-  var backObj = document.querySelector('.open-platform-back');
-  descObj.innerHTML = config[locale].desc;
-  backObj.innerHTML = config[locale].back;
-  document.title = config[locale].title;
 
-</script>
-</body>
-</html>
+    {
+      "type": "rect",
+      "id": "cat-A",
+      "x": 40, "y": 75,
+      "width": 440, "height": 665,
+      "borderWidth": 2, "borderRadius": 6
+    },
+    {
+      "type": "text",
+      "x": 48, "y": 81,
+      "width": 424, "height": 24,
+      "text": "{{CAT_A}}",
+      "fontSize": 14
+    },
+    {
+      "type": "rect",
+      "id": "cat-A-item-1",
+      "x": 40, "y": 110,
+      "width": 440, "height": 380,
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 48, "y": 116,
+      "width": 424, "height": 24,
+      "text": "{{ITEM_A1}} (24)",
+      "fontSize": 14
+    },
+    {
+      "type": "rect",
+      "id": "cat-A-item-2",
+      "x": 40, "y": 490,
+      "width": 440, "height": 250,
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 48, "y": 496,
+      "width": 424, "height": 24,
+      "text": "{{ITEM_A2}} (16)",
+      "fontSize": 14
+    },
+
+    {
+      "type": "rect",
+      "id": "cat-B",
+      "x": 480, "y": 75,
+      "width": 385, "height": 665,
+      "borderWidth": 2, "borderRadius": 6
+    },
+    {
+      "type": "text",
+      "x": 488, "y": 81,
+      "width": 369, "height": 24,
+      "text": "{{CAT_B}}",
+      "fontSize": 14
+    },
+    {
+      "type": "rect",
+      "id": "cat-B-item-1",
+      "x": 480, "y": 110,
+      "width": 385, "height": 380,
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 488, "y": 116,
+      "width": 369, "height": 24,
+      "text": "{{ITEM_B1}} (20)",
+      "fontSize": 14
+    },
+    {
+      "type": "rect",
+      "id": "cat-B-item-2",
+      "x": 480, "y": 490,
+      "width": 385, "height": 285,
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 488, "y": 496,
+      "width": 369, "height": 24,
+      "text": "{{ITEM_B2}} (15)",
+      "fontSize": 14
+    },
+
+    {
+      "type": "rect",
+      "id": "cat-C",
+      "x": 865, "y": 75,
+      "width": 275, "height": 665,
+      "borderWidth": 2, "borderRadius": 6
+    },
+    {
+      "type": "text",
+      "x": 873, "y": 81,
+      "width": 259, "height": 24,
+      "text": "{{CAT_C}}",
+      "fontSize": 14
+    },
+    {
+      "type": "rect",
+      "id": "cat-C-item-1",
+      "x": 865, "y": 110,
+      "width": 275, "height": 399,
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 873, "y": 116,
+      "width": 259, "height": 24,
+      "text": "{{ITEM_C1}} (15)",
+      "fontSize": 14
+    },
+    {
+      "type": "rect",
+      "id": "cat-C-item-2",
+      "x": 865, "y": 509,
+      "width": 275, "height": 231,
+      "borderRadius": 4
+    },
+    {
+      "type": "text",
+      "x": 873, "y": 515,
+      "width": 259, "height": 24,
+      "text": "{{ITEM_C2}} (10)",
+      "fontSize": 14
+    }
+  ]
+}
+```
+
+面积比例验证（第一层水平切分 width）：
+- 硬件 40/100 * 1100 = 440，软件 35/100 * 1100 = 385，服务 25/100 * 1100 = 275
+- 子矩形从 y=75 开始，可用高度 665
+
+## 陷阱
+
+- **父标签被子矩形遮挡**（最严重）：子矩形必须从 y + 35（相对父矩形顶部）开始放置，为父分类标签留出空间
+- **分类标签不可见**：分类标签 text 节点必须在其子矩形 rect 节点之前添加（z-index 靠后的节点在上层）
+- **面积比例不正确**：必须用脚本预先计算比例，不要心算
+- **缺少配色区分**：不同顶层分类必须用不同背景色（从色板选取），所有子节点继承对应色系
+
+此场景必须用 .cjs 脚本生成。Agent 使用时只需修改 `data` 树，其余坐标与矩形面积自动递归计算。
+
+```javascript
+const { writeFileSync } = require('fs');
+```

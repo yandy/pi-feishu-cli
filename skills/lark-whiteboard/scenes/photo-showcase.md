@@ -1,198 +1,126 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="favicon.ico" />
-  <title></title>
-  <style>
-      * {
-          box-sizing: border-box;
-          padding: 0;
-          margin: 0;
-      }
+# 图片展示 (Photo Showcase)
 
-      .open-platform-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          background-color: #ffffff;
-      }
+适用于：用户**显式要求使用图片/配图/插图**的场景（如"画一个带配图的旅行路线"、"做一个有图片的产品展示"）。
 
-      .open-platform-icon {
-          width: 120px;
-          height: 120px;
-          display: block;
-      }
+> **注意**：仅当用户明确说了「图片/配图/插图/照片」等词时才进入本场景。单纯说"旅行路线图"、"产品展示"等不触发。
 
-      .open-platform-desc {
-          margin-top: 16px;
-          line-height: 22px;
-          font-size: 14px;
-          color: #646a73;
-          text-align: center
-      }
+> **前置条件**：进入本场景前，必须已完成 [`references/image.md`](../references/image.md) 的 Step 0（图片准备），拿到所有 media token。
 
-      .open-platform-back {
-          border-radius: 6px;
-          font-size: 14px;
-          height: 32px;
-          line-height: 22px;
-          min-width: 80px;
-          padding: 4px 11px;
-          text-align: center;
-          text-decoration: none;
-          touch-action: manipulation;
-          transition: color .1s ease-in, background-color .1s ease-in, border-color .1s ease-in, width .2s ease-in;
-          user-select: none;
-          white-space: nowrap;
-          background: #1456f0;
-          border: 1px solid #1456f0;
-          color: #ffffff;
-          margin-top: 16px;
-      }
-  </style>
-</head>
-<body>
-<div class="open-platform-wrapper">
-  <img class="open-platform-icon"
-       src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyLjkxMyA1NS4yNDRjLTUuNjMyIDIuOTUtOC4yNDYgNi4yODQtOC4yNDYgOS40NHY5LjcyYzAtMy4xNTYgMi42MTQtNi40OSA4LjI0Ni05LjQ0di05LjcyWm05NC4xNjMtMTIuMDg0di05LjcyNmM1LjkzNC0zLjE5IDguOTgxLTYuODkxIDguOTgxLTEwLjcyNXY5LjcyYzAgMy44NC0zLjA0NyA3LjU0My04Ljk4MSAxMC43MzJaIiBmaWxsPSIjMEMyOTZFIi8+PHBhdGggZD0iTTYwLjIyOSAxOS4wNTkgNDguNzMgNDkuOTIyIDYwLjM2NSA3Mi45MmwtOC40NzQgMjMuODczSDE2LjkyM2E0IDQgMCAwIDEtNC00VjIzLjA2YTQgNCAwIDAgMSA0LTRINjAuMjNaIiBmaWxsPSIjQkJCRkM0IiBmaWxsLW9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik03MS40MDggMTkuMDU5IDYwLjAxMyA0OS45MjIgNzEuNDYgNzIuOTJsLTguMzI1IDIzLjg3M2gzOS45NDNhNCA0IDAgMCAwIDQtNFYyMy4wNmE0IDQgMCAwIDAtNC00aC0zMS42N1oiIGZpbGw9IiNCQkJGQzQiIGZpbGwtb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTIxLjkyMyAyNi4xYTIgMiAwIDEgMSAwIDQgMiAyIDAgMCAxIDAtNFptMyAyYTMgMyAwIDEgMC02IDAgMyAzIDAgMCAwIDYgMFptNi45MTUtMmEyIDIgMCAxIDEgMCA0IDIgMiAwIDAgMSAwLTRabTMgMmEzIDMgMCAxIDAtNiAwIDMgMyAwIDAgMCA2IDBabS0xNS43NjMgNy4zOTRhLjUuNSAwIDAgMSAuNS0uNWgzMS41ODFhLjUuNSAwIDAgMSAwIDFIMTkuNTc1YS41LjUgMCAwIDEtLjUtLjVabTQ4LjQ3NyAwYS41LjUgMCAwIDEgLjUtLjVoMzIuNDY1YS41LjUgMCAwIDEgMCAxSDY4LjA1MmEuNS41IDAgMCAxLS41LS41WiIgZmlsbD0iIzhGOTU5RSIvPjxwYXRoIGQ9Ik05OCAxMTFjOS45NDEgMCAxOC04LjA1OSAxOC0xOHMtOC4wNTktMTgtMTgtMThjLTkuOTQyIDAtMTggOC4wNTktMTggMThzOC4wNTggMTggMTggMThaIiBmaWxsPSIjRjgwIi8+PHBhdGggZD0iTTk3LjE4MSA4NC44MThhLjgxOC44MTggMCAwIDAtLjgxOC44MTl2OS44MThjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTkuODE5YS44MTguODE4IDAgMCAwLS44MTgtLjgxOEg5Ny4xOFptMCAxMy4wOTJhLjgxOC44MTggMCAwIDAtLjgxOC44MTh2MS42MzZjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTEuNjM2YS44MTguODE4IDAgMCAwLS44MTgtLjgxOUg5Ny4xOFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNC4wMjcgODUuMzFjMi40OSA1LjUxIDE0Ljc3IDkuOTQgNDEuNDUgOS45M3Y5LjcyMWMtMjYuNjguMDEtMzguOTYtNC40Mi00MS40NS05Ljkzdi05LjcyWm04NC44MS0yNy4yN2MxNy41Mi0yLjY5IDI1LjgwNy03LjAyNiAyNy4yLTExLjcxdjkuNzJjLS4zMyA0LjY3LTkuNjggOS4wMi0yNy4yIDExLjcxdi05LjcyWiIgZmlsbD0iIzMzNzBGRiIvPjxwYXRoIGQ9Ik04OS4yMzcgMTMuMDFjMTguMDU4IDAgMjYuOCAzLjI1IDI2LjggOS43MnY5LjcyYzAtNi40Ny04Ljc0Mi05LjcyLTI2LjgtOS43MnYtOS43MlptLTg0LjU3IDUxLjdjMCA2LjYgMTEuMzcgMTIuNDUgMzAuNDcgMTIuNDR2OS43MmMtMTkuMSAwLTMwLjQ3LTUuODQtMzAuNDctMTIuNDR2LTkuNzJaIiBmaWxsPSIjMDBENkI5Ii8+PC9zdmc+"
-       alt="">
-  <div class="open-platform-desc">The page does not exist.</div>
-  <a class="open-platform-back" href="/">Go to homepage</a>
-</div>
-<script>window.gfdatav1={"env":"prod","ver":"1.0.0.13","canary":0,"garrModules":null,"envName":"prod","region":"CN","idc":"hl","webServerCodeType":"DeployServerlessWebServer","runtime":"node","extra":{"canaryType":null}}</script><script>
+## Content 约束
 
-  function parseQueryString(queryString) {
-    // 移除开头的 "?"
-    if (queryString.charAt(0) === '?') {
-      queryString = queryString.substring(1);
-    }
+- 图片 3-6 张，每张配标题（必需）+ 简短描述（可选，15字内）
+- **每张图必须是不同的真实图片**（不同 media token），下载时用不同关键词/URL
+- 下载后用 `ls -l` 比较文件大小确保每张图不重复
+- 文字仅作辅助说明，图片是信息主体
 
-    var params = {};
-    if (!queryString) return params;
+## Layout 选型
 
-    // 分割参数对
-    var paramPairs = queryString.split('&');
+| 模式 | 适用条件 | 特征 |
+|------|---------|------|
+| **卡片网格（默认）** | 多图平级展示（产品墙、团队介绍、美食推荐） | horizontal frame 内放等尺寸图文卡片 |
+| **路线时间线** | 有先后顺序（旅行路线、团建路线、项目演进） | 图文卡片 + connector 串联 |
+| **中心辐射** | 有一个核心主题 + 周围子项 | 中心标题 + 周围图文卡片 |
 
-    for (var i = 0; i < paramPairs.length; i++) {
-      var paramPair = paramPairs[i].split('=');
-      var key = decodeURIComponent(paramPair[0]);
-      var value = paramPair.length > 1 ? decodeURIComponent(paramPair[1]) : '';
+## Layout 规则
 
-      // 处理重复参数（转为数组）
-      if (params[key] === undefined) {
-        params[key] = value;
-      } else if (!Array.isArray(params[key])) {
-        params[key] = [params[key], value];
-      } else {
-        params[key].push(value);
-      }
-    }
+- **图文卡片结构**：vertical frame（图上文下），image 宽度 = 卡片宽度，height 按 3:2 比例
+- **卡片统一尺寸**：所有卡片宽高一致（推荐 240×280 或 200×250）
+- **图片统一尺寸**：所有 image 节点用相同 width/height（推荐 240×160 或 200×133）
+- **卡片间距**：gap: 24（比纯文字图表间距更大，让图片呼吸）
+- **卡片样式**：白色底 + 圆角 12 + 细边框，image 无圆角（紧贴卡片顶部）
+- **有序路线时**：卡片间用 connector 连接，connector 放顶层 nodes 数组
 
-    return params;
-  }
+## 骨架示例
 
-  function getLocale() {
-    var zhLang = 'zh-CN';
-    var enLang = 'en-US';
+### 卡片网格（产品展示/团队介绍/美食推荐）
 
-    var queryLang = parseQueryString(window.location.search).lang;
-    var cookieLang = getCookieLocale();
-    var lang = enLang;
-
-    <!--从cookie中取值-->
-    function getCookieLocale() {
-      var locale = '';
-      var cookies = document.cookie.split('; ');
-      var loclaeKey = 'open_locale';
-
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        var cookieArr = cookie.split('=');
-        if (cookieArr[0] === loclaeKey) {
-          locale = cookieArr[1];
-          break;
+```json
+{
+  "version": 2,
+  "nodes": [
+    {
+      "type": "frame", "id": "grid", "layout": "vertical", "gap": 24, "padding": 32,
+      "width": 840, "height": "fit-content",
+      "children": [
+        { "type": "text", "id": "title", "width": 776, "height": 36,
+          "text": "图表标题", "fontSize": 24, "textAlign": "center" },
+        {
+          "type": "frame", "id": "row", "layout": "horizontal", "gap": 24, "padding": 0,
+          "width": "fit-content", "height": "fit-content",
+          "children": [
+            {
+              "type": "frame", "id": "card-1", "layout": "vertical", "gap": 8, "padding": [0, 0, 12, 0],
+              "width": 240, "height": "fit-content",
+              "fillColor": "#FFFFFF", "borderWidth": 1, "borderColor": "#E0E0E0", "borderRadius": 12,
+              "children": [
+                { "type": "image", "id": "img-1", "width": 240, "height": 160, "image": { "src": "<token_1>" } },
+                { "type": "text", "id": "t-1", "text": "标题", "fontSize": 14, "width": 216, "height": 20 },
+                { "type": "text", "id": "d-1", "text": "简短描述", "fontSize": 11, "textColor": "#666666", "width": 216, "height": 16 }
+              ]
+            }
+          ]
         }
-      }
-      return locale;
+      ]
     }
+  ]
+}
+```
 
-    function setLocaleCookie(lang) {
-      var date = new Date();
-      // 300天到期
-      date.setTime(date.getTime() + (300 * 24 * 60 * 60 * 1000));
-      var expires = 'expires=' + date.toUTCString();
-      document.cookie = 'open_locale=' + lang + '; ' + expires + '; path=/;';
-    }
+每张图文卡片结构相同，复制并替换 `<token_N>`、标题和描述即可。3 张卡片一行，超过 3 张换行（嵌套第二个 horizontal frame）。
 
-    // 获取浏览器默认语言
-    if (navigator.language.indexOf('en') !== -1) {
-      lang = enLang;
-    } else if (navigator.language.indexOf('zh') !== -1) {
-      lang = zhLang;
-    }
-    if (cookieLang === enLang) {
-      lang = enLang;
-    } else if (cookieLang === zhLang) {
-      lang = zhLang;
-    }
-    if (queryLang === enLang) {
-      lang = enLang;
-    } else if (queryLang === zhLang) {
-      lang = zhLang;
-    }
-    // 设置cookie
-    setLocaleCookie(lang);
-    return lang;
-  }
+### 路线时间线（旅行路线/团建路线）
 
-  // 根据域名获取当前brand
-  function isLarkDomain() {
-    var defaultBrandMap = {
-      lark: ['larksuite'],
-      feishu: ['feishu', 'larkoffice', 'larkenterprise'],
-    };
-    const { hostname } = window.location;
-
-    if (defaultBrandMap.feishu.some((item) => hostname.includes(item))) {
-      return false;
-    }
-
-    if (defaultBrandMap.lark.some((item) => hostname.includes(item))) {
-      return true;
-    }
-
-    if (window.domainBrand) {
-      return window.domainBrand === 'lark';
-    }
-
-    return false;
-  }
-
-  var isLarkBrand = isLarkDomain();
-
-  var config = {
-    'zh-CN': {
-      'desc': '抱歉，您访问的页面不存在',
-      'back': '返回首页',
-      'title': (isLarkBrand ? 'Lark' : '飞书') + '开放平台',
+```json
+{
+  "version": 2,
+  "nodes": [
+    {
+      "type": "frame", "id": "route", "layout": "vertical", "gap": 24, "padding": 32,
+      "width": 1100, "height": "fit-content",
+      "children": [
+        { "type": "text", "id": "title", "width": 1036, "height": 36,
+          "text": "路线标题", "fontSize": 24, "textAlign": "center" },
+        {
+          "type": "frame", "id": "stops", "layout": "horizontal", "gap": 32, "padding": 0,
+          "width": "fit-content", "height": "fit-content",
+          "children": [
+            {
+              "type": "frame", "id": "stop-1", "layout": "vertical", "gap": 8, "padding": [0, 0, 12, 0],
+              "width": 240, "height": "fit-content",
+              "fillColor": "#FFFFFF", "borderWidth": 1, "borderColor": "#E0E0E0", "borderRadius": 12,
+              "children": [
+                { "type": "image", "id": "img-1", "width": 240, "height": 160, "image": { "src": "<token_1>" } },
+                { "type": "text", "id": "t-1", "text": "第1站：地点名", "fontSize": 14, "width": 216, "height": 20 }
+              ]
+            },
+            {
+              "type": "frame", "id": "stop-2", "layout": "vertical", "gap": 8, "padding": [0, 0, 12, 0],
+              "width": 240, "height": "fit-content",
+              "fillColor": "#FFFFFF", "borderWidth": 1, "borderColor": "#E0E0E0", "borderRadius": 12,
+              "children": [
+                { "type": "image", "id": "img-2", "width": 240, "height": 160, "image": { "src": "<token_2>" } },
+                { "type": "text", "id": "t-2", "text": "第2站：地点名", "fontSize": 14, "width": 216, "height": 20 }
+              ]
+            }
+          ]
+        }
+      ]
     },
-    'en-US': {
-      'desc': 'The page does not exist.',
-      'back': 'Go to homepage',
-      'title': (isLarkBrand ? 'Lark': 'Feishu') + ' Open Platform',
-    },
-  };
-  var locale = getLocale();
-  var descObj = document.querySelector('.open-platform-desc');
-  var backObj = document.querySelector('.open-platform-back');
-  descObj.innerHTML = config[locale].desc;
-  backObj.innerHTML = config[locale].back;
-  document.title = config[locale].title;
+    { "type": "connector", "id": "c1", "connector": { "from": "stop-1", "to": "stop-2", "fromAnchor": "right", "toAnchor": "left" } }
+  ]
+}
+```
 
-</script>
-</body>
-</html>
+注意：connector 必须放在**顶层 nodes 数组**，不能嵌套在 frame.children 内。connector 的属性须包裹在 `connector` 字段中。
+
+## 图片准备检查清单
+
+生成 DSL 前确认：
+
+- [ ] 所有 image 节点的 `image.src` 都是通过 `docs +media-upload --parent-type whiteboard` 上传的 media token（非 URL、非 Drive file token）
+- [ ] 所有图片已上传到目标画板（`--parent-node` 设为目标画板 token）
+- [ ] 每个 media token 不同（对应不同的真实图片）
+- [ ] 所有图片尺寸一致（同一画板内统一 width×height）
+- [ ] 图片宽高比合理（推荐 3:2，即 240×160）
+- [ ] 渲染 PNG 后查看图片内容，确认每张图片与主题相关
+- [ ] 未使用随机占位图服务（关键词参数不影响返回内容的图库）

@@ -1,198 +1,120 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="favicon.ico" />
-  <title></title>
-  <style>
-      * {
-          box-sizing: border-box;
-          padding: 0;
-          margin: 0;
-      }
+# mail +send-receipt
 
-      .open-platform-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          background-color: #ffffff;
-      }
+> **前置条件：** 先阅读 [`../../lark-shared/SKILL.md`](../../lark-shared/SKILL.md) 了解认证、全局参数和安全规则。
 
-      .open-platform-icon {
-          width: 120px;
-          height: 120px;
-          display: block;
-      }
+响应收到的已读回执请求。**本命令仅在对方邮件请求了已读回执（`READ_RECEIPT_REQUEST` 标签，系统 ID `-607`）时使用**，用于向原发件人发送一封短回复以告知"已阅读"。
 
-      .open-platform-desc {
-          margin-top: 16px;
-          line-height: 22px;
-          font-size: 14px;
-          color: #646a73;
-          text-align: center
-      }
+本 skill 对应 shortcut：`lark-cli mail +send-receipt`。
 
-      .open-platform-back {
-          border-radius: 6px;
-          font-size: 14px;
-          height: 32px;
-          line-height: 22px;
-          min-width: 80px;
-          padding: 4px 11px;
-          text-align: center;
-          text-decoration: none;
-          touch-action: manipulation;
-          transition: color .1s ease-in, background-color .1s ease-in, border-color .1s ease-in, width .2s ease-in;
-          user-select: none;
-          white-space: nowrap;
-          background: #1456f0;
-          border: 1px solid #1456f0;
-          color: #ffffff;
-          margin-top: 16px;
-      }
-  </style>
-</head>
-<body>
-<div class="open-platform-wrapper">
-  <img class="open-platform-icon"
-       src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyLjkxMyA1NS4yNDRjLTUuNjMyIDIuOTUtOC4yNDYgNi4yODQtOC4yNDYgOS40NHY5LjcyYzAtMy4xNTYgMi42MTQtNi40OSA4LjI0Ni05LjQ0di05LjcyWm05NC4xNjMtMTIuMDg0di05LjcyNmM1LjkzNC0zLjE5IDguOTgxLTYuODkxIDguOTgxLTEwLjcyNXY5LjcyYzAgMy44NC0zLjA0NyA3LjU0My04Ljk4MSAxMC43MzJaIiBmaWxsPSIjMEMyOTZFIi8+PHBhdGggZD0iTTYwLjIyOSAxOS4wNTkgNDguNzMgNDkuOTIyIDYwLjM2NSA3Mi45MmwtOC40NzQgMjMuODczSDE2LjkyM2E0IDQgMCAwIDEtNC00VjIzLjA2YTQgNCAwIDAgMSA0LTRINjAuMjNaIiBmaWxsPSIjQkJCRkM0IiBmaWxsLW9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik03MS40MDggMTkuMDU5IDYwLjAxMyA0OS45MjIgNzEuNDYgNzIuOTJsLTguMzI1IDIzLjg3M2gzOS45NDNhNCA0IDAgMCAwIDQtNFYyMy4wNmE0IDQgMCAwIDAtNC00aC0zMS42N1oiIGZpbGw9IiNCQkJGQzQiIGZpbGwtb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTIxLjkyMyAyNi4xYTIgMiAwIDEgMSAwIDQgMiAyIDAgMCAxIDAtNFptMyAyYTMgMyAwIDEgMC02IDAgMyAzIDAgMCAwIDYgMFptNi45MTUtMmEyIDIgMCAxIDEgMCA0IDIgMiAwIDAgMSAwLTRabTMgMmEzIDMgMCAxIDAtNiAwIDMgMyAwIDAgMCA2IDBabS0xNS43NjMgNy4zOTRhLjUuNSAwIDAgMSAuNS0uNWgzMS41ODFhLjUuNSAwIDAgMSAwIDFIMTkuNTc1YS41LjUgMCAwIDEtLjUtLjVabTQ4LjQ3NyAwYS41LjUgMCAwIDEgLjUtLjVoMzIuNDY1YS41LjUgMCAwIDEgMCAxSDY4LjA1MmEuNS41IDAgMCAxLS41LS41WiIgZmlsbD0iIzhGOTU5RSIvPjxwYXRoIGQ9Ik05OCAxMTFjOS45NDEgMCAxOC04LjA1OSAxOC0xOHMtOC4wNTktMTgtMTgtMThjLTkuOTQyIDAtMTggOC4wNTktMTggMThzOC4wNTggMTggMTggMThaIiBmaWxsPSIjRjgwIi8+PHBhdGggZD0iTTk3LjE4MSA4NC44MThhLjgxOC44MTggMCAwIDAtLjgxOC44MTl2OS44MThjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTkuODE5YS44MTguODE4IDAgMCAwLS44MTgtLjgxOEg5Ny4xOFptMCAxMy4wOTJhLjgxOC44MTggMCAwIDAtLjgxOC44MTh2MS42MzZjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTEuNjM2YS44MTguODE4IDAgMCAwLS44MTgtLjgxOUg5Ny4xOFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNC4wMjcgODUuMzFjMi40OSA1LjUxIDE0Ljc3IDkuOTQgNDEuNDUgOS45M3Y5LjcyMWMtMjYuNjguMDEtMzguOTYtNC40Mi00MS40NS05Ljkzdi05LjcyWm04NC44MS0yNy4yN2MxNy41Mi0yLjY5IDI1LjgwNy03LjAyNiAyNy4yLTExLjcxdjkuNzJjLS4zMyA0LjY3LTkuNjggOS4wMi0yNy4yIDExLjcxdi05LjcyWiIgZmlsbD0iIzMzNzBGRiIvPjxwYXRoIGQ9Ik04OS4yMzcgMTMuMDFjMTguMDU4IDAgMjYuOCAzLjI1IDI2LjggOS43MnY5LjcyYzAtNi40Ny04Ljc0Mi05LjcyLTI2LjgtOS43MnYtOS43MlptLTg0LjU3IDUxLjdjMCA2LjYgMTEuMzcgMTIuNDUgMzAuNDcgMTIuNDR2OS43MmMtMTkuMSAwLTMwLjQ3LTUuODQtMzAuNDctMTIuNDR2LTkuNzJaIiBmaWxsPSIjMDBENkI5Ii8+PC9zdmc+"
-       alt="">
-  <div class="open-platform-desc">The page does not exist.</div>
-  <a class="open-platform-back" href="/">Go to homepage</a>
-</div>
-<script>window.gfdatav1={"env":"prod","ver":"1.0.0.13","canary":0,"garrModules":null,"envName":"prod","region":"CN","idc":"lf","webServerCodeType":"DeployServerlessWebServer","runtime":"node","extra":{"canaryType":null}}</script><script>
+## CRITICAL — 工作流与安全规则
 
-  function parseQueryString(queryString) {
-    // 移除开头的 "?"
-    if (queryString.charAt(0) === '?') {
-      queryString = queryString.substring(1);
-    }
+1. **触发条件严格**：仅当拉信（`+message` / `+messages` / `+thread`）看到 `label_ids` 里有 `READ_RECEIPT_REQUEST` 时，才应该问用户是否发回执。对普通邮件**绝不**调用此命令。
+2. **必须先问用户**：发回执之前**必须**向用户展示原邮件摘要（发件人、主题）并请求确认；用户明确同意后才执行。**不要替用户自动回执**——这会造成隐私泄露（告诉对方"我读了"）。
+3. **`--yes` 不省略**：本命令被标记为 `high-risk-write`，框架要求 `--yes` 才执行（无 `--confirm-send` flag）。仅在用户确认后附上。
+4. **失败安全**：若原邮件没有 `READ_RECEIPT_REQUEST` 标签，命令会拒绝执行并报错——这是防御，不要通过其他方式绕过。
 
-    var params = {};
-    if (!queryString) return params;
+## 命令
 
-    // 分割参数对
-    var paramPairs = queryString.split('&');
+```bash
+# 标准用法：对指定 message-id 发回执
+lark-cli mail +send-receipt --message-id <message-id> --yes
 
-    for (var i = 0; i < paramPairs.length; i++) {
-      var paramPair = paramPairs[i].split('=');
-      var key = decodeURIComponent(paramPair[0]);
-      var value = paramPair.length > 1 ? decodeURIComponent(paramPair[1]) : '';
+# 指定邮箱（公共邮箱场景）
+lark-cli mail +send-receipt --mailbox shared@example.com --message-id <message-id> --yes
 
-      // 处理重复参数（转为数组）
-      if (params[key] === undefined) {
-        params[key] = value;
-      } else if (!Array.isArray(params[key])) {
-        params[key] = [params[key], value];
-      } else {
-        params[key].push(value);
-      }
-    }
+# Dry Run（不真发）
+lark-cli mail +send-receipt --message-id <message-id> --dry-run
+```
 
-    return params;
+## 参数
+
+| 参数 | 必填 | 默认 | 说明 |
+|------|------|------|------|
+| `--message-id <id>` | 是 | — | 请求了已读回执的原邮件 message ID |
+| `--mailbox <email>` | 否 | `me` | 回执邮件归属的邮箱 |
+| `--from <email>` | 否 | 邮箱主地址 | 回执 From 头 |
+| `--yes` | 是 | — | 确认高危写操作。仅在用户明确同意发回执后附上 |
+| `--dry-run` | 否 | — | 仅打印请求，不执行 |
+
+> **没有 `--body` 参数**：回执正文**由命令自动生成**（见下方"行为细节"），对齐业界惯例（Outlook / Thunderbird / Lark 客户端等均不支持逐封自定义回执正文）。若真需要自由回复，请改用 `mail +reply`——那本来就是"自由回复"的命令，不该与"已读回执"混用。
+
+## 行为细节
+
+- **Subject**：按原邮件主题语言（`detectSubjectLang`）自动选前缀 —— <code>已读回执：&lt;原邮件主题&gt;</code>（zh）或 <code>Read receipt:&nbsp;&lt;原邮件主题&gt;</code>（en）。后端 `GetRealSubject` 正则剥除这两类前缀用于会话聚合，zh 已内置；en 需在 TCC `MailPrefixConfig.SubjectPrefixListForAdvancedSearch` 加入 `Read receipt:`。
+- **正文**（自动生成，纯文本 + HTML 双版本走 `multipart/alternative`）：
+    - 按原邮件主题语言（`detectSubjectLang`）在 `zh` 与 `en` 之间切换，label 套通过 `receiptMetaLabels` 集中维护
+    - 结构化 4 行（纯文本版，zh）：
+      ```text
+      您发送的邮件已被阅读，详情如下：
+      > 主题：<原邮件主题>
+      > 收件人：<回执发件人地址>
+      > 发送时间：<原邮件发送时间>
+      > 阅读时间：<当前时间>
+      ```
+    - en 版：`Your message has been read. Details:` + <code>Subject:&nbsp;</code> / <code>To:&nbsp;</code> / <code>Sent:&nbsp;</code> / <code>Read:&nbsp;</code>
+    - HTML 版同信息量，包在一个浅灰 quote-block
+- **会话挂接**：自动设置 `In-Reply-To`（原信的 SMTP Message-ID）和 `References`（原信 references + 原信 SMTP Message-ID），保证在发件人邮箱里聚合到原邮件回复链。
+- **发送路径**：走现有 drafts raw 路径（`drafts.create` + `drafts.send`），与 `+send` / `+reply` 共用基础设施。后端会自动标记这是一封回执邮件并在原邮件会话里清除"请求回执"状态。
+- **即时发送**：本命令不支持保存草稿——回执邮件按语义是"立即告知对方已读"，保存草稿无意义。
+
+## 返回值
+
+```json
+{
+  "ok": true,
+  "data": {
+    "message_id":             "回执邮件的 message ID",
+    "thread_id":              "挂到原会话的 thread ID",
+    "receipt_for_message_id": "原邮件的 message ID"
   }
+}
+```
 
-  function getLocale() {
-    var zhLang = 'zh-CN';
-    var enLang = 'en-US';
+`message_id` 可用于后续 `send_status` 查询投递状态。
 
-    var queryLang = parseQueryString(window.location.search).lang;
-    var cookieLang = getCookieLocale();
-    var lang = enLang;
+## 典型场景
 
-    <!--从cookie中取值-->
-    function getCookieLocale() {
-      var locale = '';
-      var cookies = document.cookie.split('; ');
-      var loclaeKey = 'open_locale';
+### 场景 1：用户在拉信时看到 `-607` 标签
 
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        var cookieArr = cookie.split('=');
-        if (cookieArr[0] === loclaeKey) {
-          locale = cookieArr[1];
-          break;
-        }
-      }
-      return locale;
-    }
+```bash
+# 1. 拉信
+lark-cli mail +message --message-id msg-1 --format json | jq '.data.label_ids'
+# 输出 ["UNREAD", "READ_RECEIPT_REQUEST"] → 原邮件请求了已读回执
 
-    function setLocaleCookie(lang) {
-      var date = new Date();
-      // 300天到期
-      date.setTime(date.getTime() + (300 * 24 * 60 * 60 * 1000));
-      var expires = 'expires=' + date.toUTCString();
-      document.cookie = 'open_locale=' + lang + '; ' + expires + '; path=/;';
-    }
+# 2. 向用户提示：
+#    "这封来自 alice@example.com 的邮件请求已读回执。主题：《周报》。
+#     要不要回一封告诉对方你已阅读？"
 
-    // 获取浏览器默认语言
-    if (navigator.language.indexOf('en') !== -1) {
-      lang = enLang;
-    } else if (navigator.language.indexOf('zh') !== -1) {
-      lang = zhLang;
-    }
-    if (cookieLang === enLang) {
-      lang = enLang;
-    } else if (cookieLang === zhLang) {
-      lang = zhLang;
-    }
-    if (queryLang === enLang) {
-      lang = enLang;
-    } else if (queryLang === zhLang) {
-      lang = zhLang;
-    }
-    // 设置cookie
-    setLocaleCookie(lang);
-    return lang;
-  }
+# 3. 用户确认后发回执
+lark-cli mail +send-receipt --message-id msg-1 --yes
+```
 
-  // 根据域名获取当前brand
-  function isLarkDomain() {
-    var defaultBrandMap = {
-      lark: ['larksuite'],
-      feishu: ['feishu', 'larkoffice', 'larkenterprise'],
-    };
-    const { hostname } = window.location;
+### 场景 2：批量拉信中发现多封请求回执
 
-    if (defaultBrandMap.feishu.some((item) => hostname.includes(item))) {
-      return false;
-    }
+```bash
+# 1. 筛出带 -607 标签的邮件
+lark-cli mail +triage --folder INBOX --format json \
+  | jq '.data.messages[] | select(.label_ids | index("READ_RECEIPT_REQUEST")) | {message_id, subject, from}'
 
-    if (defaultBrandMap.lark.some((item) => hostname.includes(item))) {
-      return true;
-    }
+# 2. 对每封分别问用户 → 用户确认后再发
+```
 
-    if (window.domainBrand) {
-      return window.domainBrand === 'lark';
-    }
+### 场景 3：公共邮箱的回执
 
-    return false;
-  }
+```bash
+# 公共邮箱收到的回执请求，用 --mailbox 指定
+lark-cli mail +send-receipt --mailbox support@example.com --message-id <id> --yes
+```
 
-  var isLarkBrand = isLarkDomain();
+## 不要这样做
 
-  var config = {
-    'zh-CN': {
-      'desc': '抱歉，您访问的页面不存在',
-      'back': '返回首页',
-      'title': (isLarkBrand ? 'Lark' : '飞书') + '开放平台',
-    },
-    'en-US': {
-      'desc': 'The page does not exist.',
-      'back': 'Go to homepage',
-      'title': (isLarkBrand ? 'Lark': 'Feishu') + ' Open Platform',
-    },
-  };
-  var locale = getLocale();
-  var descObj = document.querySelector('.open-platform-desc');
-  var backObj = document.querySelector('.open-platform-back');
-  descObj.innerHTML = config[locale].desc;
-  backObj.innerHTML = config[locale].back;
-  document.title = config[locale].title;
+- ❌ **自动回执**（不经用户确认就发）——违反隐私规则
+- ❌ 对普通邮件调用 `+send-receipt`（命令会拒绝，但 agent 也不应尝试）
+- ❌ 用 `+send` / `+reply` 手工拼 "已读回执" 回复——会缺少 `X-Lark-Read-Receipt-Mail` 头，后端不会打 `-608` 标签，收信人看不到系统样式的回执
+- ❌ 一次调用发多条（本命令设计为单次响应）
 
-</script>
-</body>
-</html>
+## 相关命令
+
+- `lark-cli mail +message` — 拉单封邮件（在 `label_ids` 里检查 `READ_RECEIPT_REQUEST`）
+- `lark-cli mail +send --request-receipt` — 反向：**请求**别人回执
+- `lark-cli mail user_mailbox.messages send_status` — 查询回执邮件的投递状态

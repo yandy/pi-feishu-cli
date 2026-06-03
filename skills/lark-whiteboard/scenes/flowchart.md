@@ -1,198 +1,185 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="favicon.ico" />
-  <title></title>
-  <style>
-      * {
-          box-sizing: border-box;
-          padding: 0;
-          margin: 0;
-      }
+# 流程图 (Flowchart)
 
-      .open-platform-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          background-color: #ffffff;
-      }
+适用于：各种业务流转图、决策树、审批流、时序控制逻辑、带条件判断的链路、系统架构拓扑等。
 
-      .open-platform-icon {
-          width: 120px;
-          height: 120px;
-          display: block;
-      }
+通用字段语义详见 `references/schema.md`，通用布局原则详见 `references/layout.md`；本文件只描述流程图场景下的选型边界与范式。
 
-      .open-platform-desc {
-          margin-top: 16px;
-          line-height: 22px;
-          font-size: 14px;
-          color: #646a73;
-          text-align: center
-      }
+> [!IMPORTANT]
+> **流程图必须走 DSL 路径，不再使用 Mermaid！**
+> 复杂分支、判断、回路、跳级关系优先使用 `layout: "dagre"` 计算拓扑；如果只是规整的单线流水线，且卡片强对齐比自动拓扑更重要，也可以使用 Flex + 顶层 `connector` 组合实现。
 
-      .open-platform-back {
-          border-radius: 6px;
-          font-size: 14px;
-          height: 32px;
-          line-height: 22px;
-          min-width: 80px;
-          padding: 4px 11px;
-          text-align: center;
-          text-decoration: none;
-          touch-action: manipulation;
-          transition: color .1s ease-in, background-color .1s ease-in, border-color .1s ease-in, width .2s ease-in;
-          user-select: none;
-          white-space: nowrap;
-          background: #1456f0;
-          border: 1px solid #1456f0;
-          color: #ffffff;
-          margin-top: 16px;
-      }
-  </style>
-</head>
-<body>
-<div class="open-platform-wrapper">
-  <img class="open-platform-icon"
-       src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyLjkxMyA1NS4yNDRjLTUuNjMyIDIuOTUtOC4yNDYgNi4yODQtOC4yNDYgOS40NHY5LjcyYzAtMy4xNTYgMi42MTQtNi40OSA4LjI0Ni05LjQ0di05LjcyWm05NC4xNjMtMTIuMDg0di05LjcyNmM1LjkzNC0zLjE5IDguOTgxLTYuODkxIDguOTgxLTEwLjcyNXY5LjcyYzAgMy44NC0zLjA0NyA3LjU0My04Ljk4MSAxMC43MzJaIiBmaWxsPSIjMEMyOTZFIi8+PHBhdGggZD0iTTYwLjIyOSAxOS4wNTkgNDguNzMgNDkuOTIyIDYwLjM2NSA3Mi45MmwtOC40NzQgMjMuODczSDE2LjkyM2E0IDQgMCAwIDEtNC00VjIzLjA2YTQgNCAwIDAgMSA0LTRINjAuMjNaIiBmaWxsPSIjQkJCRkM0IiBmaWxsLW9wYWNpdHk9Ii40NSIvPjxwYXRoIGQ9Ik03MS40MDggMTkuMDU5IDYwLjAxMyA0OS45MjIgNzEuNDYgNzIuOTJsLTguMzI1IDIzLjg3M2gzOS45NDNhNCA0IDAgMCAwIDQtNFYyMy4wNmE0IDQgMCAwIDAtNC00aC0zMS42N1oiIGZpbGw9IiNCQkJGQzQiIGZpbGwtb3BhY2l0eT0iLjQ1Ii8+PHBhdGggZD0iTTIxLjkyMyAyNi4xYTIgMiAwIDEgMSAwIDQgMiAyIDAgMCAxIDAtNFptMyAyYTMgMyAwIDEgMC02IDAgMyAzIDAgMCAwIDYgMFptNi45MTUtMmEyIDIgMCAxIDEgMCA0IDIgMiAwIDAgMSAwLTRabTMgMmEzIDMgMCAxIDAtNiAwIDMgMyAwIDAgMCA2IDBabS0xNS43NjMgNy4zOTRhLjUuNSAwIDAgMSAuNS0uNWgzMS41ODFhLjUuNSAwIDAgMSAwIDFIMTkuNTc1YS41LjUgMCAwIDEtLjUtLjVabTQ4LjQ3NyAwYS41LjUgMCAwIDEgLjUtLjVoMzIuNDY1YS41LjUgMCAwIDEgMCAxSDY4LjA1MmEuNS41IDAgMCAxLS41LS41WiIgZmlsbD0iIzhGOTU5RSIvPjxwYXRoIGQ9Ik05OCAxMTFjOS45NDEgMCAxOC04LjA1OSAxOC0xOHMtOC4wNTktMTgtMTgtMThjLTkuOTQyIDAtMTggOC4wNTktMTggMThzOC4wNTggMTggMTggMThaIiBmaWxsPSIjRjgwIi8+PHBhdGggZD0iTTk3LjE4MSA4NC44MThhLjgxOC44MTggMCAwIDAtLjgxOC44MTl2OS44MThjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTkuODE5YS44MTguODE4IDAgMCAwLS44MTgtLjgxOEg5Ny4xOFptMCAxMy4wOTJhLjgxOC44MTggMCAwIDAtLjgxOC44MTh2MS42MzZjMCAuNDUyLjM2Ni44MTguODE4LjgxOGgxLjYzN2EuODE4LjgxOCAwIDAgMCAuODE4LS44MTh2LTEuNjM2YS44MTguODE4IDAgMCAwLS44MTgtLjgxOUg5Ny4xOFoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNC4wMjcgODUuMzFjMi40OSA1LjUxIDE0Ljc3IDkuOTQgNDEuNDUgOS45M3Y5LjcyMWMtMjYuNjguMDEtMzguOTYtNC40Mi00MS40NS05Ljkzdi05LjcyWm04NC44MS0yNy4yN2MxNy41Mi0yLjY5IDI1LjgwNy03LjAyNiAyNy4yLTExLjcxdjkuNzJjLS4zMyA0LjY3LTkuNjggOS4wMi0yNy4yIDExLjcxdi05LjcyWiIgZmlsbD0iIzMzNzBGRiIvPjxwYXRoIGQ9Ik04OS4yMzcgMTMuMDFjMTguMDU4IDAgMjYuOCAzLjI1IDI2LjggOS43MnY5LjcyYzAtNi40Ny04Ljc0Mi05LjcyLTI2LjgtOS43MnYtOS43MlptLTg0LjU3IDUxLjdjMCA2LjYgMTEuMzcgMTIuNDUgMzAuNDcgMTIuNDR2OS43MmMtMTkuMSAwLTMwLjQ3LTUuODQtMzAuNDctMTIuNDR2LTkuNzJaIiBmaWxsPSIjMDBENkI5Ii8+PC9zdmc+"
-       alt="">
-  <div class="open-platform-desc">The page does not exist.</div>
-  <a class="open-platform-back" href="/">Go to homepage</a>
-</div>
-<script>window.gfdatav1={"env":"prod","ver":"1.0.0.13","canary":0,"garrModules":null,"envName":"prod","region":"CN","idc":"hl","webServerCodeType":"DeployServerlessWebServer","runtime":"node","extra":{"canaryType":null}}</script><script>
+## 美学规范
 
-  function parseQueryString(queryString) {
-    // 移除开头的 "?"
-    if (queryString.charAt(0) === '?') {
-      queryString = queryString.substring(1);
-    }
+- **摒弃简陋节点，推崇全卡片化**：核心业务节点不要只用一个纯文本 `rect`。**应优先采用 Flex 组合卡片**（如：在 `vertical` frame 内上下组合【Emoji 标题项】和【补充说明项】），使得节点信息结构化、层级分明。
+- **语义化色彩编排**：节点底色严禁随机分配。必须按状态语义映射：常规链路用浅蓝/浅紫、核心风控/检查用预警黄、成功通过用生命绿、失败熔断用危险红。边框颜色可同色系加深，以凸显卡片边缘。
+- **统一判定逻辑**：条件分支必须使用 `diamond` 菱形节点，并且**严禁漏掉** `layoutOptions.edges` 边定义里的第三个标签参数（必须清晰写明"是/否"、"通过/拒绝"）。
+- **形状多样化**：合理搭配不同形状来表达语义 —— `ellipse` 用于外部实体/起终点、`diamond` 用于判断路由、`rect` 用于业务处理节点、`cylinder` 用于持久化存储。
 
-    var params = {};
-    if (!queryString) return params;
+## Layout 选型
 
-    // 分割参数对
-    var paramPairs = queryString.split('&');
+| 模式             | 适用条件                                       | 核心配置                                                                                                 |
+| ---------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **主体用 Dagre** | 有判断、分支、回路、回退、跳级关系的标准流程图 | 主体 frame 设定 `layout: "dagre"`，按需配置 `rankdir: "TB"` 或 `rankdir: "LR"`。                          |
+| **局部复合节点** | 流程中的某一步本身是一个小型 UI 组合体         | 外层仍用 `dagre`，复合步骤内部改用 `layout: "vertical"` / `"horizontal"`。此类节点为**不透明节点**，外层连线只能连到外壳。 |
+| **透明子图**     | 需按业务区域分组，且连线穿越区域边界           | 子容器声明 `layout: "dagre"` + `layoutOptions: { isCluster: true }`，成为透明子图。内部节点直接参与外层拓扑运算。 |
+| **规整流水线**   | 基本是单线 A → B → C → D，且卡片对齐要求极高   | 主体可用 Flex 排版，连线改用顶层 `connector`；不要为了"自动"而硬上 Dagre。                                  |
 
-    for (var i = 0; i < paramPairs.length; i++) {
-      var paramPair = paramPairs[i].split('=');
-      var key = decodeURIComponent(paramPair[0]);
-      var value = paramPair.length > 1 ? decodeURIComponent(paramPair[1]) : '';
+## 核心属性
 
-      // 处理重复参数（转为数组）
-      if (params[key] === undefined) {
-        params[key] = value;
-      } else if (!Array.isArray(params[key])) {
-        params[key] = [params[key], value];
-      } else {
-        params[key].push(value);
-      }
-    }
+- **`rankdir`**: `TB`（上下）或 `LR`（左右）。**强烈推荐优先使用 `LR`**，充分利用宽屏横向空间。
+- **`edges`**: 在根 Dagre 的 `layoutOptions.edges` 中按 `[fromId, toId, "标签"]` 声明。**支持反向连接**实现闭环。所有 edges 统一写在**最外层根 Dagre**，不要写在 cluster 内部。
+- **`ranksep` 与边文本**: 若边上标注了说明文字，**必须根据字数调大间距**：`ranksep = max(60, 字数 × 16)`。
+- **自适应尺寸**: dagre 容器**必须**设定 `width: "fit-content"` 和 `height: "fit-content"`。
+- **`clusterTitle`**: 透明子图可通过 `clusterTitle` 声明悬浮标题（自动吸附左上角、加粗 14px），搭配 `clusterTitleColor` 指定标题颜色。
 
-    return params;
-  }
+## 两种嵌套模式
 
-  function getLocale() {
-    var zhLang = 'zh-CN';
-    var enLang = 'en-US';
+### 不透明节点（Opaque Node）
+Dagre 内的子容器，只要未声明 `isCluster: true`，对外层 Dagre 就是具有确定宽高的原子节点。外层连线无法寻址其内部子节点。适合封装复杂的组合卡片（如带图标、版本号、多行描述的业务模块）。
 
-    var queryLang = parseQueryString(window.location.search).lang;
-    var cookieLang = getCookieLocale();
-    var lang = enLang;
+### 透明子图（Compound Cluster）
+子容器同时声明 `layout: "dagre"` 与 `layoutOptions: { isCluster: true }` 时，成为外层 Dagre 的复合子图。其内部子节点直接参与外层拓扑运算，连线可穿越子图边界。适合划分网络区域、功能层级、命名空间等边界容器。推荐搭配 `borderDash: "dashed"` 虚线边框 + 淡色背景。
 
-    <!--从cookie中取值-->
-    function getCookieLocale() {
-      var locale = '';
-      var cookies = document.cookie.split('; ');
-      var loclaeKey = 'open_locale';
+## 骨架示例（推荐范本）
 
-      for (var i = 0; i < cookies.length; i++) {
-        var cookie = cookies[i].trim();
-        var cookieArr = cookie.split('=');
-        if (cookieArr[0] === loclaeKey) {
-          locale = cookieArr[1];
-          break;
+以下是一个混合架构拓扑的完整示例。它同时展示了**透明子图**（Kubernetes Zone，连线可穿透）和**不透明复合节点**（DB 集群、AI 引擎，连线只能连外壳）的标准写法，以及多种形状（ellipse / diamond / rect / cylinder）和语义化配色规范。
+
+```json
+{
+  "version": 2,
+  "nodes": [
+    {
+      "type": "frame",
+      "id": "root",
+      "x": 20, "y": 20,
+      "layout": "dagre",
+      "width": "fit-content", "height": "fit-content",
+      "padding": 60,
+      "fillColor": "#F8FAFC",
+      "borderColor": "#CBD5E1",
+      "borderWidth": 1,
+      "borderRadius": 16,
+      "layoutOptions": {
+        "rankdir": "LR",
+        "nodesep": 60,
+        "ranksep": 120,
+        "edges": [
+          ["user", "k8s_ingress", "HTTPS request"],
+          ["k8s_ingress", "web_pod", "Route UI"],
+          ["k8s_ingress", "api_pod", "Route API"],
+          ["web_pod", "api_pod", "Internal REST"],
+          ["api_pod", "db_cluster", "SQL Query"],
+          ["api_pod", "ai_service", "gRPC Stream"]
+        ]
+      },
+      "children": [
+        {
+          "type": "ellipse", "id": "user", "text": "Global Users",
+          "width": 110, "height": 60,
+          "fillColor": "#E2E8F0", "borderColor": "#64748B", "borderWidth": 1,
+          "fontSize": 14, "textColor": "#334155"
+        },
+        {
+          "type": "frame", "id": "zone_k8s",
+          "layout": "dagre",
+          "layoutOptions": {
+            "isCluster": true,
+            "clusterTitle": "☸️ Kubernetes Zone (isCluster)",
+            "clusterTitleColor": "#2563EB"
+          },
+          "fillColor": "#EFF6FF", "borderColor": "#60A5FA",
+          "borderWidth": 2, "borderDash": "dashed", "borderRadius": 24,
+          "children": [
+            {
+              "type": "diamond", "id": "k8s_ingress", "text": "Nginx Ingress",
+              "width": 130, "height": 70,
+              "fillColor": "#DBEAFE", "borderColor": "#3B82F6", "borderWidth": 2,
+              "textColor": "#1E40AF"
+            },
+            {
+              "type": "rect", "id": "web_pod", "text": "Next.js SSR Pod",
+              "width": 140, "height": 48,
+              "fillColor": "#BFDBFE", "borderColor": "#2563EB", "borderWidth": 2,
+              "borderRadius": 8, "textColor": "#1E3A8A"
+            },
+            {
+              "type": "rect", "id": "api_pod", "text": "Go Lang API Pod",
+              "width": 140, "height": 48,
+              "fillColor": "#BFDBFE", "borderColor": "#2563EB", "borderWidth": 2,
+              "borderRadius": 8, "textColor": "#1E3A8A"
+            }
+          ]
+        },
+        {
+          "type": "frame", "id": "db_cluster",
+          "layout": "vertical", "gap": 16, "padding": [20, 24],
+          "alignItems": "center",
+          "fillColor": "#F0FDF4", "borderColor": "#22C55E",
+          "borderWidth": 2, "borderRadius": 16,
+          "children": [
+            {
+              "type": "text", "id": "db_title",
+              "text": "🗄️ Highly Available DB (不透明)", "fontSize": 14, "textColor": "#14532D"
+            },
+            {
+              "type": "frame", "id": "db_row", "layout": "horizontal", "gap": 20,
+              "children": [
+                {
+                  "type": "cylinder", "id": "db_master", "text": "Master",
+                  "width": 80, "height": 50,
+                  "fillColor": "#DCFCE7", "borderColor": "#16A34A", "borderWidth": 1,
+                  "textColor": "#166534"
+                },
+                {
+                  "type": "cylinder", "id": "db_replica", "text": "Replica",
+                  "width": 80, "height": 50,
+                  "fillColor": "#DCFCE7", "borderColor": "#16A34A", "borderWidth": 1,
+                  "textColor": "#166534"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame", "id": "ai_service",
+          "layout": "vertical", "gap": 10, "padding": [16, 20],
+          "alignItems": "center",
+          "fillColor": "#FAF5FF", "borderColor": "#A855F7",
+          "borderWidth": 2, "borderRadius": 12,
+          "children": [
+            {
+              "type": "text", "id": "ai_title",
+              "text": "🧠 Multi-Modal Engine (不透明)", "fontSize": 14, "textColor": "#6B21A8"
+            },
+            {
+              "type": "rect", "id": "ai_version",
+              "text": "v4.2.1-beta", "width": 90, "height": 22,
+              "fillColor": "#E9D5FF", "borderColor": "#C084FC", "borderWidth": 1,
+              "borderRadius": 4, "fontSize": 11, "textColor": "#581C87"
+            },
+            {
+              "type": "text", "id": "ai_desc",
+              "text": "Includes Vector Store\n& Transformer Blocks",
+              "fontSize": 12, "textColor": "#7E22CE", "textAlign": "center"
+            }
+          ]
         }
-      }
-      return locale;
+      ]
     }
+  ]
+}
+```
 
-    function setLocaleCookie(lang) {
-      var date = new Date();
-      // 300天到期
-      date.setTime(date.getTime() + (300 * 24 * 60 * 60 * 1000));
-      var expires = 'expires=' + date.toUTCString();
-      document.cookie = 'open_locale=' + lang + '; ' + expires + '; path=/;';
-    }
+**范本要点**：
+- `zone_k8s` 是**透明子图**（`isCluster: true` + `clusterTitle`），外部连线穿越虚线边界直达 `k8s_ingress`、`web_pod`、`api_pod`。
+- `db_cluster` 和 `ai_service` 是**不透明节点**（`layout: "vertical"`），内部用 Flex 组合了多行结构化信息，对外层 Dagre 是固定宽高的原子。连线只能连到外壳 ID。
+- 所有 `edges` 统一写在最外层根 Dagre 的 `layoutOptions` 中。
+- 本范本中用到了 `ellipse`（外部实体）、`diamond`（路由判断）、`rect`（业务节点）、`cylinder`（数据库存储）四种形状。
 
-    // 获取浏览器默认语言
-    if (navigator.language.indexOf('en') !== -1) {
-      lang = enLang;
-    } else if (navigator.language.indexOf('zh') !== -1) {
-      lang = zhLang;
-    }
-    if (cookieLang === enLang) {
-      lang = enLang;
-    } else if (cookieLang === zhLang) {
-      lang = zhLang;
-    }
-    if (queryLang === enLang) {
-      lang = enLang;
-    } else if (queryLang === zhLang) {
-      lang = zhLang;
-    }
-    // 设置cookie
-    setLocaleCookie(lang);
-    return lang;
-  }
+## 陷阱与常见报错防范
 
-  // 根据域名获取当前brand
-  function isLarkDomain() {
-    var defaultBrandMap = {
-      lark: ['larksuite'],
-      feishu: ['feishu', 'larkoffice', 'larkenterprise'],
-    };
-    const { hostname } = window.location;
-
-    if (defaultBrandMap.feishu.some((item) => hostname.includes(item))) {
-      return false;
-    }
-
-    if (defaultBrandMap.lark.some((item) => hostname.includes(item))) {
-      return true;
-    }
-
-    if (window.domainBrand) {
-      return window.domainBrand === 'lark';
-    }
-
-    return false;
-  }
-
-  var isLarkBrand = isLarkDomain();
-
-  var config = {
-    'zh-CN': {
-      'desc': '抱歉，您访问的页面不存在',
-      'back': '返回首页',
-      'title': (isLarkBrand ? 'Lark' : '飞书') + '开放平台',
-    },
-    'en-US': {
-      'desc': 'The page does not exist.',
-      'back': 'Go to homepage',
-      'title': (isLarkBrand ? 'Lark': 'Feishu') + ' Open Platform',
-    },
-  };
-  var locale = getLocale();
-  var descObj = document.querySelector('.open-platform-desc');
-  var backObj = document.querySelector('.open-platform-back');
-  descObj.innerHTML = config[locale].desc;
-  backObj.innerHTML = config[locale].back;
-  document.title = config[locale].title;
-
-</script>
-</body>
-</html>
+- **误用 Mermaid**：只要用户没有带 `mermaid` 具体语法代码，哪怕描述明确是"流程图"，也**强制使用 DSL 框架下的 Dagre 模式**。
+- **重复画线**：`dagre` 里的所有子节点关系通过 `edges` 定义，引擎会自动生成连线。**绝对不要再去外层用 `connector` 节点重复连一次**。
+- **穿透黑盒**：普通子容器是不透明节点，外部连线无法直接寻址其内部子节点（引擎会自动重定向至外壳）。若需穿透，必须声明 `layout: "dagre"` 与 `layoutOptions: { isCluster: true }`。
+- **`id` 缺失**：只要是在 `edges` 里出现的标识符，`children` 里一定能找到同名 `id` 的节点对应，拼写必须完全一致。
+- **宽度灾难**：Dagre 内容器禁止子框使用 `fill-container`，因为 dagre 父容器本身是被内容撑开的。
