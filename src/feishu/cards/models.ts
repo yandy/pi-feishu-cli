@@ -71,16 +71,18 @@ export async function buildModelsCard(
         type: (level === currentThink ? "primary" : "default") as
           | "primary"
           | "default",
-        behaviors: [{
-          type: "callback",
-          value: {
-            cmd: "model",
-            action: "select",
-            provider: model.provider,
-            modelId: model.id,
-            thinkingLevel: level,
+        behaviors: [
+          {
+            type: "callback",
+            value: {
+              cmd: "model",
+              action: "select",
+              provider: model.provider,
+              modelId: model.id,
+              thinkingLevel: level,
+            },
           },
-        }],
+        ],
       });
     }
   }
