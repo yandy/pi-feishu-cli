@@ -1,6 +1,6 @@
 {
   "name": "pi-feishu-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Pi AI agent with Feishu bot integration",
   "keywords": ["pi", "feishu", "lark", "ai", "agent", "cli"],
   "license": "MIT",
