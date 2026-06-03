@@ -29,19 +29,24 @@ export function createStreamingHandler(
   let needsQuotePrefix = true;
   let needLineBreak = false;
 
+  const closeThinkBlock = (): string => {
+    let prefix = "";
+    if (inThinkBlock && !needsQuotePrefix) {
+      prefix = "\n";
+    }
+    inThinkBlock = false;
+    needsQuotePrefix = true;
+    return prefix;
+  };
+
   return session.subscribe((event: StreamEvent) => {
     switch (event.type) {
       case "message_update": {
         const sub = event.assistantMessageEvent;
         if (!sub) break;
         if (sub.type === "text_delta") {
-          let delta = sub.delta ?? "";
-          if (inThinkBlock && !needsQuotePrefix) {
-            delta = "\n" + delta;
-          }
-          inThinkBlock = false;
-          needsQuotePrefix = true;
-          stream.append(delta);
+          const delta = sub.delta ?? "";
+          stream.append(closeThinkBlock() + delta);
           needLineBreak = !delta.endsWith("\n");
         } else if (sub.type === "thinking_delta") {
           const delta = sub.delta ?? "";
@@ -61,43 +66,59 @@ export function createStreamingHandler(
           stream.append(out);
           inThinkBlock = true;
         } else if (sub.type === "error") {
-          stream.append("— 模型返回错误 —");
+          stream.append(closeThinkBlock() + "— 模型返回错误 —");
+          needLineBreak = true;
         }
         break;
       }
 
       case "tool_execution_start":
-        stream.append(`🔧 ${event.toolName ?? ""}`);
+        stream.append(
+          closeThinkBlock() + `🔧 ${event.toolName ?? ""}`,
+        );
+        needLineBreak = true;
         break;
 
       case "tool_execution_update":
-        stream.append(String(event.partialResult ?? ""));
+        stream.append(closeThinkBlock() + String(event.partialResult ?? ""));
+        needLineBreak = true;
         break;
 
       case "tool_execution_end":
-        stream.append(event.isError ? "❌" : "✅");
+        stream.append(
+          closeThinkBlock() + (event.isError ? "❌" : "✅"),
+        );
+        needLineBreak = true;
         break;
 
       case "queue_update":
-        stream.append("— 消息已排队 —");
+        stream.append(closeThinkBlock() + "— 消息已排队 —");
+        needLineBreak = true;
         break;
 
       case "compaction_start":
-        stream.append("— 压缩中... —");
+        stream.append(closeThinkBlock() + "— 压缩中... —");
+        needLineBreak = true;
         break;
 
       case "compaction_end":
-        stream.append("— 压缩完成 —");
+        stream.append(closeThinkBlock() + "— 压缩完成 —");
+        needLineBreak = true;
         break;
 
       case "auto_retry_start":
         stream.append(
-          `— 自动重试 (${event.attempt}/${event.maxAttempts})... —`,
+          closeThinkBlock() +
+            `— 自动重试 (${event.attempt}/${event.maxAttempts})... —`,
         );
+        needLineBreak = true;
         break;
 
       case "auto_retry_end":
-        stream.append(event.success ? "✅ 重试成功" : "❌ 重试失败");
+        stream.append(
+          closeThinkBlock() + (event.success ? "✅ 重试成功" : "❌ 重试失败"),
+        );
+        needLineBreak = true;
         break;
     }
   });

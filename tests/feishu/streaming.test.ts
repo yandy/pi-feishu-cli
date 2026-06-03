@@ -248,6 +248,68 @@ describe("createStreamingHandler", () => {
     unsub();
   });
 
+  it("closes think block when tool fires while think ends without newline", () => {
+    const session = createMockSession();
+    const stream = createMockStream();
+    const unsub = createStreamingHandler(session as any, stream as any);
+
+    session.emit({
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "thinking_delta",
+        delta: "think",
+        contentIndex: 0,
+        partial: {},
+      },
+    });
+
+    session.emit({
+      type: "tool_execution_start",
+      toolName: "bash",
+      toolCallId: "1",
+      args: {},
+    });
+
+    expect(stream.chunks).toEqual(["> think", "\n🔧 bash"]);
+    unsub();
+  });
+
+  it("starts new think block after tool execution", () => {
+    const session = createMockSession();
+    const stream = createMockStream();
+    const unsub = createStreamingHandler(session as any, stream as any);
+
+    session.emit({
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "thinking_delta",
+        delta: "think\n",
+        contentIndex: 0,
+        partial: {},
+      },
+    });
+
+    session.emit({
+      type: "tool_execution_start",
+      toolName: "bash",
+      toolCallId: "1",
+      args: {},
+    });
+
+    session.emit({
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "thinking_delta",
+        delta: "rethink\n",
+        contentIndex: 0,
+        partial: {},
+      },
+    });
+
+    expect(stream.chunks).toEqual(["> think\n", "🔧 bash", "\n> rethink\n"]);
+    unsub();
+  });
+
   it("streams consecutive text_delta without adding newlines", () => {
     const session = createMockSession();
     const stream = createMockStream();
