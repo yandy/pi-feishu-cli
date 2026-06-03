@@ -19,7 +19,7 @@ describe("loadConfig", () => {
     process.env.FEISHU_APP_ID = "env-id";
     process.env.FEISHU_APP_SECRET = "env-secret";
     try {
-      const cfg = loadConfig({});
+      const cfg = loadConfig({ config: join(tmpDir, ".nonexistent.json") });
       expect(cfg.appId).toBe("env-id");
       expect(cfg.appSecret).toBe("env-secret");
     } finally {
@@ -161,7 +161,7 @@ describe("loadConfig", () => {
     delete process.env.FEISHU_APP_ID;
     delete process.env.FEISHU_APP_SECRET;
     try {
-      expect(() => loadConfig({})).toThrow("Feishu credentials not configured");
+      expect(() => loadConfig({ config: join(tmpDir, ".nonexistent.json") })).toThrow("Feishu credentials not configured");
     } finally {
       process.env.FEISHU_APP_ID = prevId;
       process.env.FEISHU_APP_SECRET = prevSecret;
