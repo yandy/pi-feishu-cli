@@ -64,23 +64,25 @@ export async function buildModelsCard(
     const key = modelKey(model);
     elements.push(createDividerBlock());
     elements.push(createMarkdownBlock(`**${key}**`));
-    elements.push({
-      tag: "action",
-      actions: THINKING_LEVELS.map((level) => ({
-        tag: "button" as const,
-        text: { tag: "plain_text" as const, content: THINKING_LABELS[level] },
+    for (const level of THINKING_LEVELS) {
+      elements.push({
+        tag: "button",
+        text: { tag: "plain_text", content: THINKING_LABELS[level] },
         type: (level === currentThink ? "primary" : "default") as
           | "primary"
           | "default",
-        value: {
-          cmd: "model",
-          action: "select",
-          provider: model.provider,
-          modelId: model.id,
-          thinkingLevel: level,
-        },
-      })),
-    });
+        behaviors: [{
+          type: "callback",
+          value: {
+            cmd: "model",
+            action: "select",
+            provider: model.provider,
+            modelId: model.id,
+            thinkingLevel: level,
+          },
+        }],
+      });
+    }
   }
 
   return buildCard(createCardHeader("Model 管理", "blue"), elements);

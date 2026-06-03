@@ -20,26 +20,16 @@ export function buildHelpCard(botName: string): Record<string, unknown> {
     ),
     createDividerBlock(),
     createMarkdownBlock("**可用命令**"),
-    {
-      tag: "action",
-      actions: [
-        createActionButton(
-          "管理会话",
-          { cmd: "help", action: "sessions" },
-          "primary",
-        ),
-      ],
-    },
-    {
-      tag: "action",
-      actions: [
-        createActionButton(
-          "选择模型",
-          { cmd: "help", action: "models" },
-          "primary",
-        ),
-      ],
-    },
+    createActionButton(
+      "管理会话",
+      { cmd: "help", action: "sessions" },
+      "primary",
+    ),
+    createActionButton(
+      "选择模型",
+      { cmd: "help", action: "models" },
+      "primary",
+    ),
     createMarkdownBlock("/help · 显示此帮助"),
     createNoteBlock("💡 对话历史自动保存，可随时点击上方按钮管理"),
   ];

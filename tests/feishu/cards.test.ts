@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildHelpCard } from "../../src/feishu/cards/help.js";
 import {
   buildCard,
+  type CardButton,
   createActionButton,
   createCardHeader,
   createDividerBlock,
@@ -26,7 +27,7 @@ describe("card helpers", () => {
       "Click",
       { cmd: "test", action: "go" },
       "primary",
-    );
+    ) as CardButton;
     expect(b.tag).toBe("button");
     expect(b.text).toEqual({ tag: "plain_text", content: "Click" });
     expect(b.type).toBe("primary");

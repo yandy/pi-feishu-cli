@@ -4,20 +4,19 @@ export interface CardHeader {
 }
 
 export interface CardConfig {
-  wide_screen_mode?: boolean;
+  width_mode?: "fill" | "compact";
 }
 
 export type CardElement =
-  | { tag: "div"; text?: { tag: "lark_md"; content: string } }
+  | { tag: "markdown"; content: string }
   | { tag: "hr" }
-  | { tag: "action"; actions: CardButton[] }
-  | { tag: "note"; elements: { tag: "plain_text"; content: string }[] };
+  | CardButton;
 
 export interface CardButton {
   tag: "button";
   text: { tag: "plain_text"; content: string };
   type?: "primary" | "default" | "danger";
-  value: Record<string, unknown>;
+  behaviors: { type: "callback"; value: Record<string, unknown> }[];
 }
 
 export function createCardHeader(title: string, template?: string): CardHeader {
@@ -30,8 +29,8 @@ export function createCardHeader(title: string, template?: string): CardHeader {
 
 export function createMarkdownBlock(content: string): CardElement {
   return {
-    tag: "div",
-    text: { tag: "lark_md", content },
+    tag: "markdown",
+    content,
   };
 }
 
@@ -39,12 +38,12 @@ export function createActionButton(
   text: string,
   value: Record<string, unknown>,
   type: "primary" | "default" | "danger" = "default",
-): CardButton {
+): CardElement {
   return {
     tag: "button",
     text: { tag: "plain_text", content: text },
     type,
-    value,
+    behaviors: [{ type: "callback", value }],
   };
 }
 
@@ -53,10 +52,7 @@ export function createDividerBlock(): CardElement {
 }
 
 export function createNoteBlock(content: string): CardElement {
-  return {
-    tag: "note",
-    elements: [{ tag: "plain_text", content }],
-  };
+  return createMarkdownBlock(content);
 }
 
 export function buildCard(
@@ -64,8 +60,9 @@ export function buildCard(
   elements: CardElement[],
 ): Record<string, unknown> {
   return {
-    config: { wide_screen_mode: true, update_multi: true },
+    schema: "2.0",
+    config: { update_multi: true, width_mode: "full" },
     header,
-    elements,
+    body: { elements },
   };
 }
