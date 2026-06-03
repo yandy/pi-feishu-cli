@@ -1,10 +1,10 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import {
   buildCard,
-  createCardHeader,
-  createMarkdownBlock,
-  createDividerBlock,
   type CardElement,
+  createCardHeader,
+  createDividerBlock,
+  createMarkdownBlock,
 } from "./helpers.js";
 
 type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -19,7 +19,14 @@ export interface ModelCardOptions {
   availableModels: Model[];
 }
 
-const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const THINKING_LEVELS: ThinkingLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+];
 
 const THINKING_LABELS: Record<ThinkingLevel, string> = {
   off: "off",
@@ -34,7 +41,9 @@ function modelKey(model: Model): string {
   return `${model.provider}/${model.id}`;
 }
 
-export async function buildModelsCard(options: ModelCardOptions): Promise<Record<string, unknown>> {
+export async function buildModelsCard(
+  options: ModelCardOptions,
+): Promise<Record<string, unknown>> {
   const { session, availableModels } = options;
 
   const currentModel = session.model;
@@ -60,8 +69,16 @@ export async function buildModelsCard(options: ModelCardOptions): Promise<Record
       actions: THINKING_LEVELS.map((level) => ({
         tag: "button" as const,
         text: { tag: "plain_text" as const, content: THINKING_LABELS[level] },
-        type: (level === currentThink ? "primary" : "default") as "primary" | "default",
-        value: { cmd: "model", action: "select", provider: model.provider, modelId: model.id, thinkingLevel: level },
+        type: (level === currentThink ? "primary" : "default") as
+          | "primary"
+          | "default",
+        value: {
+          cmd: "model",
+          action: "select",
+          provider: model.provider,
+          modelId: model.id,
+          thinkingLevel: level,
+        },
       })),
     });
   }

@@ -2,7 +2,14 @@
   "name": "pi-feishu-cli",
   "version": "1.1.0",
   "description": "Pi AI agent with Feishu bot integration",
-  "keywords": ["pi", "feishu", "lark", "ai", "agent", "cli"],
+  "keywords": [
+    "pi",
+    "feishu",
+    "lark",
+    "ai",
+    "agent",
+    "cli"
+  ],
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -22,6 +29,7 @@
     "typebox": "*"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
@@ -30,6 +38,7 @@
     "dev": "tsc --watch",
     "build": "tsc",
     "check": "tsc --noEmit",
+    "lint": "biome check --write",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "npm run build"

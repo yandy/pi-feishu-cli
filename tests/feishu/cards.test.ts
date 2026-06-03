@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
-import {
-  createCardHeader,
-  createMarkdownBlock,
-  createActionButton,
-  createDividerBlock,
-  createNoteBlock,
-  buildCard,
-} from "../../src/feishu/cards/helpers.js";
+import { describe, expect, it } from "vitest";
 import { buildHelpCard } from "../../src/feishu/cards/help.js";
+import {
+  buildCard,
+  createActionButton,
+  createCardHeader,
+  createDividerBlock,
+  createMarkdownBlock,
+  createNoteBlock,
+} from "../../src/feishu/cards/helpers.js";
 
 describe("card helpers", () => {
   it("createCardHeader returns header with title", () => {
@@ -25,7 +25,11 @@ describe("card helpers", () => {
   });
 
   it("createActionButton returns button with value", () => {
-    const b = createActionButton("Click", { cmd: "test", action: "go" }, "primary");
+    const b = createActionButton(
+      "Click",
+      { cmd: "test", action: "go" },
+      "primary",
+    );
     expect(b.tag).toBe("button");
     expect(b.text).toEqual({ tag: "plain_text", content: "Click" });
     expect(b.type).toBe("primary");
@@ -63,7 +67,9 @@ describe("help card", () => {
     const markdownBlocks = (card.elements as any[]).filter(
       (e: any) => e.tag === "div" && e.text?.tag === "lark_md",
     );
-    expect(markdownBlocks.some((b: any) => b.text.content.includes("TestBot"))).toBe(true);
+    expect(
+      markdownBlocks.some((b: any) => b.text.content.includes("TestBot")),
+    ).toBe(true);
   });
 
   it("help card has session and model action buttons", () => {
@@ -72,8 +78,14 @@ describe("help card", () => {
       (e: any) => e.tag === "action",
     );
     expect(actionBlocks.length).toBeGreaterThanOrEqual(2);
-    expect(actionBlocks[0].actions[0].value).toMatchObject({ cmd: "help", action: "sessions" });
-    expect(actionBlocks[1].actions[0].value).toMatchObject({ cmd: "help", action: "models" });
+    expect(actionBlocks[0].actions[0].value).toMatchObject({
+      cmd: "help",
+      action: "sessions",
+    });
+    expect(actionBlocks[1].actions[0].value).toMatchObject({
+      cmd: "help",
+      action: "models",
+    });
   });
 });
 
@@ -90,15 +102,25 @@ describe("models card", () => {
   ];
 
   it("uses short thinking labels without 'Think:' prefix", async () => {
-    const card = await buildModelsCard({ session: mockSession as any, availableModels: mockModels });
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: mockModels,
+    });
     const divs = (card.elements as any[]).filter((e: any) => e.tag === "div");
-    const currentDiv = divs.find((d: any) => d.text?.content?.includes("test/gpt-4"));
+    const currentDiv = divs.find((d: any) =>
+      d.text?.content?.includes("test/gpt-4"),
+    );
     expect(currentDiv?.text?.content).not.toContain("Thinking:");
   });
 
   it("action buttons use short labels", async () => {
-    const card = await buildModelsCard({ session: mockSession as any, availableModels: mockModels });
-    const actions = (card.elements as any[]).filter((e: any) => e.tag === "action");
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: mockModels,
+    });
+    const actions = (card.elements as any[]).filter(
+      (e: any) => e.tag === "action",
+    );
     expect(actions.length).toBeGreaterThan(0);
     const buttons = actions[0].actions;
     const buttonTexts = buttons.map((b: any) => b.text.content);
@@ -110,17 +132,25 @@ describe("models card", () => {
   });
 
   it("has dividers between model groups", async () => {
-    const card = await buildModelsCard({ session: mockSession as any, availableModels: mockModels });
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: mockModels,
+    });
     const hrs = (card.elements as any[]).filter((e: any) => e.tag === "hr");
     expect(hrs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("model names are bolded", async () => {
-    const card = await buildModelsCard({ session: mockSession as any, availableModels: mockModels });
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: mockModels,
+    });
     const divs = (card.elements as any[]).filter((e: any) => e.tag === "div");
     const boldModelNames = divs.filter((d: any) => {
       const c = d.text?.content || "";
-      return c.includes("**openai/gpt-4**") || c.includes("**anthropic/claude-3**");
+      return (
+        c.includes("**openai/gpt-4**") || c.includes("**anthropic/claude-3**")
+      );
     });
     expect(boldModelNames.length).toBe(2);
   });

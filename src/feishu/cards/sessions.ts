@@ -1,11 +1,14 @@
-import type { AgentSessionRuntime, SessionInfo } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentSessionRuntime,
+  SessionInfo,
+} from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
   buildCard,
-  createCardHeader,
-  createMarkdownBlock,
-  createDividerBlock,
   type CardElement,
+  createCardHeader,
+  createDividerBlock,
+  createMarkdownBlock,
 } from "./helpers.js";
 
 export interface SessionCardOptions {
@@ -27,11 +30,13 @@ function relativeTime(date: Date): string {
 
 function sessionLabel(s: SessionInfo): string {
   const title = s.name || s.firstMessage || "(空会话)";
-  const truncated = title.length > 40 ? title.slice(0, 37) + "..." : title;
+  const truncated = title.length > 40 ? `${title.slice(0, 37)}...` : title;
   return `${truncated}  ·  ${s.messageCount}条  ·  ${relativeTime(s.modified)}`;
 }
 
-export async function buildSessionsCard(options: SessionCardOptions): Promise<Record<string, unknown>> {
+export async function buildSessionsCard(
+  options: SessionCardOptions,
+): Promise<Record<string, unknown>> {
   const { runtime, cwd } = options;
 
   const currentSessionPath = runtime.session.sessionFile;
@@ -40,7 +45,9 @@ export async function buildSessionsCard(options: SessionCardOptions): Promise<Re
 
   const elements: (CardElement | Record<string, unknown>)[] = [];
 
-  const currentInfo = projectSessions.find(s => s.path === currentSessionPath);
+  const currentInfo = projectSessions.find(
+    (s) => s.path === currentSessionPath,
+  );
   const currentLabel = currentInfo
     ? sessionLabel(currentInfo)
     : runtime.session.sessionName || runtime.session.sessionId || "(未命名)";
@@ -61,8 +68,18 @@ export async function buildSessionsCard(options: SessionCardOptions): Promise<Re
       elements.push({
         tag: "action",
         actions: [
-          { tag: "button", text: { tag: "plain_text", content: "切换" }, type: "default", value: { cmd: "session", action: "switch", sessionPath: s.path } },
-          { tag: "button", text: { tag: "plain_text", content: "删除" }, type: "danger", value: { cmd: "session", action: "delete", sessionPath: s.path } },
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "切换" },
+            type: "default",
+            value: { cmd: "session", action: "switch", sessionPath: s.path },
+          },
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "删除" },
+            type: "danger",
+            value: { cmd: "session", action: "delete", sessionPath: s.path },
+          },
         ],
       });
     }
@@ -72,9 +89,17 @@ export async function buildSessionsCard(options: SessionCardOptions): Promise<Re
   elements.push({
     tag: "action",
     actions: [
-      { tag: "button", text: { tag: "plain_text", content: "新建 Session" }, type: "primary", value: { cmd: "session", action: "new" } },
+      {
+        tag: "button",
+        text: { tag: "plain_text", content: "新建 Session" },
+        type: "primary",
+        value: { cmd: "session", action: "new" },
+      },
     ],
   });
 
-  return buildCard(createCardHeader("Session 管理", "blue"), elements as CardElement[]);
+  return buildCard(
+    createCardHeader("Session 管理", "blue"),
+    elements as CardElement[],
+  );
 }

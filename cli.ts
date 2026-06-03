@@ -4,8 +4,8 @@
 // This file is compiled by tsc to dist/cli.js
 // import.meta is available because the package is "type": "module"
 
-import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { main } from "./src/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +88,9 @@ main({
   noBundleFeishuSkills: cliArgs.noBundleFeishuSkills,
   packageRoot,
 }).catch((err) => {
-  console.error("Fatal error:", err instanceof Error ? err.message : String(err));
+  console.error(
+    "Fatal error:",
+    err instanceof Error ? err.message : String(err),
+  );
   process.exit(1);
 });

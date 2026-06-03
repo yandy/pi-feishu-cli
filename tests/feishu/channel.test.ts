@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LOG_LEVEL_MAP, LoggerLevel, createChannel } from "../../src/feishu/channel.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createChannel,
+  LOG_LEVEL_MAP,
+  LoggerLevel,
+} from "../../src/feishu/channel.js";
 
 const mockDispatcher = { register: vi.fn().mockReturnThis() };
 const mockRawChannel = {
@@ -10,7 +14,9 @@ const mockRawChannel = {
   send: vi.fn(),
   stream: vi.fn(),
   updateCard: vi.fn(),
-  get connected() { return false; },
+  get connected() {
+    return false;
+  },
   dispatcher: mockDispatcher,
   rawClient: {
     im: { v1: { messageResource: { get: vi.fn() } } },
@@ -38,7 +44,7 @@ describe("log level mapping", () => {
   });
 
   it("defaults to warn for unknown level strings", () => {
-    const loggerLevel = LOG_LEVEL_MAP["invalid"] ?? LoggerLevel.warn;
+    const loggerLevel = LOG_LEVEL_MAP.invalid ?? LoggerLevel.warn;
     expect(loggerLevel).toBe(LoggerLevel.warn);
   });
 });
@@ -64,24 +70,30 @@ describe("createChannel", () => {
   it("registers a no-op handler for im.message.message_read_v1 on creation", () => {
     createChannel({ appId: "test", appSecret: "secret" });
 
-    expect(mockDispatcher.register).toHaveBeenCalledWith(
-      { "im.message.message_read_v1": expect.any(Function) },
-    );
+    expect(mockDispatcher.register).toHaveBeenCalledWith({
+      "im.message.message_read_v1": expect.any(Function),
+    });
   });
 
   describe("downloadMessageResource", () => {
     it("calls messageResource.get and returns Buffer from stream", async () => {
       const channel = createChannel({ appId: "test", appSecret: "secret" });
-      const mockStream = async function*() {
+      const mockStream = (async function* () {
         yield Buffer.from("hello");
         yield Buffer.from("world");
-      }();
+      })();
       mockRawChannel.rawClient.im.v1.messageResource.get.mockResolvedValue({
         getReadableStream: () => mockStream,
       });
 
-      const result = await channel.downloadMessageResource("msg-1", "file-1", "image");
-      expect(mockRawChannel.rawClient.im.v1.messageResource.get).toHaveBeenCalledWith({
+      const result = await channel.downloadMessageResource(
+        "msg-1",
+        "file-1",
+        "image",
+      );
+      expect(
+        mockRawChannel.rawClient.im.v1.messageResource.get,
+      ).toHaveBeenCalledWith({
         path: { message_id: "msg-1", file_key: "file-1" },
         params: { type: "image" },
       });
@@ -91,14 +103,18 @@ describe("createChannel", () => {
 
     it("handles non-Buffer chunks from stream", async () => {
       const channel = createChannel({ appId: "test", appSecret: "secret" });
-      const mockStream = async function*() {
+      const mockStream = (async function* () {
         yield "string-chunk";
-      }();
+      })();
       mockRawChannel.rawClient.im.v1.messageResource.get.mockResolvedValue({
         getReadableStream: () => mockStream,
       });
 
-      const result = await channel.downloadMessageResource("msg-2", "file-2", "file");
+      const result = await channel.downloadMessageResource(
+        "msg-2",
+        "file-2",
+        "file",
+      );
       expect(result.toString()).toBe("string-chunk");
     });
   });

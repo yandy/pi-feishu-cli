@@ -1,4 +1,4 @@
-import { writeFile, mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Channel, NormalizedMessage } from "./channel.js";
 
@@ -61,23 +61,35 @@ export async function processAttachments(
     if (res.type === "image") {
       if (supportedInput.includes("image")) {
         try {
-          const buf = await channel.downloadMessageResource(msg.messageId, res.fileKey, res.type);
+          const buf = await channel.downloadMessageResource(
+            msg.messageId,
+            res.fileKey,
+            res.type,
+          );
           images.push({
             type: "image",
             data: buf.toString("base64"),
             mimeType: inferMime(fileName),
           });
         } catch (err) {
-          textParts.push(`[图片: ${fileName} 下载失败: ${(err as Error).message}]`);
+          textParts.push(
+            `[图片: ${fileName} 下载失败: ${(err as Error).message}]`,
+          );
         }
       } else {
         try {
-          const buf = await channel.downloadMessageResource(msg.messageId, res.fileKey, res.type);
+          const buf = await channel.downloadMessageResource(
+            msg.messageId,
+            res.fileKey,
+            res.type,
+          );
           const filePath = join(downloadDir, fileName);
           await writeFile(filePath, buf);
           textParts.push(`[图片: ${fileName} 已保存到 ${filePath}]`);
         } catch (err) {
-          textParts.push(`[图片: ${fileName} 下载失败: ${(err as Error).message}]`);
+          textParts.push(
+            `[图片: ${fileName} 下载失败: ${(err as Error).message}]`,
+          );
         }
       }
       continue;
@@ -86,7 +98,11 @@ export async function processAttachments(
     const isAudioVideo = res.type === "audio" || res.type === "video";
 
     try {
-      const buf = await channel.downloadMessageResource(msg.messageId, res.fileKey, res.type);
+      const buf = await channel.downloadMessageResource(
+        msg.messageId,
+        res.fileKey,
+        res.type,
+      );
 
       if (!isAudioVideo && buf.length <= TEXT_SIZE_LIMIT && isTextBuffer(buf)) {
         const content = buf.toString("utf-8");
@@ -95,15 +111,21 @@ export async function processAttachments(
         const filePath = join(downloadDir, fileName);
         await writeFile(filePath, buf);
         const label = isAudioVideo
-          ? (res.type === "audio" ? "音频" : "视频")
+          ? res.type === "audio"
+            ? "音频"
+            : "视频"
           : "文件";
         textParts.push(`[${label}: ${fileName} 已保存到 ${filePath}]`);
       }
     } catch (err) {
       const label = isAudioVideo
-        ? (res.type === "audio" ? "音频" : "视频")
+        ? res.type === "audio"
+          ? "音频"
+          : "视频"
         : "文件";
-      textParts.push(`[${label}: ${fileName} 下载失败: ${(err as Error).message}]`);
+      textParts.push(
+        `[${label}: ${fileName} 下载失败: ${(err as Error).message}]`,
+      );
     }
   }
 

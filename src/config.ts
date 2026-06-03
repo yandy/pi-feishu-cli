@@ -1,6 +1,6 @@
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import type { FeishuConfig } from "./types.js";
 
@@ -27,12 +27,19 @@ function loadFileConfig(path: string): FeishuConfig | null {
   try {
     const raw = readFileSync(path, "utf-8");
     const parsed = JSON.parse(raw);
-    if (parsed.appId && typeof parsed.appId === "string" && parsed.appSecret && typeof parsed.appSecret === "string") {
+    if (
+      parsed.appId &&
+      typeof parsed.appId === "string" &&
+      parsed.appSecret &&
+      typeof parsed.appSecret === "string"
+    ) {
       return {
         appId: parsed.appId,
         appSecret: parsed.appSecret,
         ...(parsed.botName ? { botName: parsed.botName } : {}),
-        ...(parsed.noBundleFeishuSkills !== undefined ? { noBundleFeishuSkills: parsed.noBundleFeishuSkills } : {}),
+        ...(parsed.noBundleFeishuSkills !== undefined
+          ? { noBundleFeishuSkills: parsed.noBundleFeishuSkills }
+          : {}),
       };
     }
     return null;
@@ -44,11 +51,14 @@ function loadFileConfig(path: string): FeishuConfig | null {
 export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   const envConfig: Partial<FeishuConfig> = {};
   if (process.env.FEISHU_APP_ID) envConfig.appId = process.env.FEISHU_APP_ID;
-  if (process.env.FEISHU_APP_SECRET) envConfig.appSecret = process.env.FEISHU_APP_SECRET;
-  if (process.env.FEISHU_BOT_NAME) envConfig.botName = process.env.FEISHU_BOT_NAME;
+  if (process.env.FEISHU_APP_SECRET)
+    envConfig.appSecret = process.env.FEISHU_APP_SECRET;
+  if (process.env.FEISHU_BOT_NAME)
+    envConfig.botName = process.env.FEISHU_BOT_NAME;
 
   let fileConfig: FeishuConfig | null = null;
-  const configPath = options.config ?? findConfigFile(options.cwd ?? process.cwd());
+  const configPath =
+    options.config ?? findConfigFile(options.cwd ?? process.cwd());
   if (configPath) {
     fileConfig = loadFileConfig(configPath);
   }
@@ -58,17 +68,20 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   if (options.appSecret) cliConfig.appSecret = options.appSecret;
 
   const appId = cliConfig.appId ?? fileConfig?.appId ?? envConfig.appId;
-  const appSecret = cliConfig.appSecret ?? fileConfig?.appSecret ?? envConfig.appSecret;
+  const appSecret =
+    cliConfig.appSecret ?? fileConfig?.appSecret ?? envConfig.appSecret;
 
   if (!appId || !appSecret) {
     throw new Error(
       "Feishu credentials not configured. Set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, " +
-      "create .pi/feishu.json or ~/.pi/agent/feishu.json, or pass --app-id/--app-secret CLI args.",
+        "create .pi/feishu.json or ~/.pi/agent/feishu.json, or pass --app-id/--app-secret CLI args.",
     );
   }
 
   const cliNoBundle = options.noBundleFeishuSkills;
-  const envNoBundle = process.env.FEISHU_NO_BUNDLE_SKILLS === "1" || process.env.FEISHU_NO_BUNDLE_SKILLS === "true";
+  const envNoBundle =
+    process.env.FEISHU_NO_BUNDLE_SKILLS === "1" ||
+    process.env.FEISHU_NO_BUNDLE_SKILLS === "true";
   const fileNoBundle = fileConfig?.noBundleFeishuSkills;
 
   return {
@@ -99,7 +112,9 @@ async function readNonEmpty(question: string): Promise<string> {
   }
 }
 
-export async function promptAndSaveCredentials(savePath?: string): Promise<FeishuConfig> {
+export async function promptAndSaveCredentials(
+  savePath?: string,
+): Promise<FeishuConfig> {
   const appId = await readNonEmpty("Feishu App ID: ");
   const appSecret = await readNonEmpty("Feishu App Secret: ");
 
