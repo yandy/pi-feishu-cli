@@ -276,15 +276,12 @@ async function handleCardAction(
       }
     }
     const card = await buildSessionsCard({ runtime, cwd });
-    if (messageId) {
-      try {
-        await channel.updateCard(messageId, card);
-      } catch (err) {
-        console.error("updateCard failed, sending reply:", (err as Error).message);
-        if (chatId) await channel.send(chatId, { card }, { replyTo: messageId });
+    if (chatId) {
+      if (messageId) {
+        await channel.send(chatId, { card }, { replyTo: messageId! });
+      } else {
+        await channel.send(chatId, { card });
       }
-    } else if (chatId) {
-      await channel.send(chatId, { card });
     }
   } else if (cmd === "model" && action === "select") {
     const { provider, modelId, thinkingLevel } = value;
@@ -302,15 +299,12 @@ async function handleCardAction(
         (m): m is NonNullable<typeof m> => m != null,
       ),
     });
-    if (messageId) {
-      try {
-        await channel.updateCard(messageId, card);
-      } catch (err) {
-        console.error("updateCard failed, sending reply:", (err as Error).message);
-        if (chatId) await channel.send(chatId, { card }, { replyTo: messageId });
+    if (chatId) {
+      if (messageId) {
+        await channel.send(chatId, { card }, { replyTo: messageId! });
+      } else {
+        await channel.send(chatId, { card });
       }
-    } else if (chatId) {
-      await channel.send(chatId, { card });
     }
   }
 }
