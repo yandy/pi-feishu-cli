@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { processAttachments } from "../../src/feishu/attachments.js";
 import type { NormalizedMessage } from "../../src/feishu/channel.js";
 
@@ -21,7 +21,11 @@ function testMsg(resources: any[]): NormalizedMessage {
 describe("processAttachments", () => {
   it("returns empty result when msg has no resources", async () => {
     const channel = { downloadMessageResource: vi.fn() };
-    const result = await processAttachments(channel as any, testMsg([]), "/tmp/test");
+    const result = await processAttachments(
+      channel as any,
+      testMsg([]),
+      "/tmp/test",
+    );
     expect(result.images).toEqual([]);
     expect(result.text).toBe("");
   });
@@ -37,7 +41,11 @@ describe("processAttachments", () => {
     ]);
     const result = await processAttachments(channel as any, msg, "/tmp/test");
 
-    expect(channel.downloadMessageResource).toHaveBeenCalledWith("msg-1", "img-1", "image");
+    expect(channel.downloadMessageResource).toHaveBeenCalledWith(
+      "msg-1",
+      "img-1",
+      "image",
+    );
     expect(result.images).toHaveLength(1);
     expect(result.images[0].type).toBe("image");
     expect(result.images[0].mimeType).toBe("image/png");
@@ -60,16 +68,14 @@ describe("processAttachments", () => {
       const channel = {
         downloadMessageResource: vi.fn().mockResolvedValue(Buffer.from("x")),
       };
-      const msg = testMsg([
-        { type: "image", fileKey: "k", fileName },
-      ]);
+      const msg = testMsg([{ type: "image", fileKey: "k", fileName }]);
       const result = await processAttachments(channel as any, msg, "/tmp/test");
       expect(result.images[0].mimeType).toBe(expectedMime);
     }
   });
 
   it("reads small text file and includes content in text", async () => {
-    const textContent = 'const x = 1;\nconsole.log(x);';
+    const textContent = "const x = 1;\nconsole.log(x);";
     const buffer = Buffer.from(textContent, "utf-8");
     const channel = {
       downloadMessageResource: vi.fn().mockResolvedValue(buffer),
@@ -104,7 +110,8 @@ describe("processAttachments", () => {
     const pngBuffer = Buffer.from("png");
     const textBuffer = Buffer.from("hello", "utf-8");
     const channel = {
-      downloadMessageResource: vi.fn()
+      downloadMessageResource: vi
+        .fn()
         .mockResolvedValueOnce(pngBuffer)
         .mockResolvedValueOnce(textBuffer),
     };
@@ -122,7 +129,9 @@ describe("processAttachments", () => {
 
   it("handles download errors gracefully", async () => {
     const channel = {
-      downloadMessageResource: vi.fn().mockRejectedValue(new Error("download failed")),
+      downloadMessageResource: vi
+        .fn()
+        .mockRejectedValue(new Error("download failed")),
     };
 
     const msg = testMsg([
@@ -135,7 +144,11 @@ describe("processAttachments", () => {
   });
 
   it("detects binary files by null bytes in first 4096 bytes", async () => {
-    const binaryBuffer = Buffer.concat([Buffer.from("text"), Buffer.from([0x00]), Buffer.from("binary")]);
+    const binaryBuffer = Buffer.concat([
+      Buffer.from("text"),
+      Buffer.from([0x00]),
+      Buffer.from("binary"),
+    ]);
     const channel = {
       downloadMessageResource: vi.fn().mockResolvedValue(binaryBuffer),
     };
@@ -152,12 +165,12 @@ describe("processAttachments", () => {
 
   it("falls back to fileKey.bin when fileName is missing", async () => {
     const channel = {
-      downloadMessageResource: vi.fn().mockResolvedValue(Buffer.from("text", "utf-8")),
+      downloadMessageResource: vi
+        .fn()
+        .mockResolvedValue(Buffer.from("text", "utf-8")),
     };
 
-    const msg = testMsg([
-      { type: "file", fileKey: "file-1" },
-    ]);
+    const msg = testMsg([{ type: "file", fileKey: "file-1" }]);
     const result = await processAttachments(channel as any, msg, "/tmp/test");
 
     expect(result.text).toContain("[文件内容: file-1.bin]");
@@ -165,7 +178,9 @@ describe("processAttachments", () => {
 
   it("handles audio/video by saving and including path", async () => {
     const channel = {
-      downloadMessageResource: vi.fn().mockResolvedValue(Buffer.from("audio-data")),
+      downloadMessageResource: vi
+        .fn()
+        .mockResolvedValue(Buffer.from("audio-data")),
     };
 
     const msg = testMsg([
@@ -188,7 +203,11 @@ describe("processAttachments", () => {
     await processAttachments(channel as any, msg, "/tmp/test");
 
     expect(channel.downloadMessageResource).toHaveBeenCalledTimes(1);
-    expect(channel.downloadMessageResource).toHaveBeenCalledWith("msg-1", "img-1", "image");
+    expect(channel.downloadMessageResource).toHaveBeenCalledWith(
+      "msg-1",
+      "img-1",
+      "image",
+    );
   });
 
   it("text-only 模型下图片保存到文件并在 text 中提示路径", async () => {
@@ -200,9 +219,15 @@ describe("processAttachments", () => {
     const msg = testMsg([
       { type: "image", fileKey: "img-1", fileName: "photo.png" },
     ]);
-    const result = await processAttachments(channel as any, msg, "/tmp/test", ["text"]);
+    const result = await processAttachments(channel as any, msg, "/tmp/test", [
+      "text",
+    ]);
 
-    expect(channel.downloadMessageResource).toHaveBeenCalledWith("msg-1", "img-1", "image");
+    expect(channel.downloadMessageResource).toHaveBeenCalledWith(
+      "msg-1",
+      "img-1",
+      "image",
+    );
     expect(result.images).toHaveLength(0);
     expect(result.text).toContain("[图片: photo.png");
     expect(result.text).toContain("/tmp/test/photo.png");

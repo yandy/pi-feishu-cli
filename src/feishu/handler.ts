@@ -1,6 +1,6 @@
 import type { AgentSessionRuntime } from "@earendil-works/pi-coding-agent";
-import type { NormalizedMessage } from "./channel.js";
 import type { ProcessedAttachments } from "./attachments.js";
+import type { NormalizedMessage } from "./channel.js";
 
 export type FeishuCommandHandler = (chatId: string) => Promise<void>;
 
@@ -9,7 +9,10 @@ export function createMessageHandler(
   handleSessions: FeishuCommandHandler,
   handleModels: FeishuCommandHandler,
   handleHelp: FeishuCommandHandler,
-): (msg: NormalizedMessage, attachments?: ProcessedAttachments) => Promise<void> {
+): (
+  msg: NormalizedMessage,
+  attachments?: ProcessedAttachments,
+) => Promise<void> {
   return async (msg: NormalizedMessage, attachments?: ProcessedAttachments) => {
     const content = msg.content.trim();
 
@@ -39,7 +42,10 @@ export function createMessageHandler(
 
     await runtime.session.prompt(fullText, {
       streamingBehavior: "steer",
-      images: attachments?.images && attachments.images.length > 0 ? attachments.images : undefined,
+      images:
+        attachments?.images && attachments.images.length > 0
+          ? attachments.images
+          : undefined,
     });
   };
 }

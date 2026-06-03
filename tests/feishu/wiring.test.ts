@@ -1,12 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockProcessAttachments, mockCreateStreamingHandler } = vi.hoisted(() => ({
-  mockProcessAttachments: vi.fn().mockResolvedValue({
-    images: [{ type: "image" as const, data: "base64", mimeType: "image/png" }],
-    text: "[文件: test.txt 已保存到 /tmp/pi-feishu/test/test.txt]",
+const { mockProcessAttachments, mockCreateStreamingHandler } = vi.hoisted(
+  () => ({
+    mockProcessAttachments: vi.fn().mockResolvedValue({
+      images: [
+        { type: "image" as const, data: "base64", mimeType: "image/png" },
+      ],
+      text: "[文件: test.txt 已保存到 /tmp/pi-feishu/test/test.txt]",
+    }),
+    mockCreateStreamingHandler: vi.fn(() => vi.fn()),
   }),
-  mockCreateStreamingHandler: vi.fn(() => vi.fn()),
-}));
+);
 
 vi.mock("../../src/feishu/attachments.js", () => ({
   processAttachments: mockProcessAttachments,
@@ -23,10 +27,13 @@ const mockSessionPrompt = vi.fn().mockResolvedValue(undefined);
 function createMockChannel() {
   return {
     on: vi.fn((event: string, handler: Function) => {
-      if (event === "message") (createMockChannel as any)._messageHandler = handler;
+      if (event === "message")
+        (createMockChannel as any)._messageHandler = handler;
     }),
     send: mockChannelSend,
-    stream: mockChannelStream.mockImplementation(async (_chatId, _producer, _opts) => {}),
+    stream: mockChannelStream.mockImplementation(
+      async (_chatId, _producer, _opts) => {},
+    ),
     connect: vi.fn(),
     disconnect: vi.fn(),
     onRawEvent: vi.fn(),
@@ -71,9 +78,7 @@ describe("attachment wiring in message handler", () => {
       chatId: "chat-1",
       content: "check my files",
       rawContentType: "text",
-      resources: [
-        { type: "image", fileKey: "img-1", fileName: "photo.png" },
-      ],
+      resources: [{ type: "image", fileKey: "img-1", fileName: "photo.png" }],
       mentions: [],
       mentionAll: false,
       mentionedBot: false,

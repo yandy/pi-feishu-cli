@@ -1,8 +1,8 @@
 import {
-  createLarkChannel,
-  LoggerLevel,
-  type NormalizedMessage as LarkNormalizedMessage,
   type CardActionEvent,
+  createLarkChannel,
+  type NormalizedMessage as LarkNormalizedMessage,
+  LoggerLevel,
 } from "@larksuiteoapi/node-sdk";
 
 export type { CardActionEvent };
@@ -32,58 +32,105 @@ export interface StreamProducer {
   markdown: (s: StreamController) => Promise<void>;
 }
 
+interface RawLarkChannel {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  send(chatId: string, content: unknown, options?: unknown): Promise<void>;
+  stream(chatId: string, producer: unknown, options?: unknown): Promise<void>;
+  updateCard(messageId: string, card: unknown): Promise<void>;
+  readonly botIdentity: { name: string } | undefined;
+  readonly dispatcher: {
+    register(config: Record<string, (...args: unknown[]) => void>): void;
+  };
+  readonly rawClient: {
+    im: {
+      v1: {
+        messageResource: {
+          get(params: {
+            path: Record<string, string>;
+            params: Record<string, string>;
+          }): Promise<{
+            getReadableStream(): AsyncIterable<Buffer | string>;
+          }>;
+        };
+      };
+    };
+  };
+}
+
 export interface Channel {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   on(event: "message", handler: (msg: NormalizedMessage) => void): void;
-  on(event: "cardAction", handler: (evt: any) => void): void;
+  on(event: "cardAction", handler: (evt: CardActionEvent) => void): void;
   on(event: "error", handler: (err: Error) => void): void;
-  on(event: "reconnecting" | "reconnected" | "botAdded", handler: () => void): void;
-  onRawEvent(type: string, handler: (...args: any[]) => any): void;
-  send(chatId: string, content: { text?: string; markdown?: string; card?: unknown }, options?: { replyTo?: string }): Promise<void>;
-  downloadMessageResource(messageId: string, fileKey: string, type: string): Promise<Buffer>;
-  stream(chatId: string, producer: StreamProducer, options?: { replyTo?: string }): Promise<void>;
+  on(
+    event: "reconnecting" | "reconnected" | "botAdded",
+    handler: () => void,
+  ): void;
+  onRawEvent(type: string, handler: (...args: unknown[]) => void): void;
+  send(
+    chatId: string,
+    content: { text?: string; markdown?: string; card?: unknown },
+    options?: { replyTo?: string },
+  ): Promise<void>;
+  downloadMessageResource(
+    messageId: string,
+    fileKey: string,
+    type: string,
+  ): Promise<Buffer>;
+  stream(
+    chatId: string,
+    producer: StreamProducer,
+    options?: { replyTo?: string },
+  ): Promise<void>;
   updateCard(messageId: string, card: unknown): Promise<void>;
   get botIdentity(): { name: string } | undefined;
   get connected(): boolean;
 }
 
 export function createChannel(options: ChannelOptions): Channel {
-  const loggerLevel = LOG_LEVEL_MAP[options.logLevel?.toLowerCase() ?? ""] ?? LoggerLevel.warn;
+  const loggerLevel =
+    LOG_LEVEL_MAP[options.logLevel?.toLowerCase() ?? ""] ?? LoggerLevel.warn;
   const raw = createLarkChannel({
     appId: options.appId,
     appSecret: options.appSecret,
     loggerLevel,
     policy: { requireMention: true, dmMode: "open" },
-  });
+  }) as unknown as RawLarkChannel;
 
   let _connected = false;
 
-  const channel: Channel = {
-    onRawEvent(type: string, handler: (...args: any[]) => any) {
-      (raw as any).dispatcher.register({ [type]: handler });
+  const channel = {
+    onRawEvent(type: string, handler: (...args: unknown[]) => void) {
+      raw.dispatcher.register({ [type]: handler });
     },
 
     async connect() {
-      await (raw as any).connect();
+      await raw.connect();
       _connected = true;
     },
 
     async disconnect() {
-      await (raw as any).disconnect();
+      await raw.disconnect();
       _connected = false;
     },
 
-    on(event: string, handler: (...args: any[]) => any) {
-      (raw as any).on(event, handler);
+    on(event: string, handler: (...args: unknown[]) => void) {
+      raw.on(event, handler);
     },
 
-    async send(chatId, content, options) {
-      await (raw as any).send(chatId, content, options);
+    async send(chatId: string, content: unknown, options?: unknown) {
+      await raw.send(chatId, content, options);
     },
 
-    async downloadMessageResource(messageId, fileKey, type) {
-      const res = await (raw as any).rawClient.im.v1.messageResource.get({
+    async downloadMessageResource(
+      messageId: string,
+      fileKey: string,
+      type: string,
+    ) {
+      const res = await raw.rawClient.im.v1.messageResource.get({
         path: { message_id: messageId, file_key: fileKey },
         params: { type },
       });
@@ -94,22 +141,26 @@ export function createChannel(options: ChannelOptions): Channel {
       return Buffer.concat(chunks);
     },
 
-    async stream(chatId, producer, options) {
-      await (raw as any).stream(chatId, producer, options);
+    async stream(
+      chatId: string,
+      producer: StreamProducer,
+      options?: { replyTo?: string },
+    ) {
+      await raw.stream(chatId, producer, options);
     },
 
-    async updateCard(messageId, card) {
-      await (raw as any).updateCard(messageId, card);
+    async updateCard(messageId: string, card: unknown) {
+      await raw.updateCard(messageId, card);
     },
 
     get botIdentity() {
-      return (raw as any).botIdentity;
+      return raw.botIdentity;
     },
 
     get connected() {
       return _connected;
     },
-  };
+  } as Channel;
 
   channel.onRawEvent("im.message.message_read_v1", () => {});
 

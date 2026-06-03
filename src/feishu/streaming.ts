@@ -2,18 +2,38 @@ export interface StreamWriter {
   append(chunk: string): Promise<void>;
 }
 
+interface AssistantMessageEvent {
+  type: string;
+  delta?: string;
+  error?: unknown;
+}
+
+interface StreamEvent {
+  type: string;
+  assistantMessageEvent?: AssistantMessageEvent;
+  toolName?: string;
+  partialResult?: unknown;
+  isError?: boolean;
+  attempt?: number;
+  maxAttempts?: number;
+  success?: boolean;
+}
+
 export function createStreamingHandler(
-  session: { subscribe: (listener: (event: any) => void) => () => void },
+  session: {
+    subscribe: (listener: (event: StreamEvent) => void) => () => void;
+  },
   stream: StreamWriter,
 ): () => void {
-  return session.subscribe((event: any) => {
+  return session.subscribe((event: StreamEvent) => {
     switch (event.type) {
       case "message_update": {
         const sub = event.assistantMessageEvent;
+        if (!sub) break;
         if (sub.type === "text_delta") {
-          stream.append(sub.delta);
+          stream.append(sub.delta ?? "");
         } else if (sub.type === "thinking_delta") {
-          stream.append(`> ${sub.delta}`);
+          stream.append(`> ${sub.delta ?? ""}`);
         } else if (sub.type === "error") {
           stream.append("— 模型返回错误 —");
         }
@@ -21,7 +41,7 @@ export function createStreamingHandler(
       }
 
       case "tool_execution_start":
-        stream.append(`🔧 ${event.toolName}`);
+        stream.append(`🔧 ${event.toolName ?? ""}`);
         break;
 
       case "tool_execution_update":
@@ -45,7 +65,9 @@ export function createStreamingHandler(
         break;
 
       case "auto_retry_start":
-        stream.append(`— 自动重试 (${event.attempt}/${event.maxAttempts})... —`);
+        stream.append(
+          `— 自动重试 (${event.attempt}/${event.maxAttempts})... —`,
+        );
         break;
 
       case "auto_retry_end":

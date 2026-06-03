@@ -1,17 +1,17 @@
+import { readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
+  type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
-  getAgentDir,
-  SessionManager,
-  type AgentSessionRuntime,
   createSyntheticSourceInfo,
-  type Skill,
+  getAgentDir,
   type ResourceDiagnostic,
+  SessionManager,
+  type Skill,
 } from "@earendil-works/pi-coding-agent";
-import { readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
 
 export interface InitRuntimeOptions {
   cwd: string;
@@ -26,14 +26,22 @@ export interface InitRuntimeResult {
 
 function loadSkillsFromDir(skillsDir: string): Skill[] {
   const skills: Skill[] = [];
-  try { statSync(skillsDir); } catch { return skills; }
+  try {
+    statSync(skillsDir);
+  } catch {
+    return skills;
+  }
 
   for (const entry of readdirSync(skillsDir)) {
     const fullPath = join(skillsDir, entry);
     const stat = statSync(fullPath);
     if (!stat.isDirectory()) continue;
     const skillMd = join(fullPath, "SKILL.md");
-    try { statSync(skillMd); } catch { continue; }
+    try {
+      statSync(skillMd);
+    } catch {
+      continue;
+    }
     skills.push({
       name: entry,
       description: `Skill from ${entry}`,
@@ -51,7 +59,9 @@ function loadSkillsFromDir(skillsDir: string): Skill[] {
   return skills;
 }
 
-export async function initRuntime(options: InitRuntimeOptions): Promise<InitRuntimeResult> {
+export async function initRuntime(
+  options: InitRuntimeOptions,
+): Promise<InitRuntimeResult> {
   const cwd = resolve(options.cwd);
   const agentDir = options.agentDir ?? getAgentDir();
 
@@ -60,18 +70,29 @@ export async function initRuntime(options: InitRuntimeOptions): Promise<InitRunt
   const skillsDir = join(packageRoot, "skills");
   const customSkills = noBundle ? [] : loadSkillsFromDir(skillsDir);
 
-  const skillsOverride = (current: { skills: Skill[]; diagnostics: ResourceDiagnostic[] }) => ({
+  const skillsOverride = (current: {
+    skills: Skill[];
+    diagnostics: ResourceDiagnostic[];
+  }) => ({
     skills: [...current.skills, ...customSkills],
     diagnostics: current.diagnostics,
   });
 
-  const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd: runtimeCwd, sessionManager, sessionStartEvent }) => {
+  const createRuntime: CreateAgentSessionRuntimeFactory = async ({
+    cwd: runtimeCwd,
+    sessionManager,
+    sessionStartEvent,
+  }) => {
     const services = await createAgentSessionServices({
       cwd: runtimeCwd,
       resourceLoaderOptions: { skillsOverride },
     });
     return {
-      ...(await createAgentSessionFromServices({ services, sessionManager, sessionStartEvent })),
+      ...(await createAgentSessionFromServices({
+        services,
+        sessionManager,
+        sessionStartEvent,
+      })),
       services,
       diagnostics: services.diagnostics,
     };

@@ -1,11 +1,11 @@
 import {
   buildCard,
-  createCardHeader,
-  createMarkdownBlock,
-  createDividerBlock,
-  createActionButton,
-  createNoteBlock,
   type CardElement,
+  createActionButton,
+  createCardHeader,
+  createDividerBlock,
+  createMarkdownBlock,
+  createNoteBlock,
 } from "./helpers.js";
 
 export function buildHelpCard(botName: string): Record<string, unknown> {
@@ -14,22 +14,30 @@ export function buildHelpCard(botName: string): Record<string, unknown> {
     createDividerBlock(),
     createMarkdownBlock(
       "**如何使用**\n" +
-      "· 发送文字、图片、文件等附件，我会理解并回复\n" +
-      "· 回复会实时流式输出\n" +
-      "· 支持多轮对话，上下文保留",
+        "· 发送文字、图片、文件等附件，我会理解并回复\n" +
+        "· 回复会实时流式输出\n" +
+        "· 支持多轮对话，上下文保留",
     ),
     createDividerBlock(),
     createMarkdownBlock("**可用命令**"),
     {
       tag: "action",
       actions: [
-        createActionButton("管理会话", { cmd: "help", action: "sessions" }, "primary"),
+        createActionButton(
+          "管理会话",
+          { cmd: "help", action: "sessions" },
+          "primary",
+        ),
       ],
     },
     {
       tag: "action",
       actions: [
-        createActionButton("选择模型", { cmd: "help", action: "models" }, "primary"),
+        createActionButton(
+          "选择模型",
+          { cmd: "help", action: "models" },
+          "primary",
+        ),
       ],
     },
     createMarkdownBlock("/help · 显示此帮助"),

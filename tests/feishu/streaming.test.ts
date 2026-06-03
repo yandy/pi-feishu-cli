@@ -1,14 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createStreamingHandler } from "../../src/feishu/streaming.js";
 
-function createMockSession(events: any[]) {
+function createMockSession(_events: any[]) {
   let listener: ((e: any) => void) | null = null;
   return {
     subscribe: (fn: (e: any) => void) => {
       listener = fn;
-      return () => { listener = null; };
+      return () => {
+        listener = null;
+      };
     },
-    emit: (e: any) => { listener?.(e); },
+    emit: (e: any) => {
+      listener?.(e);
+    },
   };
 }
 
@@ -16,7 +20,9 @@ function createMockStream() {
   const chunks: string[] = [];
   return {
     chunks,
-    append: vi.fn(async (chunk: string) => { chunks.push(chunk); }),
+    append: vi.fn(async (chunk: string) => {
+      chunks.push(chunk);
+    }),
   };
 }
 
@@ -28,7 +34,12 @@ describe("createStreamingHandler", () => {
 
     session.emit({
       type: "message_update",
-      assistantMessageEvent: { type: "text_delta", delta: "Hello", contentIndex: 0, partial: {} },
+      assistantMessageEvent: {
+        type: "text_delta",
+        delta: "Hello",
+        contentIndex: 0,
+        partial: {},
+      },
     });
 
     expect(stream.append).toHaveBeenCalledWith("Hello");
@@ -42,7 +53,12 @@ describe("createStreamingHandler", () => {
 
     session.emit({
       type: "message_update",
-      assistantMessageEvent: { type: "thinking_delta", delta: "hmm", contentIndex: 0, partial: {} },
+      assistantMessageEvent: {
+        type: "thinking_delta",
+        delta: "hmm",
+        contentIndex: 0,
+        partial: {},
+      },
     });
 
     expect(stream.append).toHaveBeenCalledWith("> hmm");
@@ -54,7 +70,12 @@ describe("createStreamingHandler", () => {
     const stream = createMockStream();
     const unsub = createStreamingHandler(session as any, stream as any);
 
-    session.emit({ type: "tool_execution_start", toolName: "bash", toolCallId: "1", args: {} });
+    session.emit({
+      type: "tool_execution_start",
+      toolName: "bash",
+      toolCallId: "1",
+      args: {},
+    });
 
     expect(stream.append).toHaveBeenCalledWith("🔧 bash");
     unsub();
@@ -65,7 +86,13 @@ describe("createStreamingHandler", () => {
     const stream = createMockStream();
     const unsub = createStreamingHandler(session as any, stream as any);
 
-    session.emit({ type: "tool_execution_update", toolName: "bash", toolCallId: "1", args: {}, partialResult: "output" });
+    session.emit({
+      type: "tool_execution_update",
+      toolName: "bash",
+      toolCallId: "1",
+      args: {},
+      partialResult: "output",
+    });
 
     expect(stream.append).toHaveBeenCalledWith("output");
     unsub();
