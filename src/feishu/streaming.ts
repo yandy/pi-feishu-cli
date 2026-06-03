@@ -30,10 +30,8 @@ export function createStreamingHandler(
   let needLineBreak = false;
 
   const closeThinkBlock = (): string => {
-    let prefix = "";
-    if (inThinkBlock && !needsQuotePrefix) {
-      prefix = "\n";
-    }
+    if (!inThinkBlock) return "";
+    const prefix = needsQuotePrefix ? "\n" : "\n\n";
     inThinkBlock = false;
     needsQuotePrefix = true;
     return prefix;

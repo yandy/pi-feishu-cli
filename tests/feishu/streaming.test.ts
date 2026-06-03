@@ -157,11 +157,11 @@ describe("createStreamingHandler", () => {
       },
     });
 
-    expect(stream.chunks).toEqual(["> think", "\nanswer"]);
+    expect(stream.chunks).toEqual(["> think", "\n\nanswer"]);
     unsub();
   });
 
-  it("does not add extra newline when think ends with newline before text", () => {
+  it("closes blockquote with blank line when think ends with newline before text", () => {
     const session = createMockSession();
     const stream = createMockStream();
     const unsub = createStreamingHandler(session as any, stream as any);
@@ -186,7 +186,7 @@ describe("createStreamingHandler", () => {
       },
     });
 
-    expect(stream.chunks).toEqual(["> think\n", "answer\n"]);
+    expect(stream.chunks).toEqual(["> think\n", "\nanswer\n"]);
     unsub();
   });
 
@@ -270,7 +270,7 @@ describe("createStreamingHandler", () => {
       args: {},
     });
 
-    expect(stream.chunks).toEqual(["> think", "\n🔧 bash"]);
+    expect(stream.chunks).toEqual(["> think", "\n\n🔧 bash"]);
     unsub();
   });
 
@@ -306,7 +306,7 @@ describe("createStreamingHandler", () => {
       },
     });
 
-    expect(stream.chunks).toEqual(["> think\n", "🔧 bash", "\n> rethink\n"]);
+    expect(stream.chunks).toEqual(["> think\n", "\n🔧 bash", "\n> rethink\n"]);
     unsub();
   });
 
