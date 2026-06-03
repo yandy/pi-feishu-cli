@@ -2,6 +2,8 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Channel, NormalizedMessage } from "./channel.js";
 
+export type SupportedInput = ("text" | "image" | "video")[];
+
 export interface ImageContent {
   type: "image";
   data: string;
@@ -42,6 +44,7 @@ export async function processAttachments(
   channel: Pick<Channel, "downloadMessageResource">,
   msg: NormalizedMessage,
   downloadDir: string,
+  supportedInput: SupportedInput = ["text", "image"],
 ): Promise<ProcessedAttachments> {
   const images: ImageContent[] = [];
   const textParts: string[] = [];
@@ -56,15 +59,26 @@ export async function processAttachments(
     }
 
     if (res.type === "image") {
-      try {
-        const buf = await channel.downloadMessageResource(msg.messageId, res.fileKey, res.type);
-        images.push({
-          type: "image",
-          data: buf.toString("base64"),
-          mimeType: inferMime(fileName),
-        });
-      } catch (err) {
-        textParts.push(`[图片: ${fileName} 下载失败: ${(err as Error).message}]`);
+      if (supportedInput.includes("image")) {
+        try {
+          const buf = await channel.downloadMessageResource(msg.messageId, res.fileKey, res.type);
+          images.push({
+            type: "image",
+            data: buf.toString("base64"),
+            mimeType: inferMime(fileName),
+          });
+        } catch (err) {
+          textParts.push(`[图片: ${fileName} 下载失败: ${(err as Error).message}]`);
+        }
+      } else {
+        try {
+          const buf = await channel.downloadMessageResource(msg.messageId, res.fileKey, res.type);
+          const filePath = join(downloadDir, fileName);
+          await writeFile(filePath, buf);
+          textParts.push(`[图片: ${fileName} 已保存到 ${filePath}]`);
+        } catch (err) {
+          textParts.push(`[图片: ${fileName} 下载失败: ${(err as Error).message}]`);
+        }
       }
       continue;
     }
