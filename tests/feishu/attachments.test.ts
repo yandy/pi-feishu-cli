@@ -190,4 +190,21 @@ describe("processAttachments", () => {
     expect(channel.downloadMessageResource).toHaveBeenCalledTimes(1);
     expect(channel.downloadMessageResource).toHaveBeenCalledWith("msg-1", "img-1", "image");
   });
+
+  it("text-only 模型下图片保存到文件并在 text 中提示路径", async () => {
+    const pngBuffer = Buffer.from("fake-png-data");
+    const channel = {
+      downloadMessageResource: vi.fn().mockResolvedValue(pngBuffer),
+    };
+
+    const msg = testMsg([
+      { type: "image", fileKey: "img-1", fileName: "photo.png" },
+    ]);
+    const result = await processAttachments(channel as any, msg, "/tmp/test", ["text"]);
+
+    expect(channel.downloadMessageResource).toHaveBeenCalledWith("msg-1", "img-1", "image");
+    expect(result.images).toHaveLength(0);
+    expect(result.text).toContain("[图片: photo.png");
+    expect(result.text).toContain("/tmp/test/photo.png");
+  });
 });
