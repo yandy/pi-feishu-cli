@@ -44,6 +44,11 @@ interface RawLarkChannel {
     register(config: Record<string, (...args: unknown[]) => void>): void;
   };
   readonly rawClient: {
+    request(opts: {
+      url: string;
+      method: string;
+      data?: unknown;
+    }): Promise<Record<string, unknown>>;
     im: {
       v1: {
         messageResource: {
@@ -85,7 +90,10 @@ export interface Channel {
     producer: StreamProducer,
     options?: { replyTo?: string },
   ): Promise<void>;
+  /** 主动更新卡片（无需用户交互），通过 message_id 直接替换卡片内容。 */
   updateCard(messageId: string, card: unknown): Promise<void>;
+  /** 延时更新卡片（需用户交互触发），通过回调中的 token 替换卡片内容。token 有效期 30 分钟。 */
+  updateCardByToken(token: string, card: unknown): Promise<void>;
   get botIdentity(): { name: string } | undefined;
   get connected(): boolean;
 }
@@ -98,6 +106,7 @@ export function createChannel(options: ChannelOptions): Channel {
     appSecret: options.appSecret,
     loggerLevel,
     policy: { requireMention: true, dmMode: "open" },
+    includeRawEvent: true,
   }) as unknown as RawLarkChannel;
 
   let _connected = false;
@@ -151,6 +160,14 @@ export function createChannel(options: ChannelOptions): Channel {
 
     async updateCard(messageId: string, card: unknown) {
       await raw.updateCard(messageId, card);
+    },
+
+    async updateCardByToken(token: string, card: unknown) {
+      await raw.rawClient.request({
+        url: "/open-apis/interactive/v1/card/update",
+        method: "POST",
+        data: { token, card },
+      });
     },
 
     get botIdentity() {
