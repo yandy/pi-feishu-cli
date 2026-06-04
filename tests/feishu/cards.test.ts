@@ -91,29 +91,52 @@ import { buildModelsCard } from "../../src/feishu/cards/models.js";
 
 describe("models card", () => {
   const mockSession = {
-    model: { provider: "test", id: "gpt-4" },
+    model: {
+      provider: "test",
+      id: "gpt-4",
+      name: "GPT-4",
+      input: ["text", "image"] as ("text" | "image")[],
+      contextWindow: 128000,
+    },
     thinkingLevel: "high" as const,
   };
   const mockModels = [
-    { provider: "openai", id: "gpt-4" },
-    { provider: "anthropic", id: "claude-3" },
+    {
+      provider: "openai",
+      id: "gpt-4",
+      name: "GPT-4",
+      input: ["text", "image"] as ("text" | "image")[],
+      contextWindow: 128000,
+    },
+    {
+      provider: "anthropic",
+      id: "claude-3",
+      name: "Claude 3",
+      input: ["text", "image"] as ("text" | "image")[],
+      contextWindow: 200000,
+    },
   ];
 
-  it("uses short thinking labels without 'Think:' prefix", async () => {
+  it("current model line shows name, provider, level, input, context", async () => {
     const card = await buildModelsCard({
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const divs = ((card as any).body?.elements ?? []).filter(
+    const markdowns = ((card as any).body?.elements ?? []).filter(
       (e: any) => e.tag === "markdown",
     );
-    const currentDiv = divs.find((d: any) =>
-      d.content?.includes("test/gpt-4"),
+    const currentDiv = markdowns.find((d: any) =>
+      d.content?.includes("**当前**"),
     );
-    expect(currentDiv?.content).not.toContain("Thinking:");
+    expect(currentDiv).toBeDefined();
+    expect(currentDiv.content).toContain("GPT-4");
+    expect(currentDiv.content).toContain("test");
+    expect(currentDiv.content).toContain("high");
+    expect(currentDiv.content).toContain("text+image");
+    expect(currentDiv.content).toContain("128K");
   });
 
-  it("action buttons use short labels", async () => {
+  it("action buttons use short thinking labels", async () => {
     const card = await buildModelsCard({
       session: mockSession as any,
       availableModels: mockModels,
@@ -126,33 +149,84 @@ describe("models card", () => {
     expect(buttonTexts.some((t: string) => t.startsWith("Think:"))).toBe(false);
     expect(buttonTexts).toContain("high");
     expect(buttonTexts).toContain("off");
-    expect(buttonTexts).toContain("min");
     expect(buttonTexts).toContain("med");
   });
 
-  it("has dividers between model groups", async () => {
+  it("divides sections with hr elements", async () => {
     const card = await buildModelsCard({
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const hrs = ((card as any).body?.elements ?? []).filter((e: any) => e.tag === "hr");
-    expect(hrs.length).toBeGreaterThanOrEqual(1);
+    const hrs = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "hr",
+    );
+    expect(hrs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("model names are bolded", async () => {
+  it("model names are bolded in markdown", async () => {
     const card = await buildModelsCard({
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const divs = ((card as any).body?.elements ?? []).filter(
+    const markdowns = ((card as any).body?.elements ?? []).filter(
       (e: any) => e.tag === "markdown",
     );
-    const boldModelNames = divs.filter((d: any) => {
+    const boldNames = markdowns.filter((d: any) => {
       const c = d.content || "";
-      return (
-        c.includes("**openai/gpt-4**") || c.includes("**anthropic/claude-3**")
-      );
+      return c.includes("**GPT-4**") || c.includes("**Claude 3**");
     });
-    expect(boldModelNames.length).toBe(2);
+    expect(boldNames.length).toBe(2);
+  });
+
+  it("current model has no [选取] button, other models do", async () => {
+    const currentProvider = mockSession.model.provider;
+    const currentId = mockSession.model.id;
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: [
+        { provider: currentProvider, id: currentId, name: "M1", input: ["text"] as ("text" | "image")[], contextWindow: 1000 },
+        { provider: "other", id: "m2", name: "M2", input: ["text"] as ("text" | "image")[], contextWindow: 1000 },
+      ],
+    });
+    const buttons = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "button",
+    );
+    const selectButtons = buttons.filter((b: any) => b.text.content === "选取");
+    expect(selectButtons.length).toBe(1);
+  });
+
+  it("thinking level buttons carry current model in callback", async () => {
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: mockModels,
+    });
+    const buttons = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "button",
+    );
+    const levelButtons = buttons.filter(
+      (b: any) =>
+        b.behaviors?.[0]?.value?.cmd === "model" &&
+        b.behaviors?.[0]?.value?.action === "select" &&
+        b.behaviors?.[0]?.value?.thinkingLevel,
+    );
+    for (const btn of levelButtons) {
+      const v = btn.behaviors[0].value;
+      expect(v.provider).toBe(mockSession.model.provider);
+      expect(v.modelId).toBe(mockSession.model.id);
+    }
+  });
+
+  it("groups models by provider section headers", async () => {
+    const card = await buildModelsCard({
+      session: mockSession as any,
+      availableModels: mockModels,
+    });
+    const markdowns = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "markdown",
+    );
+    const headers = markdowns.filter((d: any) =>
+      d.content?.match(/\*\*── .+ ──\*\*/),
+    );
+    expect(headers.length).toBeGreaterThanOrEqual(1);
   });
 });
