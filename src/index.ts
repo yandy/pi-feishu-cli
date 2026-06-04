@@ -207,12 +207,12 @@ export function setupFeishuHandlers(
     );
   });
 
-  channel.on("cardAction", async (evt: CardActionEvent) => {
-    try {
-      await handleCardAction(evt, runtime, cwd, channel);
-    } catch (err) {
-      console.error("Card action failed:", err);
-    }
+  channel.on("cardAction", (evt: CardActionEvent) => {
+    setTimeout(() => {
+      handleCardAction(evt, runtime, cwd, channel).catch((err) =>
+        console.error("Card action failed:", err),
+      );
+    }, 0);
   });
 
   channel.on("error", (err: Error) => {
@@ -238,8 +238,11 @@ export async function handleCardAction(
   cwd: string,
   channel: Channel,
 ): Promise<void> {
+  // biome-ignore lint/suspicious/noExplicitAny: SDK type is unknown, destructuring requires any
   const value = (evt?.action?.value ?? {}) as Record<string, any>;
-  const raw = evt?.raw as Record<string, any> | undefined;
+  const raw = evt?.raw as
+    | { event?: { token?: string }; token?: string }
+    | undefined;
   const token: string | undefined = raw?.event?.token ?? raw?.token;
   const { cmd, action } = value;
 
