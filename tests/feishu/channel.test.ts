@@ -19,6 +19,7 @@ const mockRawChannel = {
   },
   dispatcher: mockDispatcher,
   rawClient: {
+    request: vi.fn(),
     im: { v1: { messageResource: { get: vi.fn() } } },
   },
 };
@@ -116,6 +117,22 @@ describe("createChannel", () => {
         "file",
       );
       expect(result.toString()).toBe("string-chunk");
+    });
+  });
+
+  describe("updateCardByToken", () => {
+    it("calls rawClient.request with correct params for delayed card update", async () => {
+      const channel = createChannel({ appId: "test", appSecret: "secret" });
+      mockRawChannel.rawClient.request.mockClear();
+
+      const card = { schema: "2.0", header: { title: { tag: "plain_text", content: "test" } }, body: { elements: [] } };
+      await channel.updateCardByToken("c-token-abc", card);
+
+      expect(mockRawChannel.rawClient.request).toHaveBeenCalledWith({
+        url: "/open-apis/interactive/v1/card/update",
+        method: "POST",
+        data: { token: "c-token-abc", card },
+      });
     });
   });
 });
