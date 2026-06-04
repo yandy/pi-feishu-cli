@@ -44,6 +44,10 @@
 
 方式 ③ 保留 SDK 的安全机制，30 分钟窗口足够宽裕，token 限制在交互场景中不构成瓶颈（每次点击都是新 token）。
 
+### 延时更新 API：`POST /open-apis/interactive/v1/card/update`
+
+此端点不在 `@larksuiteoapi/node-sdk` 的自动生成 API client 中（搜索 `interactive/v1` 无任何结果），需通过 SDK 的 `rawClient.request()` 直接调用。`LarkChannel` 内部也用此方法调用 `bot/v3/info` 等端点。
+
 ## 方案设计
 
 ### 架构
@@ -72,7 +76,23 @@
   → 飞书原位更新卡片
 ```
 
-### 改动文件
+### Channel 接口新增方法
+
+```typescript
+/** 主动更新卡片（无需用户交互），通过 message_id 直接替换卡片内容。 */
+updateCard(messageId: string, card: unknown): Promise<void>;
+/** 延时更新卡片（需用户交互触发），通过回调中的 token 替换卡片内容。token 有效期 30 分钟。 */
+updateCardByToken(token: string, card: unknown): Promise<void>;
+```
+
+`updateCard` 与 `updateCardByToken` 的区别：
+
+| | `updateCard` | `updateCardByToken` |
+|---|---|---|
+| 触发方式 | 主动调用，无需用户交互 | 用户点击卡片按钮后，在回调中调用 |
+| 凭证 | `message_id` | 回调事件中的 `token` |
+| API | `PATCH /im/v1/messages/:message_id` | `POST /open-apis/interactive/v1/card/update` |
+| 限制 | 14 天内 | token 30 分钟有效期、最多 3 次 |
 
 | 文件 | 改动 |
 |------|------|
