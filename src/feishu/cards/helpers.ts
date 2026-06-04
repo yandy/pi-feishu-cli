@@ -7,10 +7,18 @@ export interface CardConfig {
   width_mode?: "fill" | "compact";
 }
 
+export interface CardColumn {
+  tag: "column";
+  width: "weighted" | "auto";
+  weight?: number;
+  elements: CardElement[];
+}
+
 export type CardElement =
   | { tag: "markdown"; content: string }
   | { tag: "hr" }
-  | CardButton;
+  | CardButton
+  | { tag: "column_set"; flex_mode?: string; columns: CardColumn[] };
 
 export interface CardButton {
   tag: "button";

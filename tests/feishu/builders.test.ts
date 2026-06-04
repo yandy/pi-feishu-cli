@@ -25,7 +25,9 @@ describe("card builders format", () => {
     const { runtime } = await initRuntime({ cwd });
     const card = await buildSessionsCard({ runtime, cwd });
     const elements = (card as any).body?.elements ?? [];
-    const buttonCount = elements.filter((el: any) => el.tag === "button").length;
+    const buttonCount = elements.filter(
+      (el: any) => el.tag === "button",
+    ).length;
     expect(buttonCount).toBeGreaterThan(0);
   }, 30000);
 
@@ -35,7 +37,15 @@ describe("card builders format", () => {
     const { runtime } = await initRuntime({ cwd });
     const card = await buildModelsCard({
       session: runtime.session,
-      availableModels: [{ provider: "test", id: "test-model" }],
+      availableModels: [
+        {
+          provider: "test",
+          id: "test-model",
+          name: "Test Model",
+          input: ["text"] as ("text" | "image")[],
+          contextWindow: 1000,
+        },
+      ],
     });
     const json = JSON.stringify(card);
     expect(json).not.toContain("`");
@@ -46,10 +56,20 @@ describe("card builders format", () => {
     const { runtime } = await initRuntime({ cwd });
     const card = await buildModelsCard({
       session: runtime.session,
-      availableModels: [{ provider: "test", id: "test-model" }],
+      availableModels: [
+        {
+          provider: "test",
+          id: "test-model",
+          name: "Test Model",
+          input: ["text"] as ("text" | "image")[],
+          contextWindow: 1000,
+        },
+      ],
     });
     const elements = (card as any).body?.elements ?? [];
-    const buttonCount = elements.filter((el: any) => el.tag === "button").length;
+    const buttonCount = elements.filter(
+      (el: any) => el.tag === "button",
+    ).length;
     expect(buttonCount).toBeGreaterThan(0);
   }, 30000);
 });
