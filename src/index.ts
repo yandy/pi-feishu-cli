@@ -23,7 +23,6 @@ import {
   createChannel,
   type NormalizedMessage,
 } from "./feishu/channel.js";
-import type { FeishuCommandHandler } from "./feishu/handler.js";
 import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
@@ -208,21 +207,9 @@ export function setupFeishuHandlers(
     );
   });
 
-  channel.on("cardAction", async (evt: any) => {
-    const value = evt?.action?.value ?? evt;
-    const messageId: string | undefined = evt?.messageId;
-    const chatId: string | undefined = evt?.chatId;
+  channel.on("cardAction", async (evt: CardActionEvent) => {
     try {
-      await handleCardActionOld(
-        value,
-        messageId,
-        chatId,
-        runtime,
-        cwd,
-        channel,
-        handleSessions,
-        handleModels,
-      );
+      await handleCardAction(evt, runtime, cwd, channel);
     } catch (err) {
       console.error("Card action failed:", err);
     }
@@ -251,26 +238,26 @@ export async function handleCardAction(
   cwd: string,
   channel: Channel,
 ): Promise<void> {
-  // stub — will be implemented in Task 4
-}
-
-async function handleCardActionOld(
-  value: Record<string, any>,
-  messageId: string | undefined,
-  chatId: string | undefined,
-  runtime: AgentSessionRuntime,
-  cwd: string,
-  channel: Channel,
-  handleSessions: FeishuCommandHandler,
-  handleModels: FeishuCommandHandler,
-): Promise<void> {
+  const value = (evt?.action?.value ?? {}) as Record<string, any>;
+  const raw = evt?.raw as Record<string, any> | undefined;
+  const token: string | undefined = raw?.event?.token ?? raw?.token;
   const { cmd, action } = value;
 
   if (cmd === "help") {
-    if (action === "sessions" && chatId) {
-      await handleSessions(chatId);
-    } else if (action === "models" && chatId) {
-      await handleModels(chatId);
+    if (action === "sessions") {
+      const card = await buildSessionsCard({ runtime, cwd });
+      if (token) await channel.updateCardByToken(token, card);
+    } else if (action === "models") {
+      const authStorage = AuthStorage.create();
+      const registry = ModelRegistry.create(authStorage);
+      const available = await registry.getAvailable();
+      const card = await buildModelsCard({
+        session: runtime.session,
+        availableModels: available.filter(
+          (m): m is NonNullable<typeof m> => m != null,
+        ),
+      });
+      if (token) await channel.updateCardByToken(token, card);
     }
     return;
   }
@@ -286,14 +273,11 @@ async function handleCardActionOld(
       }
     }
     const card = await buildSessionsCard({ runtime, cwd });
-    if (chatId) {
-      if (messageId) {
-        await channel.send(chatId, { card }, { replyTo: messageId! });
-      } else {
-        await channel.send(chatId, { card });
-      }
-    }
-  } else if (cmd === "model" && action === "select") {
+    if (token) await channel.updateCardByToken(token, card);
+    return;
+  }
+
+  if (cmd === "model" && action === "select") {
     const { provider, modelId, thinkingLevel } = value;
     const authStorage = AuthStorage.create();
     const registry = ModelRegistry.create(authStorage);
@@ -309,12 +293,7 @@ async function handleCardActionOld(
         (m): m is NonNullable<typeof m> => m != null,
       ),
     });
-    if (chatId) {
-      if (messageId) {
-        await channel.send(chatId, { card }, { replyTo: messageId! });
-      } else {
-        await channel.send(chatId, { card });
-      }
-    }
+    if (token) await channel.updateCardByToken(token, card);
+    return;
   }
 }
