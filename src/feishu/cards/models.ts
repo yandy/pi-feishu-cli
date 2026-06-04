@@ -24,11 +24,21 @@ export interface ModelCardOptions {
 }
 
 const THINKING_LEVELS: ThinkingLevel[] = [
-  "off", "minimal", "low", "medium", "high", "xhigh",
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
 ];
 
 const THINKING_LABELS: Record<ThinkingLevel, string> = {
-  off: "off", minimal: "min", low: "low", medium: "med", high: "high", xhigh: "xhigh",
+  off: "off",
+  minimal: "min",
+  low: "low",
+  medium: "med",
+  high: "high",
+  xhigh: "xhigh",
 };
 
 function inputLabel(input: ("text" | "image")[]): string {
@@ -68,7 +78,11 @@ export async function buildModelsCard(
     const thinkLabel = THINKING_LABELS[currentThink];
     const il = inputLabel(cm.input);
     const ctx = fmtContext(cm.contextWindow);
-    elements.push(createMarkdownBlock(`**当前**\n${cm.name} (${cm.provider}) · ${thinkLabel} · ${il} · ${ctx}`));
+    elements.push(
+      createMarkdownBlock(
+        `**当前**\n${cm.name} (${cm.provider}) · ${thinkLabel} · ${il} · ${ctx}`,
+      ),
+    );
   } else {
     elements.push(createMarkdownBlock("**当前**\n(未选择)"));
   }
@@ -83,21 +97,25 @@ export async function buildModelsCard(
     for (const model of models) {
       const il = inputLabel(model.input);
       const ctx = fmtContext(model.contextWindow);
-      const isCurrent = currentModel !== undefined &&
+      const isCurrent =
+        currentModel !== undefined &&
         model.provider === currentModel.provider &&
         model.id === currentModel.id;
 
-      const modelLine = `**${model.name}** · ${il} · ${ctx}` +
-        (isCurrent ? "  — 当前" : "");
+      const modelLine =
+        `**${model.name}** · ${il} · ${ctx}` + (isCurrent ? "  — 当前" : "");
       elements.push(createMarkdownBlock(modelLine));
 
       if (!isCurrent) {
-        elements.push(createActionButton("选取", {
-          cmd: "model",
-          action: "select",
-          provider: model.provider,
-          modelId: model.id,
-        }));
+        elements.push(
+          createActionButton("选取", {
+            cmd: "model",
+            action: "select",
+            provider: model.provider,
+            modelId: model.id,
+            thinkingLevel: currentThink,
+          }),
+        );
       }
     }
   }
@@ -112,17 +130,21 @@ export async function buildModelsCard(
     elements.push({
       tag: "button",
       text: { tag: "plain_text", content: THINKING_LABELS[level] },
-      type: (level === currentThink ? "primary" : "default") as "primary" | "default",
-      behaviors: [{
-        type: "callback",
-        value: {
-          cmd: "model",
-          action: "select",
-          provider: currentProvider,
-          modelId: currentModelId,
-          thinkingLevel: level,
+      type: (level === currentThink ? "primary" : "default") as
+        | "primary"
+        | "default",
+      behaviors: [
+        {
+          type: "callback",
+          value: {
+            cmd: "model",
+            action: "select",
+            provider: currentProvider,
+            modelId: currentModelId,
+            thinkingLevel: level,
+          },
         },
-      }],
+      ],
     });
   }
 

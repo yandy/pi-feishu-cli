@@ -65,9 +65,9 @@ describe("help card", () => {
     const markdownBlocks = ((card as any).body.elements as any[]).filter(
       (e: any) => e.tag === "markdown",
     );
-    expect(
-      markdownBlocks.some((b: any) => b.content.includes("TestBot")),
-    ).toBe(true);
+    expect(markdownBlocks.some((b: any) => b.content.includes("TestBot"))).toBe(
+      true,
+    );
   });
 
   it("help card has session and model action buttons", () => {
@@ -184,8 +184,20 @@ describe("models card", () => {
     const card = await buildModelsCard({
       session: mockSession as any,
       availableModels: [
-        { provider: currentProvider, id: currentId, name: "M1", input: ["text"] as ("text" | "image")[], contextWindow: 1000 },
-        { provider: "other", id: "m2", name: "M2", input: ["text"] as ("text" | "image")[], contextWindow: 1000 },
+        {
+          provider: currentProvider,
+          id: currentId,
+          name: "M1",
+          input: ["text"] as ("text" | "image")[],
+          contextWindow: 1000,
+        },
+        {
+          provider: "other",
+          id: "m2",
+          name: "M2",
+          input: ["text"] as ("text" | "image")[],
+          contextWindow: 1000,
+        },
       ],
     });
     const buttons = ((card as any).body?.elements ?? []).filter(
@@ -203,11 +215,9 @@ describe("models card", () => {
     const buttons = ((card as any).body?.elements ?? []).filter(
       (e: any) => e.tag === "button",
     );
-    const levelButtons = buttons.filter(
-      (b: any) =>
-        b.behaviors?.[0]?.value?.cmd === "model" &&
-        b.behaviors?.[0]?.value?.action === "select" &&
-        b.behaviors?.[0]?.value?.thinkingLevel,
+    const levelLabels = ["off", "min", "low", "med", "high", "xhigh"];
+    const levelButtons = buttons.filter((b: any) =>
+      levelLabels.includes(b.text?.content),
     );
     for (const btn of levelButtons) {
       const v = btn.behaviors[0].value;
