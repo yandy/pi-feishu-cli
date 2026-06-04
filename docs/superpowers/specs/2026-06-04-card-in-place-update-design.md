@@ -18,62 +18,66 @@
 
 之前尝试使用 PATCH API（`channel.updateCard(messageId, card)`）实现原位更新，但遇到了 **"卡片更新后迅速被重置为原始内容"** 的竞态问题。
 
-**根因**：`@larksuiteoapi/node-sdk` 的 `LarkChannel` 在 WebSocket 模式下处理 `card.action.trigger` 回调时，其内部 handler 返回 `undefined`，导致 SDK 向飞书响应**空内容**（`{ code: 200 }`），飞书将此理解为"卡片内容不变"。随后即使通过 PATCH API 更新了卡片，飞书客户端也会因回调响应指示"不变"而将卡片重置回初始状态。
+**根因**：`PATCH /im/v1/messages/{message_id}`（"更新应用发送的消息卡片"）是面向**无条件更新**场景的 API。飞书文档明确说明：交互触发的更新应使用**延时更新消息卡片**（`POST /open-apis/interactive/v1/card/update`，带 token），而非 PATCH API。用了错误的 API 导致竞态。
 
 ### 正确的飞书卡片更新机制
 
 飞书文档定义了三种卡片更新方式：
 
-| 方式 | 适用场景 | 机制 |
-|------|----------|------|
-| ① 立即更新 | 3 秒内能完成 | 在回调 HTTP 200 响应 body 中返回新卡片 JSON |
-| ② 不更新 | 仅收集点击数据 | 回调响应返回空值 |
-| ③ 延时更新 | 需超过 3 秒 | 先返回 `{}`，再用 token 调延时更新 API（30 分钟有效，最多 2 次） |
+| 方式 | 适用场景 | 机制 | API |
+|------|----------|------|-----|
+| ① 立即更新 | 3 秒内能完成 | 在回调 HTTP 200 响应 body 中返回新卡片 JSON | 回调响应 |
+| ② 不更新 | 仅收集点击数据 | 回调响应返回空值 | 回调响应 |
+| ③ 延时更新 | 需超过 3 秒（最宽松 30 分钟） | 先返回 `{}`，再用 token 调延时更新 API | `POST /open-apis/interactive/v1/card/update` |
 
-本项目应使用**方式①**：在回调响应中直接返回新卡片，飞书客户端立即原位替换。
+本项目选用**方式 ③（延时更新）**。
 
-### SDK 机制：`onRawEvent` 是唯一入口
+### 为什么选方式 ③ 而非方式 ①
 
-经深入调研 `@larksuiteoapi/node-sdk` 源码，`LarkChannel`（WebSocket 模式）下**不存在**任何配置 `card.action.trigger` 回调响应的机制：
+| | 方式 ① | 方式 ③ |
+|---|---|---|
+| 时间窗 | 3 秒 | 30 分钟 |
+| SDK 侵入 | 需 `onRawEvent` 覆盖内置 handler，失去 SafetyPipeline | 保留 `channel.on("cardAction")`，完整 SafetyPipeline |
+| 实现复杂度 | 低 | 中（新增 1 个 channel 方法 + `includeRawEvent`） |
+| token 限制 | 无 | 每 token 可用 3 次，30 分钟过期 |
+| 回调响应 | 由我们的 handler 返回新卡片 | SDK 自动返回 `{}`（不更新） |
 
-| 路径 | 结论 |
-|------|------|
-| `channel.on("cardAction", handler)` | handler 返回值在 `SafetyPipeline.pushAction()` 中被丢弃（`yield handler()` 无赋值）；内置 dispatcher 再返回 `undefined` |
-| `createLarkChannel` 构造选项 | 无 `cardAction` / `response` / `reply` / `webhookCallback` 等选项 |
-| `SafetyPipeline` | 无 `pushActionWithResult` 或类似方法 |
-| `EventDispatcher.register()` | 无 `setDefaultResponse` 或响应配置方法 |
-| `CardActionHandler`（独立类，已导出） | 仅适用于 Webhook 模式，`LarkChannel` 内部不使用它 |
-
-**唯一可用路径**：`channel.onRawEvent("card.action.trigger", handler)` → 调用 `dispatcher.register()` → **覆盖**内置 handler → handler 返回值直接经由 `EventDispatcher.invoke()` → `WSClient.handleEventData()` 作为 WS 响应发给飞书。
-
-代价：失去 `SafetyPipeline`（去重、速率限制），但卡片更新是幂等操作，影响可控。
+方式 ③ 保留 SDK 的安全机制，30 分钟窗口足够宽裕，token 限制在交互场景中不构成瓶颈（每次点击都是新 token）。
 
 ## 方案设计
 
 ### 架构
 
 ```
-之前: cardAction event → handleCardAction(channel, ...) → channel.send(replyTo)
-                                                   (发新卡)
+之前: cardAction event → handleCardAction → channel.send(replyTo)
+                                    (发新卡)
 
-之后: card.action.trigger event → onRawEvent handler
-         → handleCardAction(runtime, cwd, value) → return { card }
-         → onRawEvent return { card }
-                                          (原位更新)
+之后: cardAction event → handleCardAction → channel.updateCardByToken(token, card)
+                                    (延时更新 → 原位替换)
 ```
 
-将业务逻辑保留在重构后的 `handleCardAction` 中（职责清晰、避免 onRawEvent 代码膨胀），`onRawEvent` 仅做事件解析和路由。
+### 数据流
 
-### 改动范围
+```
+用户点击卡片按钮
+  → Feishu 发送 card.action.trigger 回调
+  → SDK 自动响应 {}（不更新）
+  → channel.on("cardAction", evt) 触发 ← 保留 safety 管道
+  → handleCardAction(evt, runtime, cwd, channel)
+     → 从 evt.raw.token 提取 token
+     → 处理业务逻辑（newSession / setModel 等）
+     → 构建新卡片
+     → channel.updateCardByToken(token, card)
+       → POST /open-apis/interactive/v1/card/update { token, card }
+  → 飞书原位更新卡片
+```
 
-**`src/index.ts`**：
+### 改动文件
 
-1. **替换事件监听**：`channel.on("cardAction", ...)` → `channel.onRawEvent("card.action.trigger", ...)`
-2. **重构 `handleCardAction`**：签名从 `(value, messageId, chatId, runtime, cwd, channel, handleSessions, handleModels) => void` 改为 `(runtime, cwd, value) => { card, toast? } | undefined`。不再接收 `channel` / `chatId` / `messageId` / `handleSessions` / `handleModels`，改为**返回**新卡片对象
-3. **删除旧 `handleCardAction`**（行 247-309）
-4. **清理不再使用的参数/变量**：`handleSessions` 和 `handleModels` 不再传给 `handleCardAction`
-
-**不变**：`channel.ts`、`handleSessions` / `handleModels` / `handleHelp`（仍用于 `/` 文本命令发新卡）。
+| 文件 | 改动 |
+|------|------|
+| `src/feishu/channel.ts` | ① `createLarkChannel` 加 `includeRawEvent: true`；② `RawLarkChannel.rawClient` 加 `request` 方法类型；③ `Channel` 接口加 `updateCardByToken`；④ 实现 `updateCardByToken` |
+| `src/index.ts` | ① 重写 `handleCardAction`（签名、逻辑）；② 修改 cardAction 回调传参；③ 删除 `FeishuCommandHandler` import（不再需要） |
 
 ### 函数签名变更
 
@@ -92,81 +96,70 @@ async function handleCardAction(
 
 // 之后
 async function handleCardAction(
+  evt: CardActionEvent,
   runtime: AgentSessionRuntime,
   cwd: string,
-  value: Record<string, any>,
-): Promise<{ card: Record<string, unknown>; toast?: { type: string; content: string } } | undefined>
-```
-
-### onRawEvent handler 伪代码
-
-```typescript
-channel.onRawEvent("card.action.trigger", async (raw: any) => {
-    const value = raw?.action?.value ?? {};
-    const messageId = raw?.open_message_id ?? raw?.context?.open_message_id;
-    if (!messageId) return;
-
-    try {
-        const result = await handleCardAction(runtime, cwd, value);
-        return result;
-    } catch (err) {
-        console.error("Card action failed:", err);
-        return { toast: { type: "error", content: "操作失败" } };
-    }
-});
+  channel: Channel,
+): Promise<void>
 ```
 
 ### handleCardAction 伪代码
 
 ```typescript
-async function handleCardAction(runtime, cwd, value): Promise<...> {
+async function handleCardAction(evt, runtime, cwd, channel): Promise<void> {
+    const value = evt?.action?.value ?? {};
+    const token = (evt?.raw as any)?.event?.token
+        ?? (evt?.raw as any)?.token;
     const { cmd, action } = value;
 
     if (cmd === "help") {
         if (action === "sessions") {
             const card = await buildSessionsCard({ runtime, cwd });
-            return { card };
+            if (token) await channel.updateCardByToken(token, card);
         }
         if (action === "models") {
-            // build ModelsCard ...
-            return { card };
+            const card = await buildModelsCard({ ... });
+            if (token) await channel.updateCardByToken(token, card);
         }
+        return;
     }
 
     if (cmd === "session") {
         // new / switch / delete ...
         const card = await buildSessionsCard({ runtime, cwd });
-        return { card };
+        if (token) await channel.updateCardByToken(token, card);
+        return;
     }
 
     if (cmd === "model" && action === "select") {
         // setModel / setThinkingLevel ...
         const card = await buildModelsCard({ ... });
-        return { card };
+        if (token) await channel.updateCardByToken(token, card);
+        return;
     }
 }
 ```
 
 ### 需清理的代码
 
-| 代码 | 位置 | 原因 |
-|------|------|------|
-| `channel.on("cardAction", ...)` 整块 | 原行 210-228 | 已被 `onRawEvent` 替代 |
-| 旧 `handleCardAction` 函数 | 原行 247-309 | 重构为新版本 |
-| `FeishuCommandHandler` import | 原行 25 | `handleCardAction` 重构后不再引用 |
-| `channel` / `handleSessions` / `handleModels` 传给 `handleCardAction` 的代码 | setupFeishuHandlers 内 | 新签名不再需要 |
+| 代码 | 原因 |
+|------|------|
+| `handleSessions` / `handleModels` 参数传给 `handleCardAction` | 新签名不接收 |
+| 旧 `handleCardAction` 中 `channel.send` + `replyTo` 逻辑 | 替换为 `updateCardByToken` |
+| `FeishuCommandHandler` import | `handleCardAction` 签名中不再引用 |
+| `chatId` 字段提取 | 延时更新不需要 chatId |
 
 ### 限制
 
 | 维度 | 限制 |
 |------|------|
 | 更新有效期 | 从卡片**原始发送时间**起 14 天（v2），过期后更新无效 |
-| 交互有效期 | 同 14 天，过期后按钮不可点击 |
-| 更新次数 | **无硬性限制**，每次点击均可立即返回新卡片 |
-| 响应时限 | 每次 callback 须在 3 秒内返回 HTTP 200 |
-| `onRawEvent` 代价 | 失去 SDK 内置 safety 管道（去重、速率限制），但卡片更新是幂等操作，影响可控 |
+| token 有效期 | 30 分钟 |
+| token 使用次数 | 每次交互可用 3 次 |
+| 安全性 | 保留 SDK 完整 SafetyPipeline（去重、速率限制） |
 
 ### 风险
 
-- 若 handler 执行超过 3 秒，飞书会展示错误，卡片不更新。三个分支的资源操作（newSession、switchSession、buildCard）预期在秒级完成。
+- token 有效期 30 分钟，交互响应在秒级完成，不构成瓶颈。
 - 14 天后卡片不可更新，交互按钮会显示失效提示。这是飞书平台限制，无法绕过。
+- `rawClient.request` 是 SDK 非文档化但实装可用的方法（LarkChannel 内部也用此调用 `bot/v3/info`）。
