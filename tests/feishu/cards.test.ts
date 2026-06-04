@@ -125,25 +125,37 @@ describe("models card", () => {
     const markdowns = ((card as any).body?.elements ?? []).filter(
       (e: any) => e.tag === "markdown",
     );
-    const currentDiv = markdowns.find((d: any) =>
-      d.content?.includes("**当前**"),
+    const currentIdx = markdowns.findIndex((d: any) =>
+      d.content?.includes("📌 **当前"),
     );
-    expect(currentDiv).toBeDefined();
-    expect(currentDiv.content).toContain("GPT-4");
-    expect(currentDiv.content).toContain("test");
-    expect(currentDiv.content).toContain("high");
-    expect(currentDiv.content).toContain("text+image");
-    expect(currentDiv.content).toContain("128K");
+    expect(currentIdx).not.toBe(-1);
+    const modelLine = markdowns[currentIdx];
+    const attrsLine = markdowns[currentIdx + 1];
+    expect(modelLine.content).toContain("GPT-4");
+    expect(modelLine.content).toContain("test");
+    expect(attrsLine.content).toContain("high");
+    expect(attrsLine.content).toContain("📝");
+    expect(attrsLine.content).toContain("🖼️");
+    expect(attrsLine.content).toContain("128K");
   });
+
+  function extractButtons(card: any): any[] {
+    const elements = (card as any).body?.elements ?? [];
+    const direct = elements.filter((e: any) => e.tag === "button");
+    const fromColumns = elements
+      .filter((e: any) => e.tag === "column_set")
+      .flatMap((e: any) => e.columns ?? [])
+      .flatMap((col: any) => col.elements ?? [])
+      .filter((e: any) => e.tag === "button");
+    return [...direct, ...fromColumns];
+  }
 
   it("action buttons use short thinking labels", async () => {
     const card = await buildModelsCard({
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const buttons = ((card as any).body?.elements ?? []).filter(
-      (e: any) => e.tag === "button",
-    );
+    const buttons = extractButtons(card);
     expect(buttons.length).toBeGreaterThan(0);
     const buttonTexts = buttons.map((b: any) => b.text.content);
     expect(buttonTexts.some((t: string) => t.startsWith("Think:"))).toBe(false);
@@ -178,7 +190,7 @@ describe("models card", () => {
     expect(boldNames.length).toBe(2);
   });
 
-  it("current model has no [选取] button, other models do", async () => {
+  it("current model has ✓ marker in markdown, other models have [选取]", async () => {
     const currentProvider = mockSession.model.provider;
     const currentId = mockSession.model.id;
     const card = await buildModelsCard({
@@ -200,9 +212,14 @@ describe("models card", () => {
         },
       ],
     });
-    const buttons = ((card as any).body?.elements ?? []).filter(
-      (e: any) => e.tag === "button",
+    const markdowns = ((card as any).body?.elements ?? []).filter(
+      (e: any) => e.tag === "markdown",
     );
+    const currentLine = markdowns.find((d: any) =>
+      d.content?.includes("✓ 当前"),
+    );
+    expect(currentLine).toBeDefined();
+    const buttons = extractButtons(card);
     const selectButtons = buttons.filter((b: any) => b.text.content === "选取");
     expect(selectButtons.length).toBe(1);
   });
@@ -212,9 +229,7 @@ describe("models card", () => {
       session: mockSession as any,
       availableModels: mockModels,
     });
-    const buttons = ((card as any).body?.elements ?? []).filter(
-      (e: any) => e.tag === "button",
-    );
+    const buttons = extractButtons(card);
     const levelLabels = ["off", "min", "low", "med", "high", "xhigh"];
     const levelButtons = buttons.filter((b: any) =>
       levelLabels.includes(b.text?.content),

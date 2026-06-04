@@ -43,9 +43,9 @@ const THINKING_LABELS: Record<ThinkingLevel, string> = {
 
 function inputLabel(input: ("text" | "image")[]): string {
   const parts: string[] = [];
-  if (input.includes("text")) parts.push("text");
-  if (input.includes("image")) parts.push("image");
-  return parts.join("+") || "text";
+  if (input.includes("text")) parts.push("📝");
+  if (input.includes("image")) parts.push("🖼️");
+  return parts.join(" ") || "📝";
 }
 
 function fmtContext(n: number): string {
@@ -79,12 +79,13 @@ export async function buildModelsCard(
     const il = inputLabel(cm.input);
     const ctx = fmtContext(cm.contextWindow);
     elements.push(
-      createMarkdownBlock(
-        `**当前**\n${cm.name} (${cm.provider}) · ${thinkLabel} · ${il} · ${ctx}`,
-      ),
+      createMarkdownBlock(`📌 **当前 · ${cm.name}** (${cm.provider})`),
+    );
+    elements.push(
+      createMarkdownBlock(`🧠 **${thinkLabel}**  ·  ${il}  ·  📏 **${ctx}**`),
     );
   } else {
-    elements.push(createMarkdownBlock("**当前**\n(未选择)"));
+    elements.push(createMarkdownBlock("📌 **当前**  (未选择)"));
   }
 
   elements.push(createDividerBlock());
@@ -103,7 +104,8 @@ export async function buildModelsCard(
         model.id === currentModel.id;
 
       const modelLine =
-        `**${model.name}** · ${il} · ${ctx}` + (isCurrent ? "  — 当前" : "");
+        `**${model.name}**  │  ${il}  │  📏 ${ctx}` +
+        (isCurrent ? "  ✓ 当前" : "");
       elements.push(createMarkdownBlock(modelLine));
 
       if (!isCurrent) {
@@ -126,25 +128,37 @@ export async function buildModelsCard(
   const currentProvider = currentModel?.provider ?? "";
   const currentModelId = currentModel?.id ?? "";
 
-  for (const level of THINKING_LEVELS) {
-    elements.push({
-      tag: "button",
-      text: { tag: "plain_text", content: THINKING_LABELS[level] },
-      type: (level === currentThink ? "primary" : "default") as
-        | "primary"
-        | "default",
-      behaviors: [
-        {
-          type: "callback",
-          value: {
-            cmd: "model",
-            action: "select",
-            provider: currentProvider,
-            modelId: currentModelId,
-            thinkingLevel: level,
-          },
+  const levelButton = (level: ThinkingLevel) => ({
+    tag: "button" as const,
+    text: { tag: "plain_text" as const, content: THINKING_LABELS[level] },
+    type: (level === currentThink ? "primary" : "default") as
+      | "primary"
+      | "default",
+    behaviors: [
+      {
+        type: "callback" as const,
+        value: {
+          cmd: "model",
+          action: "select",
+          provider: currentProvider,
+          modelId: currentModelId,
+          thinkingLevel: level,
         },
-      ],
+      },
+    ],
+  });
+
+  const mid = Math.ceil(THINKING_LEVELS.length / 2);
+  const rows = [THINKING_LEVELS.slice(0, mid), THINKING_LEVELS.slice(mid)];
+  for (const row of rows) {
+    elements.push({
+      tag: "column_set",
+      flex_mode: "none",
+      columns: row.map((level) => ({
+        tag: "column",
+        width: "auto" as const,
+        elements: [levelButton(level)],
+      })),
     });
   }
 
