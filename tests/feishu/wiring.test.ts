@@ -38,6 +38,7 @@ function createMockChannel() {
     disconnect: vi.fn(),
     onRawEvent: vi.fn(),
     updateCard: vi.fn(),
+    updateCardByToken: vi.fn(),
     botIdentity: { name: "test-bot" },
     connected: true,
     downloadMessageResource: vi.fn(),
@@ -50,13 +51,17 @@ function createMockRuntime() {
       prompt: mockSessionPrompt,
       subscribe: vi.fn(() => vi.fn()),
       sessionId: "session-test-123",
+      sessionFile: "/tmp/sessions/default.json",
+      model: undefined,
+      setModel: vi.fn(),
+      setThinkingLevel: vi.fn(),
     },
     newSession: vi.fn(),
     switchSession: vi.fn(),
   };
 }
 
-import { setupFeishuHandlers } from "../../src/index.js";
+import { handleCardAction, setupFeishuHandlers } from "../../src/index.js";
 
 describe("attachment wiring in message handler", () => {
   beforeEach(() => {
@@ -139,5 +144,102 @@ describe("attachment wiring in message handler", () => {
     await handler(msg);
 
     expect(mockProcessAttachments).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleCardAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates card by token on session switch", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    const evt = {
+      messageId: "msg-1",
+      chatId: "chat-1",
+      operator: { openId: "ou-1" },
+      action: {
+        value: { cmd: "session", action: "switch", sessionPath: "/tmp/s.json" },
+        tag: "button",
+      },
+      raw: { token: "c-token-abc" },
+    };
+
+    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("/tmp/s.json");
+    expect(channel.updateCardByToken).toHaveBeenCalledWith(
+      "c-token-abc",
+      expect.objectContaining({ schema: "2.0" }),
+    );
+  });
+
+  it("updates card by token on model select", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    const evt = {
+      messageId: "msg-2",
+      chatId: "chat-1",
+      operator: { openId: "ou-1" },
+      action: {
+        value: { cmd: "model", action: "select", provider: "openai", modelId: "gpt-4", thinkingLevel: "high" },
+        tag: "button",
+      },
+      raw: { event: { token: "c-token-def" } },
+    };
+
+    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+
+    expect(channel.updateCardByToken).toHaveBeenCalledWith(
+      "c-token-def",
+      expect.objectContaining({ schema: "2.0" }),
+    );
+  });
+
+  it("updates card by token on help → sessions", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    const evt = {
+      messageId: "msg-3",
+      chatId: "chat-1",
+      operator: { openId: "ou-1" },
+      action: {
+        value: { cmd: "help", action: "sessions" },
+        tag: "button",
+      },
+      raw: { token: "c-token-ghi" },
+    };
+
+    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+
+    expect(channel.updateCardByToken).toHaveBeenCalledWith(
+      "c-token-ghi",
+      expect.objectContaining({ schema: "2.0" }),
+    );
+  });
+
+  it("does not fail when token is missing", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    const evt = {
+      messageId: "msg-4",
+      chatId: "chat-1",
+      operator: { openId: "ou-1" },
+      action: {
+        value: { cmd: "session", action: "switch", sessionPath: "/tmp/s.json" },
+        tag: "button",
+      },
+      raw: {},
+    };
+
+    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+
+    expect(runtime.switchSession).toHaveBeenCalledWith("/tmp/s.json");
+    expect(channel.updateCardByToken).not.toHaveBeenCalled();
   });
 });

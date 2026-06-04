@@ -18,11 +18,11 @@ import { buildHelpCard } from "./feishu/cards/help.js";
 import { buildModelsCard } from "./feishu/cards/models.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
 import {
+  type CardActionEvent,
   type Channel,
   createChannel,
   type NormalizedMessage,
 } from "./feishu/channel.js";
-import type { FeishuCommandHandler } from "./feishu/handler.js";
 import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
@@ -207,24 +207,12 @@ export function setupFeishuHandlers(
     );
   });
 
-  channel.on("cardAction", async (evt: any) => {
-    const value = evt?.action?.value ?? evt;
-    const messageId: string | undefined = evt?.messageId;
-    const chatId: string | undefined = evt?.chatId;
-    try {
-      await handleCardAction(
-        value,
-        messageId,
-        chatId,
-        runtime,
-        cwd,
-        channel,
-        handleSessions,
-        handleModels,
+  channel.on("cardAction", (evt: CardActionEvent) => {
+    setTimeout(() => {
+      handleCardAction(evt, runtime, cwd, channel).catch((err) =>
+        console.error("Card action failed:", err),
       );
-    } catch (err) {
-      console.error("Card action failed:", err);
-    }
+    }, 0);
   });
 
   channel.on("error", (err: Error) => {
@@ -244,23 +232,35 @@ export function setupFeishuHandlers(
   };
 }
 
-async function handleCardAction(
-  value: Record<string, any>,
-  messageId: string | undefined,
-  chatId: string | undefined,
+export async function handleCardAction(
+  evt: CardActionEvent,
   runtime: AgentSessionRuntime,
   cwd: string,
   channel: Channel,
-  handleSessions: FeishuCommandHandler,
-  handleModels: FeishuCommandHandler,
 ): Promise<void> {
+  // biome-ignore lint/suspicious/noExplicitAny: SDK type is unknown, destructuring requires any
+  const value = (evt?.action?.value ?? {}) as Record<string, any>;
+  const raw = evt?.raw as
+    | { event?: { token?: string }; token?: string }
+    | undefined;
+  const token: string | undefined = raw?.event?.token ?? raw?.token;
   const { cmd, action } = value;
 
   if (cmd === "help") {
-    if (action === "sessions" && chatId) {
-      await handleSessions(chatId);
-    } else if (action === "models" && chatId) {
-      await handleModels(chatId);
+    if (action === "sessions") {
+      const card = await buildSessionsCard({ runtime, cwd });
+      if (token) await channel.updateCardByToken(token, card);
+    } else if (action === "models") {
+      const authStorage = AuthStorage.create();
+      const registry = ModelRegistry.create(authStorage);
+      const available = await registry.getAvailable();
+      const card = await buildModelsCard({
+        session: runtime.session,
+        availableModels: available.filter(
+          (m): m is NonNullable<typeof m> => m != null,
+        ),
+      });
+      if (token) await channel.updateCardByToken(token, card);
     }
     return;
   }
@@ -276,14 +276,11 @@ async function handleCardAction(
       }
     }
     const card = await buildSessionsCard({ runtime, cwd });
-    if (chatId) {
-      if (messageId) {
-        await channel.send(chatId, { card }, { replyTo: messageId! });
-      } else {
-        await channel.send(chatId, { card });
-      }
-    }
-  } else if (cmd === "model" && action === "select") {
+    if (token) await channel.updateCardByToken(token, card);
+    return;
+  }
+
+  if (cmd === "model" && action === "select") {
     const { provider, modelId, thinkingLevel } = value;
     const authStorage = AuthStorage.create();
     const registry = ModelRegistry.create(authStorage);
@@ -299,12 +296,7 @@ async function handleCardAction(
         (m): m is NonNullable<typeof m> => m != null,
       ),
     });
-    if (chatId) {
-      if (messageId) {
-        await channel.send(chatId, { card }, { replyTo: messageId! });
-      } else {
-        await channel.send(chatId, { card });
-      }
-    }
+    if (token) await channel.updateCardByToken(token, card);
+    return;
   }
 }
