@@ -18,6 +18,7 @@ import { buildHelpCard } from "./feishu/cards/help.js";
 import { buildModelsCard } from "./feishu/cards/models.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
 import {
+  type CardActionEvent,
   type Channel,
   createChannel,
   type NormalizedMessage,
@@ -212,7 +213,7 @@ export function setupFeishuHandlers(
     const messageId: string | undefined = evt?.messageId;
     const chatId: string | undefined = evt?.chatId;
     try {
-      await handleCardAction(
+      await handleCardActionOld(
         value,
         messageId,
         chatId,
@@ -244,7 +245,16 @@ export function setupFeishuHandlers(
   };
 }
 
-async function handleCardAction(
+export async function handleCardAction(
+  evt: CardActionEvent,
+  runtime: AgentSessionRuntime,
+  cwd: string,
+  channel: Channel,
+): Promise<void> {
+  // stub — will be implemented in Task 4
+}
+
+async function handleCardActionOld(
   value: Record<string, any>,
   messageId: string | undefined,
   chatId: string | undefined,
