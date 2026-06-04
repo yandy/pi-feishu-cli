@@ -4,7 +4,9 @@
 
 **Goal:** 将所有卡片消息从 card JSON 1.0 迁移到 card JSON 2.0，卡片刷新改为原地更新（updateCard），失败回退到 reply 新卡。**不使用 CardKit API**。
 
-**Architecture:** 不新增文件、不新增 channel 方法。只改 helpers.ts（v2 JSON 结构）、三个 card builder（组件适配）、index.ts（updateCard + fallback）。channel.ts 完全不变。
+> **⚠️ 已过时：** 原位更新部分的方案（Task 4）已废弃。`channel.updateCard()`（PATCH API）在 WebSocket 模式下存在"更新后被重置"的竞态问题，详见 `docs/superpowers/specs/2026-06-04-card-in-place-update-design.md`。Task 1-3（v2 JSON 格式迁移）已完成且有效。
+
+**Architecture:** 不新增文件、不新增 channel 方法。只改 helpers.ts（v2 JSON 结构）、三个 card builder（组件适配）、index.ts（updateCard + fallback ~~→ 已由 `onRawEvent` 方案替代~~）。channel.ts 完全不变。
 
 **Tech Stack:** TypeScript, `@larksuiteoapi/node-sdk` v1.66, vitest
 
@@ -78,9 +80,11 @@ Run tests → PASS.
 
 ---
 
-### Task 4: GREEN — index.ts 卡片刷新改用 updateCard
+### Task 4: ~~GREEN — index.ts 卡片刷新改用 updateCard~~ ⚠️ 已废弃
 
-**Files:**
+> **此任务已过时。** 替换方案见 `docs/superpowers/specs/2026-06-04-card-in-place-update-design.md`。`updateCard`（PATCH API）方案存在竞态问题，新方案改用 `onRawEvent` 覆盖 SDK handler 在回调响应中直接返回新卡片。
+
+~~**Files:**~~
 - Modify: `src/index.ts`
 
 在 `handleCardAction` 中，将 session 和 model 分支的：
