@@ -7,7 +7,10 @@ import {
   createAgentSessionServices,
   getAgentDir,
   SessionManager,
+  type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { getFeishuContext } from "./feishu/context.js";
 
 export interface InitRuntimeOptions {
   cwd: string;
@@ -38,7 +41,74 @@ export async function initRuntime(
   }) => {
     const services = await createAgentSessionServices({
       cwd: runtimeCwd,
-      resourceLoaderOptions: { additionalSkillPaths },
+      resourceLoaderOptions: {
+        additionalSkillPaths,
+        extensionFactories: [
+          (pi: ExtensionAPI) => {
+            pi.registerTool({
+              name: "send_file_to_chat",
+              label: "发送文件到飞书聊天",
+              description:
+                "发送本地文件到当前的飞书聊天窗口。仅当处于飞书对话环境中时才可使用。",
+              promptGuidelines: [
+                "当你生成了需要交付给用户的文件时（如 Word文档 .docx、图片 .png/.jpg、PDF .pdf、Excel表格 .xlsx 等），请主动调用 send_file_to_chat 工具将文件发送到聊天窗口。",
+                "此工具只能发送位于当前工作目录（或子目录）中的文件。如果文件在 /tmp 等其他位置，先用 bash 工具将其复制或移动到当前目录下。",
+                "发送前确认文件已成功创建且路径正确。",
+                "文件名应能清楚表达文件内容。",
+              ],
+              parameters: Type.Object({
+                filePath: Type.String({ description: "要发送的本地文件路径" }),
+                fileName: Type.Optional(
+                  Type.String({
+                    description:
+                      "显示给用户的文件名，不传则用文件路径中的文件名",
+                  }),
+                ),
+              }),
+              async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+                const ctx = getFeishuContext();
+                if (!ctx) {
+                  return {
+                    content: [
+                      {
+                        type: "text",
+                        text: "当前不在飞书对话中，无法发送文件。请在飞书聊天中直接请求发送。如果需要在 TUI 终端中查看文件，请直接告知文件路径。",
+                      },
+                    ],
+                    details: {},
+                  };
+                }
+                try {
+                  await ctx.channel.sendFile(
+                    ctx.chatId,
+                    params.filePath,
+                    params.fileName,
+                  );
+                  return {
+                    content: [
+                      {
+                        type: "text",
+                        text: `文件 "${params.fileName ?? params.filePath}" 已发送到飞书聊天窗口。`,
+                      },
+                    ],
+                    details: {},
+                  };
+                } catch (err) {
+                  return {
+                    content: [
+                      {
+                        type: "text",
+                        text: `文件发送失败: ${(err as Error).message}`,
+                      },
+                    ],
+                    details: {},
+                  };
+                }
+              },
+            });
+          },
+        ],
+      },
     });
     return {
       ...(await createAgentSessionFromServices({
