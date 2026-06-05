@@ -1,3 +1,6 @@
+import { stat } from "node:fs/promises";
+import { basename } from "node:path";
+
 import {
   type CardActionEvent,
   createLarkChannel,
@@ -175,15 +178,14 @@ export function createChannel(options: ChannelOptions): Channel {
     },
 
     async sendFile(chatId: string, filePath: string, fileName?: string) {
-      const fs = await import("node:fs/promises");
-      const path = await import("node:path");
-      const stat = await fs.stat(filePath);
-      const name = fileName ?? path.basename(filePath);
+      const statResult = await stat(filePath);
+      const statSize = statResult.size;
+      const name = fileName ?? basename(filePath);
 
       const MAX_FILE_SIZE = 20 * 1024 * 1024;
-      if (stat.size > MAX_FILE_SIZE) {
+      if (statSize > MAX_FILE_SIZE) {
         throw new Error(
-          `文件过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，飞书文件消息上限为 20MB`,
+          `文件过大 (${(statSize / 1024 / 1024).toFixed(1)}MB)，飞书文件消息上限为 20MB`,
         );
       }
 
@@ -193,13 +195,13 @@ export function createChannel(options: ChannelOptions): Channel {
     },
 
     async sendImage(chatId: string, imagePath: string) {
-      const fs = await import("node:fs/promises");
-      const stat = await fs.stat(imagePath);
+      const statResult = await stat(imagePath);
+      const statSize = statResult.size;
 
       const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-      if (stat.size > MAX_IMAGE_SIZE) {
+      if (statSize > MAX_IMAGE_SIZE) {
         throw new Error(
-          `图片过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，飞书图片消息上限为 10MB`,
+          `图片过大 (${(statSize / 1024 / 1024).toFixed(1)}MB)，飞书图片消息上限为 10MB`,
         );
       }
 

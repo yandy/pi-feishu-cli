@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { basename } from "node:path";
 import { createLarkChannel } from "@larksuiteoapi/node-sdk";
 import { createChannel } from "../../src/feishu/channel.js";
 
@@ -27,8 +28,7 @@ vi.mock("@larksuiteoapi/node-sdk", () => ({
 }));
 
 afterEach(() => {
-  mockSend.mockClear();
-  (createLarkChannel as any).mockClear();
+  vi.clearAllMocks();
 });
 
 describe("sendFile", () => {
@@ -47,7 +47,7 @@ describe("sendFile", () => {
     const channel = createChannel({ appId: "test", appSecret: "secret" });
     mockSend.mockResolvedValue(undefined);
 
-    const baseName = __filename.split("/").pop();
+    const baseName = basename(__filename);
     await channel.sendFile("chat-1", __filename);
 
     expect(mockSend).toHaveBeenCalledWith("chat-1", {
