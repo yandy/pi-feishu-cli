@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { getFeishuContext, setFeishuContext } from "../../src/feishu/context.js";
 
 describe("FeishuContext", () => {
+  afterEach(() => {
+    setFeishuContext(null);
+  });
+
   it("returns null before any set", () => {
     expect(getFeishuContext()).toBeNull();
   });
