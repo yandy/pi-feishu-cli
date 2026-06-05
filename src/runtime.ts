@@ -5,9 +5,9 @@ import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
+  type ExtensionAPI,
   getAgentDir,
   SessionManager,
-  type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { getFeishuContext } from "./feishu/context.js";
@@ -98,7 +98,7 @@ export async function initRuntime(
                     content: [
                       {
                         type: "text",
-                        text: `文件发送失败: ${(err as Error).message}`,
+                        text: `文件发送失败: ${err instanceof Error ? err.message : String(err)}`,
                       },
                     ],
                     details: {},
