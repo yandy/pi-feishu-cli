@@ -1,4 +1,3 @@
-import { readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   type AgentSessionRuntime,
@@ -6,11 +5,8 @@ import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
-  createSyntheticSourceInfo,
   getAgentDir,
-  type ResourceDiagnostic,
   SessionManager,
-  type Skill,
 } from "@earendil-works/pi-coding-agent";
 
 export interface InitRuntimeOptions {
@@ -24,41 +20,6 @@ export interface InitRuntimeResult {
   runtime: AgentSessionRuntime;
 }
 
-function loadSkillsFromDir(skillsDir: string): Skill[] {
-  const skills: Skill[] = [];
-  try {
-    statSync(skillsDir);
-  } catch {
-    return skills;
-  }
-
-  for (const entry of readdirSync(skillsDir)) {
-    const fullPath = join(skillsDir, entry);
-    const stat = statSync(fullPath);
-    if (!stat.isDirectory()) continue;
-    const skillMd = join(fullPath, "SKILL.md");
-    try {
-      statSync(skillMd);
-    } catch {
-      continue;
-    }
-    skills.push({
-      name: entry,
-      description: `Skill from ${entry}`,
-      filePath: skillMd,
-      baseDir: fullPath,
-      sourceInfo: createSyntheticSourceInfo(skillMd, {
-        source: "project",
-        scope: "project",
-        origin: "top-level",
-        baseDir: fullPath,
-      }),
-      disableModelInvocation: false,
-    });
-  }
-  return skills;
-}
-
 export async function initRuntime(
   options: InitRuntimeOptions,
 ): Promise<InitRuntimeResult> {
@@ -68,15 +29,7 @@ export async function initRuntime(
   const packageRoot = options.packageRoot ?? cwd;
   const noBundle = options.noBundleFeishuSkills ?? false;
   const skillsDir = join(packageRoot, "skills");
-  const customSkills = noBundle ? [] : loadSkillsFromDir(skillsDir);
-
-  const skillsOverride = (current: {
-    skills: Skill[];
-    diagnostics: ResourceDiagnostic[];
-  }) => ({
-    skills: customSkills,
-    diagnostics: current.diagnostics,
-  });
+  const additionalSkillPaths = noBundle ? [] : [skillsDir];
 
   const createRuntime: CreateAgentSessionRuntimeFactory = async ({
     cwd: runtimeCwd,
@@ -85,7 +38,7 @@ export async function initRuntime(
   }) => {
     const services = await createAgentSessionServices({
       cwd: runtimeCwd,
-      resourceLoaderOptions: { skillsOverride },
+      resourceLoaderOptions: { additionalSkillPaths },
     });
     return {
       ...(await createAgentSessionFromServices({
