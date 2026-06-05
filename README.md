@@ -1,167 +1,194 @@
 # pi-feishu
 
-A CLI tool that runs [Pi](https://pi.ai) as a terminal TUI and connects it to a Feishu (Lark) bot for remote interaction. The TUI and the Feishu bot share the same AgentSessionRuntime session — interact from either interface interchangeably.
+一个 CLI 工具，在终端中以 TUI 方式运行 [Pi](https://pi.ai)，并将其连接到飞书机器人以实现远程交互。TUI 与飞书机器人共享同一个 AgentSessionRuntime 会话 — 可在任一界面中交替使用。
 
-## Prerequisites
+## 前置要求
 
 - Node.js >= 22
-- Pi API keys configured (`~/.pi/agent/auth.json`)
-- Feishu app with bot capabilities enabled (permissions: `im:message`, `im:message.group_msg`, `card.action.trigger`)
+- 已配置 Pi API 密钥（`~/.pi/agent/auth.json`）
+- 已启用机器人能力的飞书应用（权限：`im:message`、`im:message.group_msg`、`card.action.trigger`）
 
-## Installation
+## 安装
 
 ```bash
 npm install -g pi-feishu-cli
 ```
 
-Or run directly without installing:
+或不安装直接运行：
 
 ```bash
 npx pi-feishu
 ```
 
-## Quick Start
+## 快速开始
 
 ```bash
 pi-feishu --app-id cli_xxx --app-secret xxx
 ```
 
-If credentials are missing, the CLI prompts you to enter them interactively and saves them to `~/.pi/agent/feishu.json`.
+如果缺少凭证，CLI 会交互式提示输入并将其保存到 `~/.pi/agent/feishu.json`。
 
-## CLI Arguments
+## CLI 参数
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--app-id <id>` | — | Feishu app ID |
-| `--app-secret <key>` | — | Feishu app secret |
-| `--config <path>` | — | Path to JSON config file |
-| `--log-level <level>` | `warn` | One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace` |
-| `--bot-name <name>` | `PI Agent` | Bot display name in help card |
-| `--no-bundle-feishu-skills` | — | Skip loading project `skills/` directory |
-| `--help`, `-h` | — | Show help and exit |
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--app-id <id>` | — | 飞书 App ID |
+| `--app-secret <key>` | — | 飞书 App Secret |
+| `--config <path>` | — | JSON 配置文件路径 |
+| `--log-level <level>` | `warn` | 可选值：`fatal`、`error`、`warn`、`info`、`debug`、`trace` |
+| `--bot-name <name>` | `PI Agent` | 帮助卡片中显示的机器人名称 |
+| `--no-bundle-feishu-skills` | — | 跳过加载项目 `skills/` 目录 |
+| `--help`、`-h` | — | 显示帮助并退出 |
 
-## Configuration
+## 配置
 
-Feishu credentials are resolved with the following priority (higher overrides lower):
+飞书凭证按以下优先级解析（高优先级覆盖低优先级）：
 
-| Priority | Source | Example |
-|----------|--------|---------|
-| 1 (highest) | CLI args | `pi-feishu --app-id xxx --app-secret xxx` |
-| 2 | Config file | `.pi/feishu.json` or `~/.pi/agent/feishu.json` (searched in order) |
-| 3 (lowest) | Env vars | `FEISHU_APP_ID`, `FEISHU_APP_SECRET`, `FEISHU_BOT_NAME`, `FEISHU_NO_BUNDLE_SKILLS` |
+| 优先级 | 来源 | 示例 |
+|--------|------|------|
+| 1（最高） | CLI 参数 | `pi-feishu --app-id xxx --app-secret xxx` |
+| 2 | 配置文件 | `.pi/feishu.json` 或 `~/.pi/agent/feishu.json`（按顺序查找） |
+| 3（最低） | 环境变量 | `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_BOT_NAME`、`FEISHU_NO_BUNDLE_SKILLS` |
 
-Config file format:
+配置文件格式：
 
 ```json
 { "appId": "cli_xxx", "appSecret": "xxx", "botName": "My Bot", "noBundleFeishuSkills": true }
 ```
 
-Override config file path with `--config`:
+使用 `--config` 覆盖配置文件路径：
 
 ```bash
 pi-feishu --config /path/to/config.json
 ```
 
-## Feishu Bot Commands
+## 飞书机器人命令
 
-| Command | Action |
-|---------|--------|
-| `/sessions` | Show session management card — list, switch, delete, and create sessions |
-| `/models` | Show model and thinking level selection card |
-| `/help` | Show usage instructions |
-| *any other message* | Chat with Pi — streaming response via Feishu cards (typewriter effect) |
+| 命令 | 操作 |
+|------|------|
+| `/sessions` | 显示会话管理卡片 — 列出、切换、删除和创建会话 |
+| `/models` | 显示模型和 thinking level 选择卡片 |
+| `/help` | 显示使用说明 |
+| *其他任意消息* | 与 Pi 对话 — 通过飞书卡片流式输出（打字机效果） |
 
-### Card Interactions
+### 卡片交互
 
-Clickable buttons on cards support the following actions:
+卡片上的可点击按钮支持以下操作：
 
-- **Session management:** new, switch, delete
-- **Model management:** select provider/model/thinking level (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`)
-- **Help card navigation:** jump to sessions or models card
+- **会话管理：** 新建、切换、删除
+- **模型管理：** 选择 provider/model/thinking level（`off`、`minimal`、`low`、`medium`、`high`、`xhigh`）
+- **帮助卡片导航：** 跳转到会话或模型卡片
 
-## Architecture
+## 架构
 
 ```
-cli.ts                     CLI entry — parse args, load config, call main()
-  └─ src/config.ts         Credential resolution CLI > config file > env vars
-  └─ src/runtime.ts        AgentSessionRuntime initialization + skill loading
-  └─ src/feishu/
-       ├─ channel.ts       LarkChannel wrapper — WebSocket, send, stream, cards
-       ├─ handler.ts       Message routing — commands vs conversation
-       ├─ streaming.ts     Session events → Feishu card streaming (typewriter)
-       └─ cards/
-            ├─ sessions.ts Session management card
-            ├─ models.ts   Model selection card
-            ├─ help.ts     Help card
-            └─ helpers.ts  Shared card building utilities
-  └─ InteractiveMode       TUI (from @earendil-works/pi-coding-agent)
+cli.ts (根目录)              CLI 入口 — 解析 CLI 参数，调用 main()
+  └─ src/index.ts            主入口 — 加载配置、初始化 runtime、连接飞书、启动 TUI
+       ├─ src/config.ts      凭证解析 CLI > 配置文件 > 环境变量
+       ├─ src/runtime.ts     AgentSessionRuntime 初始化 + skill 加载
+       │                     + send_file_to_chat 工具注册（extension factory）
+       ├─ src/types.ts       FeishuConfig 类型定义
+       ├─ src/feishu/
+       │    ├─ channel.ts    LarkChannel 封装 — WebSocket、发送、流式、卡片、文件/图片
+       │    ├─ handler.ts    消息路由 — 命令 vs 对话
+       │    ├─ streaming.ts  会话事件 → 飞书卡片流式输出（打字机效果）
+       │    ├─ attachments.ts 下载并处理消息附件（图片、文件、音频、视频）
+       │    ├─ context.ts    当前飞书聊天上下文（chatId + channel），供工具调用
+       │    └─ cards/
+       │         ├─ sessions.ts  会话管理卡片
+       │         ├─ models.ts    模型选择卡片
+       │         ├─ help.ts      帮助卡片
+       │         └─ helpers.ts   共享卡片构建工具函数
+       └─ InteractiveMode       TUI（来自 @earendil-works/pi-coding-agent）
 ```
 
 ### Channel API
 
-`createChannel(opts)` wraps `@larksuiteoapi/node-sdk`'s `LarkChannel` and returns a `Channel` interface.
+`createChannel(opts)` 封装了 `@larksuiteoapi/node-sdk` 的 `createLarkChannel`，返回一个 `Channel` 接口。
 
-**Events:**
+**事件：**
 
-| Event | Handler | Description |
-|-------|---------|-------------|
-| `message` | `(msg: NormalizedMessage) => void` | Incoming Feishu message |
-| `cardAction` | `(evt: any) => void` | Card button click |
-| `error` | `(err: Error) => void` | Channel-level error |
-| `reconnecting` | `() => void` | SDK reconnecting |
-| `reconnected` | `() => void` | SDK reconnected |
-| `botAdded` | `() => void` | Bot added to a chat |
-| `onRawEvent(type, handler)` | — | Register a handler for a raw SDK event type on the underlying dispatcher |
+| 事件 | 处理器 | 说明 |
+|------|--------|------|
+| `message` | `(msg: NormalizedMessage) => void` | 收到飞书消息 |
+| `cardAction` | `(evt: CardActionEvent) => void` | 卡片按钮点击 |
+| `error` | `(err: Error) => void` | 通道级别错误 |
+| `reconnecting` | `() => void` | SDK 正在重连 |
+| `reconnected` | `() => void` | SDK 重连成功 |
+| `botAdded` | `() => void` | 机器人被添加到聊天 |
+| `onRawEvent(type, handler)` | — | 在底层 dispatcher 上注册原始 SDK 事件处理器 |
 
-**Methods:** `connect`, `disconnect`, `send`, `stream`, `updateCard`, `onRawEvent`
+**方法：** `connect`、`disconnect`、`send`、`stream`、`updateCard`、`updateCardByToken`、`sendFile`、`sendImage`、`downloadMessageResource`、`onRawEvent`
 
-### Data Flow
+### 数据流
 
 ```
-Feishu user → WebSocket → channel.on("message")
-  ├── /sessions  → build card → channel.send(card)
-  ├── /models    → build card → channel.send(card)
-  ├── /help      → build card → channel.send(card)
-  └── text       → session.prompt(text) → events → channel.stream().append()
+飞书用户 → WebSocket → channel.on("message")
+  ├── /sessions  → setupFeishuHandlers → channel.send(card)
+  ├── /models    → setupFeishuHandlers → channel.send(card)
+  ├── /help      → setupFeishuHandlers → channel.send(card)
+  └── text       → setFeishuContext() + processAttachments() → channel.stream()
+                     → handler.ts: createMessageHandler → session.prompt(text)
+                     → streaming.ts: createStreamingHandler → stream.append()
 
-Card click → channel.on("cardAction")
-  ├── session: new/switch/delete → runtime.* → updateCard()
-  └── model: select → session.setModel() + setThinkingLevel() → updateCard()
+卡片点击 → channel.on("cardAction") → index.ts: handleCardAction()
+  ├── session: new / switch / delete → runtime.* → updateCardByToken(token, card)
+  ├── model: select → session.setModel() + setThinkingLevel() → updateCardByToken(token, card)
+  └── help: navigate → buildSessionsCard / buildModelsCard → updateCardByToken(token, card)
+
+工具调用 → runtime extension factory → send_file_to_chat
+  └── getFeishuContext() → channel.sendFile(chatId, filePath)
 ```
+
+## 注册的工具
+
+### `send_file_to_chat`
+
+一个运行时注册的自定义工具，允许 Pi 将文件发送到当前飞书聊天窗口。
+
+- **参数：** `filePath`（字符串，必填）、`fileName`（字符串，可选）
+- **限制：** 仅在飞书对话会话中可用；文件大小限制 20MB
+- **Prompt 引导：** 模型被指示在生成可交付文件（docx、pdf、xlsx、图片等）时自动使用此工具
 
 ## Skills
 
-The `skills/` directory contains 26 Lark API skills that provide Pi with knowledge of Feishu's ecosystem: documents, calendar, mail, spreadsheets, wiki, approval, attendance, task, minutes, whiteboard, and more. These are automatically loaded at startup via `loadSkillsFromDir()`.
+`skills/` 目录包含 26 个 Lark API skills，为 Pi 提供飞书生态的知识：文档、日历、邮件、电子表格、知识库、审批、考勤、任务、会议纪要、白板等。启动时通过 `loadSkillsFromDir()` 自动加载。使用 `--no-bundle-feishu-skills` 可跳过加载这些 skills。
 
-## Development
+Skills 可从飞书 well-known endpoint 刷新：
+
+```bash
+npm run update-skills
+```
+
+## 开发
 
 ```bash
 npm install
-npm run build     # tsc compile to dist/
-npm run check     # tsc --noEmit type check
+npm run build     # tsc 编译到 dist/
+npm run check     # tsc --noEmit 类型检查
 npm run dev       # tsc --watch
 npm test          # vitest run
 npm run test:watch # vitest
 ```
 
-### Test Structure
+### 测试结构
 
-Tests mirror `src/` under `tests/` using Vitest:
+测试文件与 `src/` 目录结构对应，位于 `tests/` 下，使用 Vitest：
 
 ```bash
 npx vitest run tests/feishu/channel.test.ts
 ```
 
-## Publishing
+## 发布
 
-Published to npm on GitHub Release (CI workflow in `.github/workflows/publish.yml`).
+通过 GitHub Release 发布到 npm（CI 工作流在 `.github/workflows/publish.yml` 中）。
 
 ```bash
 npm version patch
 git push --tags
-# Create GitHub Release → auto-publishes with --provenance
+# 创建 GitHub Release → 自动以 --provenance 发布
 ```
 
-## License
+## 许可证
 
 MIT
