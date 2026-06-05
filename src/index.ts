@@ -23,6 +23,7 @@ import {
   createChannel,
   type NormalizedMessage,
 } from "./feishu/channel.js";
+import { setFeishuContext } from "./feishu/context.js";
 import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
@@ -170,6 +171,8 @@ export function setupFeishuHandlers(
       await messageHandler(msg);
       return;
     }
+
+    setFeishuContext({ chatId: msg.chatId, channel });
 
     let attachments: ProcessedAttachments | undefined;
     let downloadDir: string | undefined;
