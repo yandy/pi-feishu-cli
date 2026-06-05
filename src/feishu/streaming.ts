@@ -71,9 +71,7 @@ export function createStreamingHandler(
       }
 
       case "tool_execution_start":
-        stream.append(
-          closeThinkBlock() + `🔧 ${event.toolName ?? ""}`,
-        );
+        stream.append(closeThinkBlock() + `🔧 ${event.toolName ?? ""}`);
         needLineBreak = true;
         break;
 
@@ -83,9 +81,7 @@ export function createStreamingHandler(
         break;
 
       case "tool_execution_end":
-        stream.append(
-          closeThinkBlock() + (event.isError ? "❌" : "✅"),
-        );
+        stream.append(closeThinkBlock() + (event.isError ? "❌" : "✅"));
         needLineBreak = true;
         break;
 
