@@ -125,7 +125,11 @@ describe("createChannel", () => {
       const channel = createChannel({ appId: "test", appSecret: "secret" });
       mockRawChannel.rawClient.request.mockClear();
 
-      const card = { schema: "2.0", header: { title: { tag: "plain_text", content: "test" } }, body: { elements: [] } };
+      const card = {
+        schema: "2.0",
+        header: { title: { tag: "plain_text", content: "test" } },
+        body: { elements: [] },
+      };
       await channel.updateCardByToken("c-token-abc", card);
 
       expect(mockRawChannel.rawClient.request).toHaveBeenCalledWith({

@@ -69,19 +69,23 @@ export async function buildSessionsCard(
         tag: "button",
         text: { tag: "plain_text", content: "切换" },
         type: "default",
-        behaviors: [{
-          type: "callback",
-          value: { cmd: "session", action: "switch", sessionPath: s.path },
-        }],
+        behaviors: [
+          {
+            type: "callback",
+            value: { cmd: "session", action: "switch", sessionPath: s.path },
+          },
+        ],
       });
       elements.push({
         tag: "button",
         text: { tag: "plain_text", content: "删除" },
         type: "danger",
-        behaviors: [{
-          type: "callback",
-          value: { cmd: "session", action: "delete", sessionPath: s.path },
-        }],
+        behaviors: [
+          {
+            type: "callback",
+            value: { cmd: "session", action: "delete", sessionPath: s.path },
+          },
+        ],
       });
     }
   }
@@ -91,14 +95,13 @@ export async function buildSessionsCard(
     tag: "button",
     text: { tag: "plain_text", content: "新建 Session" },
     type: "primary",
-    behaviors: [{
-      type: "callback",
-      value: { cmd: "session", action: "new" },
-    }],
+    behaviors: [
+      {
+        type: "callback",
+        value: { cmd: "session", action: "new" },
+      },
+    ],
   });
 
-  return buildCard(
-    createCardHeader("Session 管理", "blue"),
-    elements,
-  );
+  return buildCard(createCardHeader("Session 管理", "blue"), elements);
 }

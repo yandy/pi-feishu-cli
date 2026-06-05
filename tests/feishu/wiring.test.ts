@@ -167,7 +167,12 @@ describe("handleCardAction", () => {
       raw: { token: "c-token-abc" },
     };
 
-    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+    await handleCardAction(
+      evt as any,
+      runtime as any,
+      "/tmp/cwd",
+      channel as any,
+    );
 
     expect(runtime.switchSession).toHaveBeenCalledWith("/tmp/s.json");
     expect(channel.updateCardByToken).toHaveBeenCalledWith(
@@ -185,13 +190,24 @@ describe("handleCardAction", () => {
       chatId: "chat-1",
       operator: { openId: "ou-1" },
       action: {
-        value: { cmd: "model", action: "select", provider: "openai", modelId: "gpt-4", thinkingLevel: "high" },
+        value: {
+          cmd: "model",
+          action: "select",
+          provider: "openai",
+          modelId: "gpt-4",
+          thinkingLevel: "high",
+        },
         tag: "button",
       },
       raw: { event: { token: "c-token-def" } },
     };
 
-    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+    await handleCardAction(
+      evt as any,
+      runtime as any,
+      "/tmp/cwd",
+      channel as any,
+    );
 
     expect(channel.updateCardByToken).toHaveBeenCalledWith(
       "c-token-def",
@@ -214,7 +230,12 @@ describe("handleCardAction", () => {
       raw: { token: "c-token-ghi" },
     };
 
-    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+    await handleCardAction(
+      evt as any,
+      runtime as any,
+      "/tmp/cwd",
+      channel as any,
+    );
 
     expect(channel.updateCardByToken).toHaveBeenCalledWith(
       "c-token-ghi",
@@ -237,7 +258,12 @@ describe("handleCardAction", () => {
       raw: {},
     };
 
-    await handleCardAction(evt as any, runtime as any, "/tmp/cwd", channel as any);
+    await handleCardAction(
+      evt as any,
+      runtime as any,
+      "/tmp/cwd",
+      channel as any,
+    );
 
     expect(runtime.switchSession).toHaveBeenCalledWith("/tmp/s.json");
     expect(channel.updateCardByToken).not.toHaveBeenCalled();

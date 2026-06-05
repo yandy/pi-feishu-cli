@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { basename } from "node:path";
 import { createLarkChannel } from "@larksuiteoapi/node-sdk";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createChannel } from "../../src/feishu/channel.js";
 
 const mockSend = vi.fn();
@@ -71,7 +71,11 @@ describe("sendImage", () => {
 
 describe("allowedFileDirs", () => {
   it("passes outbound.allowedFileDirs when cwd is provided", () => {
-    createChannel({ appId: "test", appSecret: "secret", cwd: "/home/user/project" });
+    createChannel({
+      appId: "test",
+      appSecret: "secret",
+      cwd: "/home/user/project",
+    });
 
     expect(createLarkChannel).toHaveBeenCalledWith(
       expect.objectContaining({

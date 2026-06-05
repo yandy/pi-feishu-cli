@@ -6,9 +6,8 @@ describe("send_file_to_chat tool registration", () => {
     const { runtime } = await initRuntime({ cwd: process.cwd() });
 
     const extResult = runtime.services.resourceLoader.getExtensions();
-    const allTools = extResult.extensions.flatMap(
-      (ext: any) =>
-        ext.tools instanceof Map ? [...ext.tools.keys()] : [],
+    const allTools = extResult.extensions.flatMap((ext: any) =>
+      ext.tools instanceof Map ? [...ext.tools.keys()] : [],
     );
     expect(allTools).toContain("send_file_to_chat");
   }, 30000);
