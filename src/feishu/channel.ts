@@ -22,6 +22,7 @@ export interface ChannelOptions {
   appId: string;
   appSecret: string;
   logLevel?: string;
+  cwd?: string;
 }
 
 export interface StreamController {
@@ -80,6 +81,8 @@ export interface Channel {
     content: { text?: string; markdown?: string; card?: unknown },
     options?: { replyTo?: string },
   ): Promise<void>;
+  sendFile(chatId: string, filePath: string, fileName?: string): Promise<void>;
+  sendImage(chatId: string, imagePath: string): Promise<void>;
   downloadMessageResource(
     messageId: string,
     fileKey: string,
@@ -107,6 +110,7 @@ export function createChannel(options: ChannelOptions): Channel {
     loggerLevel,
     policy: { requireMention: true, dmMode: "open" },
     includeRawEvent: true,
+    ...(options.cwd ? { outbound: { allowedFileDirs: [options.cwd] } } : {}),
   }) as unknown as RawLarkChannel;
 
   let _connected = false;
@@ -167,6 +171,40 @@ export function createChannel(options: ChannelOptions): Channel {
         url: "/open-apis/interactive/v1/card/update",
         method: "POST",
         data: { token, card },
+      });
+    },
+
+    async sendFile(chatId: string, filePath: string, fileName?: string) {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const stat = await fs.stat(filePath);
+      const name = fileName ?? path.basename(filePath);
+
+      const MAX_FILE_SIZE = 20 * 1024 * 1024;
+      if (stat.size > MAX_FILE_SIZE) {
+        throw new Error(
+          `文件过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，飞书文件消息上限为 20MB`,
+        );
+      }
+
+      await raw.send(chatId, {
+        file: { source: filePath, fileName: name },
+      });
+    },
+
+    async sendImage(chatId: string, imagePath: string) {
+      const fs = await import("node:fs/promises");
+      const stat = await fs.stat(imagePath);
+
+      const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+      if (stat.size > MAX_IMAGE_SIZE) {
+        throw new Error(
+          `图片过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，飞书图片消息上限为 10MB`,
+        );
+      }
+
+      await raw.send(chatId, {
+        image: { source: imagePath },
       });
     },
 
