@@ -64,7 +64,7 @@ describe("initRuntime", () => {
     }
   }, 30000);
 
-  it("loads bundled skills from packageRoot, not from cwd", async () => {
+  it("loads skills from additionalSkillPaths when packageRoot is set", async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
     try {
       // Create mock skills under packageRoot/skills/
