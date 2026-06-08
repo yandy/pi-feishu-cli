@@ -28,6 +28,7 @@ import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
+import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
 
 export async function resumeMostRecentSession(
   runtime: AgentSessionRuntime,
@@ -50,6 +51,7 @@ export interface MainOptions {
   packageRoot?: string;
   botName?: string;
   noBundleFeishuSkills?: boolean;
+  piArgs?: PiArgs;
 }
 
 export async function main(options: MainOptions = {}): Promise<void> {

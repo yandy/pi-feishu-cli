@@ -6,6 +6,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs as parsePiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
 import { main } from "./src/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,28 +21,50 @@ interface CliArgs {
   noBundleFeishuSkills?: boolean;
 }
 
-function parseArgs(argv: string[]): CliArgs {
+export function parseArgs(argv: string[]): { cliArgs: CliArgs; remainingArgs: string[] } {
+  const consumed = new Set<number>();
   const result: CliArgs = {};
 
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
     switch (arg) {
       case "--app-id":
-        if (i + 1 < argv.length) result.appId = argv[++i];
+        if (i + 1 < argv.length) {
+          consumed.add(i);
+          consumed.add(i + 1);
+          result.appId = argv[++i];
+        }
         break;
       case "--app-secret":
-        if (i + 1 < argv.length) result.appSecret = argv[++i];
+        if (i + 1 < argv.length) {
+          consumed.add(i);
+          consumed.add(i + 1);
+          result.appSecret = argv[++i];
+        }
         break;
       case "--config":
-        if (i + 1 < argv.length) result.config = argv[++i];
+        if (i + 1 < argv.length) {
+          consumed.add(i);
+          consumed.add(i + 1);
+          result.config = argv[++i];
+        }
         break;
       case "--log-level":
-        if (i + 1 < argv.length) result.logLevel = argv[++i];
+        if (i + 1 < argv.length) {
+          consumed.add(i);
+          consumed.add(i + 1);
+          result.logLevel = argv[++i];
+        }
         break;
       case "--bot-name":
-        if (i + 1 < argv.length) result.botName = argv[++i];
+        if (i + 1 < argv.length) {
+          consumed.add(i);
+          consumed.add(i + 1);
+          result.botName = argv[++i];
+        }
         break;
       case "--no-bundle-feishu-skills":
+        consumed.add(i);
         result.noBundleFeishuSkills = true;
         break;
       case "--help":
@@ -51,7 +74,8 @@ function parseArgs(argv: string[]): CliArgs {
     }
   }
 
-  return result;
+  const remainingArgs = argv.filter((_, i) => !consumed.has(i));
+  return { cliArgs: result, remainingArgs };
 }
 
 function printHelp(): void {
@@ -77,7 +101,8 @@ Config file location:
 `);
 }
 
-const cliArgs = parseArgs(process.argv);
+const { cliArgs, remainingArgs } = parseArgs(process.argv);
+const piArgs = parsePiArgs(remainingArgs);
 
 main({
   appId: cliArgs.appId,
@@ -86,6 +111,7 @@ main({
   logLevel: cliArgs.logLevel,
   botName: cliArgs.botName,
   noBundleFeishuSkills: cliArgs.noBundleFeishuSkills,
+  piArgs,
   packageRoot,
 }).catch((err) => {
   console.error(
