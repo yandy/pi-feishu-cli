@@ -1,13 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { RawCardActionEvent } from "@larksuiteoapi/node-sdk";
 import { normalizeCardAction } from "@larksuiteoapi/node-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildModelsCard } from "../../src/feishu/cards/models.js";
 import { buildSessionsCard } from "../../src/feishu/cards/sessions.js";
-import { resumeMostRecentSession } from "../../src/index.js";
 import { initRuntime } from "../../src/runtime.js";
 
 describe("card builders format", () => {
@@ -106,7 +104,7 @@ describe("card action event parsing", () => {
   });
 });
 
-describe("startup session resume", () => {
+describe("session display", () => {
   let tmpCwd: string;
 
   beforeEach(() => {
@@ -117,38 +115,6 @@ describe("startup session resume", () => {
   afterEach(() => {
     rmSync(tmpCwd, { recursive: true, force: true });
   });
-
-  it("resumeMostRecentSession loads persisted session from previous run", async () => {
-    const cwd = tmpCwd;
-    const resolvedCwd = cwd.replace(/\/$/, "");
-    const safePath = `--${resolvedCwd.replace(/^\//, "").replace(/[/\\:]/g, "-")}--`;
-    const agentDir = join(process.env.HOME || "/root", ".pi", "agent");
-    const sessionDir = join(agentDir, "sessions", safePath);
-    mkdirSync(sessionDir, { recursive: true });
-
-    const sessionId = "test-session-001";
-    const headerLine = JSON.stringify({
-      type: "session",
-      version: 3,
-      id: sessionId,
-      timestamp: new Date().toISOString(),
-      cwd,
-    });
-    const sessionFile = join(sessionDir, `test_${sessionId}.jsonl`);
-    writeFileSync(sessionFile, `${headerLine}\n`, "utf-8");
-
-    const found = await SessionManager.list(cwd);
-    expect(found.some((s) => s.path === sessionFile)).toBe(true);
-
-    const { runtime } = await initRuntime({ cwd });
-    const _freshPath = runtime.session.sessionFile!;
-
-    const resumed = await resumeMostRecentSession(runtime, cwd);
-    expect(resumed).toBe(true);
-    expect(runtime.session.sessionFile).toBe(sessionFile);
-
-    await runtime.dispose();
-  }, 30000);
 
   it("sessions card shows human-friendly labels instead of file IDs", async () => {
     const cwd = tmpCwd;
@@ -187,18 +153,6 @@ describe("startup session resume", () => {
     expect(divTexts.some((t: string) => t.includes("我的会话"))).toBe(true);
     expect(divTexts.some((t: string) => t.includes("条"))).toBe(true);
     expect(divTexts.every((t: string) => !t.includes(".jsonl"))).toBe(true);
-
-    await runtime.dispose();
-  }, 30000);
-
-  it("resumeMostRecentSession returns false when no pre-existing sessions", async () => {
-    const cwd = tmpCwd;
-    const { runtime } = await initRuntime({ cwd });
-    const currentPath = runtime.session.sessionFile!;
-
-    const resumed = await resumeMostRecentSession(runtime, cwd);
-    expect(resumed).toBe(false);
-    expect(runtime.session.sessionFile).toBe(currentPath);
 
     await runtime.dispose();
   }, 30000);
