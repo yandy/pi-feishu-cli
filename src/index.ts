@@ -11,10 +11,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import { processFileArguments } from "@earendil-works/pi-coding-agent/dist/cli/file-processor.js";
-import {
-  buildInitialMessage,
-  type InitialMessageResult,
-} from "@earendil-works/pi-coding-agent/dist/cli/initial-message.js";
 import { resolveCliModel } from "@earendil-works/pi-coding-agent/dist/core/model-resolver.js";
 import { loadConfig, promptAndSaveCredentials } from "./config.js";
 import {
@@ -83,6 +79,15 @@ export function createSessionManager(
   return SessionManager.create(cwd);
 }
 
+export function buildInitialMessage({ parsed }: { parsed: PiArgs }): string | undefined {
+  if (parsed.messages.length > 0) {
+    const msg = parsed.messages[0];
+    parsed.messages.shift();
+    return msg;
+  }
+  return undefined;
+}
+
 export async function main(options: MainOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
@@ -142,22 +147,9 @@ export async function main(options: MainOptions = {}): Promise<void> {
   }
 
   let initialMessage: string | undefined;
-  let initialImages: InitialMessageResult["initialImages"];
 
   if (parsed) {
-    const fileResult =
-      parsed.fileArgs.length > 0
-        ? await processFileArguments(parsed.fileArgs, {
-            autoResizeImages: false,
-          })
-        : { text: undefined, images: [] };
-    const built = buildInitialMessage({
-      parsed,
-      fileText: fileResult.text,
-      fileImages: fileResult.images,
-    });
-    initialMessage = built.initialMessage;
-    initialImages = built.initialImages;
+    initialMessage = buildInitialMessage({ parsed });
   }
 
   const channel: Channel | null = await connectFeishu(
@@ -173,7 +165,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   try {
     const mode = new InteractiveMode(runtime, {
       initialMessage,
-      initialImages,
+      initialImages: [],
       initialMessages: parsed?.messages,
       verbose: parsed?.verbose,
     });
