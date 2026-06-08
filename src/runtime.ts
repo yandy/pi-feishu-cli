@@ -9,8 +9,8 @@ import {
   getAgentDir,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
+import { Type } from "typebox";
 import { getFeishuContext } from "./feishu/context.js";
 
 function isLocalPath(value: string): boolean {
@@ -29,7 +29,9 @@ function isLocalPath(value: string): boolean {
 }
 
 function resolvePath(input: string, baseDir: string): string {
-  return isAbsolute(input) ? nodeResolvePath(input) : nodeResolvePath(baseDir, input);
+  return isAbsolute(input)
+    ? nodeResolvePath(input)
+    : nodeResolvePath(baseDir, input);
 }
 
 export interface InitRuntimeOptions {
@@ -65,7 +67,7 @@ export async function initRuntime(
   const baseSkillPaths = noBundle ? [] : [skillsDir];
   const additionalSkillPaths = [
     ...(parsed?.noSkills ? [] : baseSkillPaths),
-    ...(parsed?.skills ? resolveCLIPaths(parsed.skills) ?? [] : []),
+    ...(parsed?.skills ? (resolveCLIPaths(parsed.skills) ?? []) : []),
   ];
 
   const createRuntime: CreateAgentSessionRuntimeFactory = async ({

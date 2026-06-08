@@ -9,6 +9,13 @@ import {
   ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
+import { processFileArguments } from "@earendil-works/pi-coding-agent/dist/cli/file-processor.js";
+import {
+  buildInitialMessage,
+  type InitialMessageResult,
+} from "@earendil-works/pi-coding-agent/dist/cli/initial-message.js";
+import { resolveCliModel } from "@earendil-works/pi-coding-agent/dist/core/model-resolver.js";
 import { loadConfig, promptAndSaveCredentials } from "./config.js";
 import {
   type ProcessedAttachments,
@@ -28,13 +35,6 @@ import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
-import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
-import {
-  type InitialMessageResult,
-  buildInitialMessage,
-} from "@earendil-works/pi-coding-agent/dist/cli/initial-message.js";
-import { processFileArguments } from "@earendil-works/pi-coding-agent/dist/cli/file-processor.js";
-import { resolveCliModel } from "@earendil-works/pi-coding-agent/dist/core/model-resolver.js";
 
 export async function resumeMostRecentSession(
   runtime: AgentSessionRuntime,

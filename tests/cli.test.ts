@@ -6,10 +6,14 @@ describe("parseArgs", () => {
     const { cliArgs, remainingArgs } = parseArgs([
       "node",
       "pi-feishu",
-      "--app-id", "my-app",
-      "--app-secret", "my-secret",
-      "--model", "claude-sonnet",
-      "--thinking", "high",
+      "--app-id",
+      "my-app",
+      "--app-secret",
+      "my-secret",
+      "--model",
+      "claude-sonnet",
+      "--thinking",
+      "high",
       "do something",
     ]);
 
@@ -18,8 +22,10 @@ describe("parseArgs", () => {
     expect(remainingArgs).toEqual([
       "node",
       "pi-feishu",
-      "--model", "claude-sonnet",
-      "--thinking", "high",
+      "--model",
+      "claude-sonnet",
+      "--thinking",
+      "high",
       "do something",
     ]);
   });
@@ -28,18 +34,26 @@ describe("parseArgs", () => {
     const { cliArgs, remainingArgs } = parseArgs([
       "node",
       "pi-feishu",
-      "--model", "claude-sonnet",
+      "--model",
+      "claude-sonnet",
     ]);
 
     expect(cliArgs.appId).toBeUndefined();
-    expect(remainingArgs).toEqual(["node", "pi-feishu", "--model", "claude-sonnet"]);
+    expect(remainingArgs).toEqual([
+      "node",
+      "pi-feishu",
+      "--model",
+      "claude-sonnet",
+    ]);
   });
 
   it("handles --no-bundle-feishu-skills flag", () => {
     const { cliArgs, remainingArgs } = parseArgs([
-      "node", "pi-feishu",
+      "node",
+      "pi-feishu",
       "--no-bundle-feishu-skills",
-      "--model", "sonnet",
+      "--model",
+      "sonnet",
     ]);
 
     expect(cliArgs.noBundleFeishuSkills).toBe(true);
@@ -48,8 +62,10 @@ describe("parseArgs", () => {
 
   it("handles --bot-name value", () => {
     const { cliArgs, remainingArgs } = parseArgs([
-      "node", "pi-feishu",
-      "--bot-name", "MyBot",
+      "node",
+      "pi-feishu",
+      "--bot-name",
+      "MyBot",
       "--continue",
     ]);
 

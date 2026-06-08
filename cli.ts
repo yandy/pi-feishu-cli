@@ -21,7 +21,10 @@ interface CliArgs {
   noBundleFeishuSkills?: boolean;
 }
 
-export function parseArgs(argv: string[]): { cliArgs: CliArgs; remainingArgs: string[] } {
+export function parseArgs(argv: string[]): {
+  cliArgs: CliArgs;
+  remainingArgs: string[];
+} {
   const consumed = new Set<number>();
   const result: CliArgs = {};
 
