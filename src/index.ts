@@ -10,7 +10,6 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
-import { processFileArguments } from "@earendil-works/pi-coding-agent/dist/cli/file-processor.js";
 import { resolveCliModel } from "@earendil-works/pi-coding-agent/dist/core/model-resolver.js";
 import { loadConfig, promptAndSaveCredentials } from "./config.js";
 import {
