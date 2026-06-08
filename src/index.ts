@@ -29,6 +29,12 @@ import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
+import {
+  type InitialMessageResult,
+  buildInitialMessage,
+} from "@earendil-works/pi-coding-agent/dist/cli/initial-message.js";
+import { processFileArguments } from "@earendil-works/pi-coding-agent/dist/cli/file-processor.js";
+import { resolveCliModel } from "@earendil-works/pi-coding-agent/dist/core/model-resolver.js";
 
 export async function resumeMostRecentSession(
   runtime: AgentSessionRuntime,
@@ -100,13 +106,59 @@ export async function main(options: MainOptions = {}): Promise<void> {
     process.env.FEISHU_BOT_NAME ??
     "PI Agent";
 
+  const parsed = options.piArgs;
+
+  const sessionManager = createSessionManager(parsed, cwd);
+
   const { runtime } = await initRuntime({
     cwd,
     packageRoot: options.packageRoot,
     noBundleFeishuSkills: feishuConfig.noBundleFeishuSkills,
+    piArgs: parsed,
+    sessionManager,
   });
 
-  await resumeMostRecentSession(runtime, cwd);
+  if (parsed?.model || parsed?.provider) {
+    const authStorage = AuthStorage.create();
+    const registry = ModelRegistry.create(authStorage);
+    const resolved = resolveCliModel({
+      cliProvider: parsed.provider,
+      cliModel: parsed.model,
+      modelRegistry: registry,
+    });
+    if (resolved.warning) {
+      console.error(`Warning: ${resolved.warning}`);
+    }
+    if (resolved.model) {
+      await runtime.session.setModel(resolved.model);
+    }
+    if (resolved.thinkingLevel) {
+      runtime.session.setThinkingLevel(resolved.thinkingLevel);
+    }
+  }
+
+  if (parsed?.thinking) {
+    runtime.session.setThinkingLevel(parsed.thinking);
+  }
+
+  let initialMessage: string | undefined;
+  let initialImages: InitialMessageResult["initialImages"];
+
+  if (parsed) {
+    const fileResult =
+      parsed.fileArgs.length > 0
+        ? await processFileArguments(parsed.fileArgs, {
+            autoResizeImages: false,
+          })
+        : { text: undefined, images: [] };
+    const built = buildInitialMessage({
+      parsed,
+      fileText: fileResult.text,
+      fileImages: fileResult.images,
+    });
+    initialMessage = built.initialMessage;
+    initialImages = built.initialImages;
+  }
 
   const channel: Channel | null = await connectFeishu(
     feishuConfig,
@@ -119,7 +171,12 @@ export async function main(options: MainOptions = {}): Promise<void> {
   }
 
   try {
-    const mode = new InteractiveMode(runtime, {});
+    const mode = new InteractiveMode(runtime, {
+      initialMessage,
+      initialImages,
+      initialMessages: parsed?.messages,
+      verbose: parsed?.verbose,
+    });
     await mode.run();
   } finally {
     cleanup?.();
