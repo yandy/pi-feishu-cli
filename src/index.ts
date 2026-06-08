@@ -10,7 +10,6 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
-import { resolveCliModel } from "@earendil-works/pi-coding-agent/dist/core/model-resolver.js";
 import { loadConfig, promptAndSaveCredentials } from "./config.js";
 import {
   type ProcessedAttachments,
@@ -85,6 +84,106 @@ export function buildInitialMessage({ parsed }: { parsed: PiArgs }): string | un
     return msg;
   }
   return undefined;
+}
+
+type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+
+function isValidThinkingLevel(s: string): s is ThinkingLevel {
+  return ["off", "minimal", "low", "medium", "high", "xhigh"].includes(s);
+}
+
+type ModelType = NonNullable<ReturnType<ModelRegistry["find"]>>;
+
+function resolveCliModel(options: {
+  cliProvider?: string;
+  cliModel?: string;
+  modelRegistry: ModelRegistry;
+}): {
+  model: ModelType | undefined;
+  thinkingLevel?: ThinkingLevel;
+  warning: string | undefined;
+  error: string | undefined;
+} {
+  const { cliProvider, cliModel, modelRegistry } = options;
+  if (!cliModel) {
+    return { model: undefined, warning: undefined, error: undefined };
+  }
+
+  const availableModels = modelRegistry.getAll();
+  if (availableModels.length === 0) {
+    return {
+      model: undefined,
+      warning: undefined,
+      error:
+        "No models available. Check your installation or add models to models.json.",
+    };
+  }
+
+  let provider = cliProvider;
+  let modelPattern = cliModel;
+  let thinkingLevel: ThinkingLevel | undefined;
+
+  const lastColon = modelPattern.lastIndexOf(":");
+  if (lastColon !== -1) {
+    const suffix = modelPattern.substring(lastColon + 1);
+    if (isValidThinkingLevel(suffix)) {
+      thinkingLevel = suffix;
+      modelPattern = modelPattern.substring(0, lastColon);
+    }
+  }
+
+  if (!provider) {
+    const slashIdx = modelPattern.indexOf("/");
+    if (slashIdx !== -1) {
+      provider = modelPattern.substring(0, slashIdx);
+      modelPattern = modelPattern.substring(slashIdx + 1);
+    }
+  }
+
+  if (provider) {
+    const exact = modelRegistry.find(provider, modelPattern);
+    if (exact) {
+      return { model: exact, thinkingLevel, warning: undefined, error: undefined };
+    }
+  }
+
+  const candidates = provider
+    ? availableModels.filter((m) => m.provider === provider)
+    : availableModels;
+  const fuzzy = candidates.find(
+    (m: { id: string; name?: string }) =>
+      m.id.toLowerCase().includes(modelPattern.toLowerCase()) ||
+      (m.name && m.name.toLowerCase().includes(modelPattern.toLowerCase())),
+  );
+  if (fuzzy) {
+    return {
+      model: fuzzy,
+      thinkingLevel,
+      warning: undefined,
+      error: undefined,
+    };
+  }
+
+  if (provider && availableModels.some((m) => m.provider === provider)) {
+    const baseModel = availableModels.find((m) => m.provider === provider);
+    if (baseModel) {
+      const fallback = { ...baseModel, id: modelPattern, name: modelPattern };
+      return {
+        model: fallback,
+        thinkingLevel: undefined,
+        warning: `Model "${modelPattern}" not found for provider "${provider}". Using custom model id.`,
+        error: undefined,
+      };
+    }
+  }
+
+  const display = provider ? `${provider}/${modelPattern}` : cliModel;
+  return {
+    model: undefined,
+    thinkingLevel: undefined,
+    warning: undefined,
+    error: `Model "${display}" not found. Use --list-models to see available models.`,
+  };
 }
 
 export async function main(options: MainOptions = {}): Promise<void> {
