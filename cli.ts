@@ -6,7 +6,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseArgs as parsePiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
+import { parseArgs as parsePiArgs } from "@earendil-works/pi-coding-agent";
 import { main } from "./src/index.js";
 
 const __filename = fileURLToPath(import.meta.url);

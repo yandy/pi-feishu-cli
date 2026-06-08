@@ -9,7 +9,7 @@ import {
   ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
+import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import { processFileArguments } from "@earendil-works/pi-coding-agent/dist/cli/file-processor.js";
 import {
   buildInitialMessage,
