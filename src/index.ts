@@ -54,6 +54,29 @@ export interface MainOptions {
   piArgs?: PiArgs;
 }
 
+export function createSessionManager(
+  parsed: PiArgs | undefined,
+  cwd: string,
+): SessionManager {
+  if (!parsed) return SessionManager.create(cwd);
+  if (parsed.fork) {
+    return SessionManager.forkFrom(parsed.fork, cwd);
+  }
+  if (parsed.session) {
+    return SessionManager.open(parsed.session);
+  }
+  if (parsed.sessionId) {
+    return SessionManager.create(cwd, undefined, { id: parsed.sessionId });
+  }
+  if (parsed.continue) {
+    return SessionManager.continueRecent(cwd);
+  }
+  if (parsed.noSession) {
+    return SessionManager.inMemory(cwd);
+  }
+  return SessionManager.create(cwd);
+}
+
 export async function main(options: MainOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
