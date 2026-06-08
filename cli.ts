@@ -77,7 +77,7 @@ export function parseArgs(argv: string[]): {
     }
   }
 
-  const remainingArgs = argv.filter((_, i) => !consumed.has(i));
+  const remainingArgs = argv.filter((_, i) => !consumed.has(i) && i >= 2);
   return { cliArgs: result, remainingArgs };
 }
 

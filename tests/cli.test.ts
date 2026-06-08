@@ -20,8 +20,6 @@ describe("parseArgs", () => {
     expect(cliArgs.appId).toBe("my-app");
     expect(cliArgs.appSecret).toBe("my-secret");
     expect(remainingArgs).toEqual([
-      "node",
-      "pi-feishu",
       "--model",
       "claude-sonnet",
       "--thinking",
@@ -40,8 +38,6 @@ describe("parseArgs", () => {
 
     expect(cliArgs.appId).toBeUndefined();
     expect(remainingArgs).toEqual([
-      "node",
-      "pi-feishu",
       "--model",
       "claude-sonnet",
     ]);
@@ -57,7 +53,7 @@ describe("parseArgs", () => {
     ]);
 
     expect(cliArgs.noBundleFeishuSkills).toBe(true);
-    expect(remainingArgs).toEqual(["node", "pi-feishu", "--model", "sonnet"]);
+    expect(remainingArgs).toEqual(["--model", "sonnet"]);
   });
 
   it("handles --bot-name value", () => {
@@ -70,6 +66,6 @@ describe("parseArgs", () => {
     ]);
 
     expect(cliArgs.botName).toBe("MyBot");
-    expect(remainingArgs).toEqual(["node", "pi-feishu", "--continue"]);
+    expect(remainingArgs).toEqual(["--continue"]);
   });
 });
