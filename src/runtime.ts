@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve as nodeResolvePath } from "node:path";
 import {
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
@@ -10,13 +10,35 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import type { Args as PiArgs } from "@earendil-works/pi-coding-agent/dist/cli/args.js";
 import { getFeishuContext } from "./feishu/context.js";
+
+function isLocalPath(value: string): boolean {
+  const trimmed = value.trim();
+  if (
+    trimmed.startsWith("npm:") ||
+    trimmed.startsWith("git:") ||
+    trimmed.startsWith("github:") ||
+    trimmed.startsWith("http:") ||
+    trimmed.startsWith("https:") ||
+    trimmed.startsWith("ssh:")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function resolvePath(input: string, baseDir: string): string {
+  return isAbsolute(input) ? nodeResolvePath(input) : nodeResolvePath(baseDir, input);
+}
 
 export interface InitRuntimeOptions {
   cwd: string;
   agentDir?: string;
   packageRoot?: string;
   noBundleFeishuSkills?: boolean;
+  piArgs?: PiArgs;
+  sessionManager?: SessionManager;
 }
 
 export interface InitRuntimeResult {
@@ -26,13 +48,25 @@ export interface InitRuntimeResult {
 export async function initRuntime(
   options: InitRuntimeOptions,
 ): Promise<InitRuntimeResult> {
-  const cwd = resolve(options.cwd);
+  const cwd = nodeResolvePath(options.cwd);
   const agentDir = options.agentDir ?? getAgentDir();
 
   const packageRoot = options.packageRoot ?? cwd;
   const noBundle = options.noBundleFeishuSkills ?? false;
   const skillsDir = join(packageRoot, "skills");
-  const additionalSkillPaths = noBundle ? [] : [skillsDir];
+
+  const parsed = options.piArgs;
+
+  function resolveCLIPaths(paths?: string[]): string[] | undefined {
+    if (!paths || paths.length === 0) return undefined;
+    return paths.map((p) => (isLocalPath(p) ? resolvePath(p, cwd) : p));
+  }
+
+  const baseSkillPaths = noBundle ? [] : [skillsDir];
+  const additionalSkillPaths = [
+    ...(parsed?.noSkills ? [] : baseSkillPaths),
+    ...(parsed?.skills ? resolveCLIPaths(parsed.skills) ?? [] : []),
+  ];
 
   const createRuntime: CreateAgentSessionRuntimeFactory = async ({
     cwd: runtimeCwd,
@@ -41,8 +75,19 @@ export async function initRuntime(
   }) => {
     const services = await createAgentSessionServices({
       cwd: runtimeCwd,
+      extensionFlagValues: parsed?.unknownFlags,
       resourceLoaderOptions: {
         additionalSkillPaths,
+        additionalExtensionPaths: resolveCLIPaths(parsed?.extensions),
+        additionalPromptTemplatePaths: resolveCLIPaths(parsed?.promptTemplates),
+        additionalThemePaths: resolveCLIPaths(parsed?.themes),
+        noExtensions: parsed?.noExtensions,
+        noSkills: parsed?.noSkills,
+        noPromptTemplates: parsed?.noPromptTemplates,
+        noThemes: parsed?.noThemes,
+        noContextFiles: parsed?.noContextFiles,
+        systemPrompt: parsed?.systemPrompt,
+        appendSystemPrompt: parsed?.appendSystemPrompt,
         extensionFactories: [
           (pi: ExtensionAPI) => {
             pi.registerTool({
@@ -121,10 +166,11 @@ export async function initRuntime(
     };
   };
 
+  const sm = options.sessionManager ?? SessionManager.create(cwd);
   const runtime = await createAgentSessionRuntime(createRuntime, {
-    cwd,
+    cwd: sm.getCwd(),
     agentDir,
-    sessionManager: SessionManager.create(cwd),
+    sessionManager: sm,
   });
 
   return { runtime };

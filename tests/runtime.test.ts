@@ -84,4 +84,32 @@ describe("initRuntime", () => {
       rmSync(tmpDir, { recursive: true });
     }
   }, 30000);
+
+  it("respects piArgs.noSkills to disable skill loading", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
+    try {
+      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
+      mkdirSync(dirname(skillPath), { recursive: true });
+      writeFileSync(skillPath, SKILL_CONTENT);
+
+      const cwd = process.cwd();
+      const result = await initRuntime({
+        cwd,
+        packageRoot: tmpDir,
+        piArgs: {
+          messages: [],
+          fileArgs: [],
+          unknownFlags: new Map(),
+          diagnostics: [],
+          noSkills: true,
+        },
+      });
+
+      const loaded = result.runtime.services.resourceLoader.getSkills();
+      const names = loaded.skills.map((s) => s.name);
+      expect(names).not.toContain("test-skill");
+    } finally {
+      rmSync(tmpDir, { recursive: true });
+    }
+  }, 30000);
 });
