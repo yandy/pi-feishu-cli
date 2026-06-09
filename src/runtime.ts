@@ -1,4 +1,5 @@
 import { isAbsolute, join, resolve as nodeResolvePath } from "node:path";
+import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSessionRuntime,
   type CreateAgentSessionRuntimeFactory,
@@ -9,7 +10,6 @@ import {
   getAgentDir,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { getFeishuContext } from "./feishu/context.js";
 

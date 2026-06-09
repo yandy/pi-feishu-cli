@@ -2,6 +2,7 @@ import { rmSync } from "node:fs";
 import { rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSessionRuntime,
   AuthStorage,
@@ -9,7 +10,6 @@ import {
   ModelRegistry,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import { loadConfig, promptAndSaveCredentials } from "./config.js";
 import {
   type ProcessedAttachments,
@@ -77,7 +77,11 @@ export function createSessionManager(
   return SessionManager.create(cwd);
 }
 
-export function buildInitialMessage({ parsed }: { parsed: PiArgs }): string | undefined {
+export function buildInitialMessage({
+  parsed,
+}: {
+  parsed: PiArgs;
+}): string | undefined {
   if (parsed.messages.length > 0) {
     const msg = parsed.messages[0];
     parsed.messages.shift();
@@ -143,7 +147,12 @@ function resolveCliModel(options: {
   if (provider) {
     const exact = modelRegistry.find(provider, modelPattern);
     if (exact) {
-      return { model: exact, thinkingLevel, warning: undefined, error: undefined };
+      return {
+        model: exact,
+        thinkingLevel,
+        warning: undefined,
+        error: undefined,
+      };
     }
   }
 
@@ -153,7 +162,7 @@ function resolveCliModel(options: {
   const fuzzy = candidates.find(
     (m: { id: string; name?: string }) =>
       m.id.toLowerCase().includes(modelPattern.toLowerCase()) ||
-      (m.name && m.name.toLowerCase().includes(modelPattern.toLowerCase())),
+      m.name?.toLowerCase().includes(modelPattern.toLowerCase()),
   );
   if (fuzzy) {
     return {
@@ -310,7 +319,7 @@ export function setupFeishuHandlers(
   const handleModels = async (chatId: string) => {
     const authStorage = AuthStorage.create();
     const registry = ModelRegistry.create(authStorage);
-    const available = await registry.getAvailable();
+    const available = registry.getAvailable();
     const card = await buildModelsCard({
       session: runtime.session,
       availableModels: available.filter(
@@ -428,7 +437,7 @@ export async function handleCardAction(
     } else if (action === "models") {
       const authStorage = AuthStorage.create();
       const registry = ModelRegistry.create(authStorage);
-      const available = await registry.getAvailable();
+      const available = registry.getAvailable();
       const card = await buildModelsCard({
         session: runtime.session,
         availableModels: available.filter(
@@ -464,7 +473,7 @@ export async function handleCardAction(
       await runtime.session.setModel(model);
       runtime.session.setThinkingLevel(thinkingLevel);
     }
-    const available = await registry.getAvailable();
+    const available = registry.getAvailable();
     const card = await buildModelsCard({
       session: runtime.session,
       availableModels: available.filter(
