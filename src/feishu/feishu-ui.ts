@@ -16,11 +16,11 @@ interface PendingDialog {
 
 const pendingDialogs = new Map<string, PendingDialog>();
 
-export function resolvePermissionCardAction(
+export function resolveFeishuDialog(
   value: Record<string, unknown>,
 ): void {
-  const dialogId = value["perm_dialog_id"] as string | undefined;
-  const choice = value["perm_choice"] as string | undefined;
+  const dialogId = value["dialog_id"] as string | undefined;
+  const choice = value["dialog_choice"] as string | undefined;
   if (!dialogId) return;
   const dialog = pendingDialogs.get(dialogId);
   if (dialog) {
@@ -59,9 +59,9 @@ export function createFeishuUIContext(): ExtensionUIContext {
           createActionButton(
             truncate(option, MAX_BUTTON_TEXT),
             {
-              cmd: "permission",
-              perm_dialog_id: dialogId,
-              perm_choice: option,
+              cmd: "feishu_dialog",
+              dialog_id: dialogId,
+              dialog_choice: option,
             },
             "default",
           ),

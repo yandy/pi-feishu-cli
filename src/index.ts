@@ -31,8 +31,8 @@ import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
 import {
   createFeishuUIContext,
-  resolvePermissionCardAction,
-} from "./feishu/permission-ui.js";
+  resolveFeishuDialog,
+} from "./feishu/feishu-ui.js";
 
 export async function resumeMostRecentSession(
   runtime: AgentSessionRuntime,
@@ -501,8 +501,8 @@ export async function handleCardAction(
     return;
   }
 
-  if (cmd === "permission") {
-    resolvePermissionCardAction(value);
+  if (cmd === "feishu_dialog") {
+    resolveFeishuDialog(value);
     return;
   }
 }

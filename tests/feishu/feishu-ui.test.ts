@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createFeishuUIContext, resolvePermissionCardAction } from "../../src/feishu/permission-ui.js";
+import { createFeishuUIContext, resolveFeishuDialog } from "../../src/feishu/feishu-ui.js";
 
 const mockSend = vi.fn().mockResolvedValue(undefined);
 const mockChannel = { send: mockSend } as any;
@@ -47,7 +47,7 @@ describe("createFeishuUIContext", () => {
       const buttons = sentCard.body.elements.filter((e: any) => e.tag === "button");
       const yesButton = buttons.find((b: any) => b.text.content === "是");
       const value = yesButton.behaviors[0].value;
-      resolvePermissionCardAction(value as Record<string, unknown>);
+      resolveFeishuDialog(value as Record<string, unknown>);
 
       const result = await promise;
       expect(result).toBe(true);
@@ -64,7 +64,7 @@ describe("createFeishuUIContext", () => {
       const buttons = sentCard.body.elements.filter((e: any) => e.tag === "button");
       const noButton = buttons.find((b: any) => b.text.content === "否");
       const value = noButton.behaviors[0].value;
-      resolvePermissionCardAction(value as Record<string, unknown>);
+      resolveFeishuDialog(value as Record<string, unknown>);
 
       expect(await promise).toBe(false);
     });
@@ -106,7 +106,7 @@ describe("createFeishuUIContext", () => {
       expect(buttons[2].text.content).toBe("选项C");
 
       const value = buttons[1].behaviors[0].value;
-      resolvePermissionCardAction(value as Record<string, unknown>);
+      resolveFeishuDialog(value as Record<string, unknown>);
 
       expect(await promise).toBe("选项B");
     });
@@ -175,8 +175,8 @@ describe("createFeishuUIContext", () => {
   });
 });
 
-describe("resolvePermissionCardAction", () => {
+describe("resolveFeishuDialog", () => {
   it("is a no-op for unknown dialog ids", () => {
-    resolvePermissionCardAction({ perm_dialog_id: "nonexistent", perm_choice: "x" });
+    resolveFeishuDialog({ dialog_id: "nonexistent", dialog_choice: "x" });
   });
 });
