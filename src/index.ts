@@ -18,6 +18,7 @@ import {
 import { buildHelpCard } from "./feishu/cards/help.js";
 import { buildModelsCard } from "./feishu/cards/models.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
+import { buildDialogResultCard } from "./feishu/cards/dialog.js";
 import {
   type CardActionEvent,
   type Channel,
@@ -29,7 +30,6 @@ import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
-import { buildDialogResultCard } from "./feishu/cards/dialog.js";
 import {
   createFeishuUIContext,
   resolveFeishuDialog,
