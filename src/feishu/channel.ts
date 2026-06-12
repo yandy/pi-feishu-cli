@@ -113,6 +113,7 @@ export function createChannel(options: ChannelOptions): Channel {
     loggerLevel,
     policy: { requireMention: true, dmMode: "open" },
     includeRawEvent: true,
+    safety: { chatQueue: { enabled: false } },
     ...(options.cwd ? { outbound: { allowedFileDirs: [options.cwd] } } : {}),
   }) as unknown as RawLarkChannel;
 
