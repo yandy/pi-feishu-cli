@@ -29,6 +29,7 @@ import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
+import { buildDialogResultCard } from "./feishu/cards/dialog.js";
 import {
   createFeishuUIContext,
   resolveFeishuDialog,
@@ -502,7 +503,19 @@ export async function handleCardAction(
   }
 
   if (cmd === "feishu_dialog") {
-    resolveFeishuDialog(value);
+    const info = resolveFeishuDialog(value);
+    if (info && token) {
+      channel
+        .updateCardByToken(
+          token,
+          buildDialogResultCard(
+            info.headerTitle,
+            info.headerTemplate,
+            info.choice,
+          ),
+        )
+        .catch(() => {});
+    }
     return;
   }
 }

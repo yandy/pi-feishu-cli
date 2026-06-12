@@ -21,7 +21,7 @@ vi.mock("../../src/feishu/streaming.js", () => ({
 }));
 
 const mockChannelStream = vi.fn();
-const mockChannelSend = vi.fn();
+const mockChannelSend = vi.fn().mockResolvedValue(undefined);
 const mockSessionPrompt = vi.fn().mockResolvedValue(undefined);
 
 function createMockChannel() {
@@ -38,7 +38,7 @@ function createMockChannel() {
     disconnect: vi.fn(),
     onRawEvent: vi.fn(),
     updateCard: vi.fn(),
-    updateCardByToken: vi.fn(),
+    updateCardByToken: vi.fn().mockResolvedValue(undefined),
     botIdentity: { name: "test-bot" },
     connected: true,
     downloadMessageResource: vi.fn(),
@@ -63,6 +63,8 @@ function createMockRuntime() {
 }
 
 import { handleCardAction, setupFeishuHandlers } from "../../src/index.js";
+import { createFeishuUIContext } from "../../src/feishu/feishu-ui.js";
+import { setFeishuContext } from "../../src/feishu/context.js";
 
 describe("attachment wiring in message handler", () => {
   beforeEach(() => {
@@ -268,5 +270,94 @@ describe("handleCardAction", () => {
 
     expect(runtime.switchSession).toHaveBeenCalledWith("/tmp/s.json");
     expect(channel.updateCardByToken).not.toHaveBeenCalled();
+  });
+
+  it("updates card by token on feishu_dialog with selected choice", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    setFeishuContext({ chatId: "chat-dialog", channel } as any);
+
+    const ui = createFeishuUIContext();
+
+    ui.select("测试标题", ["是", "否"]);
+    const sentCard = (mockChannelSend.mock.lastCall as any)[1]?.card as any;
+    const button = sentCard.body.elements.find((e: any) => e.tag === "button");
+    const dialogId = button.behaviors[0].value.dialog_id;
+
+    mockChannelSend.mockClear();
+    (channel.updateCardByToken as any).mockClear();
+
+    const evt = {
+      action: {
+        value: {
+          cmd: "feishu_dialog",
+          dialog_id: dialogId,
+          dialog_choice: "是",
+        },
+        tag: "button",
+      },
+      raw: { token: "t-dialog-refresh" },
+    };
+
+    await handleCardAction(
+      evt as any,
+      runtime as any,
+      "/tmp/cwd",
+      channel as any,
+    );
+
+    expect(channel.updateCardByToken).toHaveBeenCalledWith(
+      "t-dialog-refresh",
+      expect.objectContaining({ schema: "2.0" }),
+    );
+
+    const updatedCard = (channel.updateCardByToken as any).mock.calls[0][1] as any;
+    expect(updatedCard.header.title.content).toBe("测试标题");
+    expect(updatedCard.header.template).toBe("red");
+    const md = updatedCard.body.elements[0];
+    expect(md.tag).toBe("markdown");
+    expect(md.content).toContain("已选择: **是**");
+
+    setFeishuContext(null);
+  });
+
+  it("does not update card on feishu_dialog when token is missing", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    setFeishuContext({ chatId: "chat-d2", channel } as any);
+    const ui = createFeishuUIContext();
+    ui.select("标题", ["是"]);
+
+    const sentCard = (mockChannelSend.mock.lastCall as any)[1]?.card as any;
+    const button = sentCard.body.elements.find((e: any) => e.tag === "button");
+    const dialogId = button.behaviors[0].value.dialog_id;
+
+    mockChannelSend.mockClear();
+    (channel.updateCardByToken as any).mockClear();
+
+    const evt = {
+      action: {
+        value: {
+          cmd: "feishu_dialog",
+          dialog_id: dialogId,
+          dialog_choice: "是",
+        },
+        tag: "button",
+      },
+      raw: {},
+    };
+
+    await handleCardAction(
+      evt as any,
+      runtime as any,
+      "/tmp/cwd",
+      channel as any,
+    );
+
+    expect(channel.updateCardByToken).not.toHaveBeenCalled();
+
+    setFeishuContext(null);
   });
 });
