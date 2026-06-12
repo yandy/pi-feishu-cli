@@ -1,17 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createFeishuUIContext, resolveFeishuDialog } from "../../src/feishu/feishu-ui.js";
+import {
+  createFeishuUIContext,
+  resolveFeishuDialog,
+} from "../../src/feishu/feishu-ui.js";
 
 const mockSend = vi.fn().mockResolvedValue(undefined);
 const mockChannel = { send: mockSend } as any;
 
 vi.mock("../../src/feishu/context.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../src/feishu/context.js")>();
+  const actual =
+    await importOriginal<typeof import("../../src/feishu/context.js")>();
   return {
     ...actual,
   };
 });
 
-import { getFeishuContext, setFeishuContext } from "../../src/feishu/context.js";
+import {
+  getFeishuContext,
+  setFeishuContext,
+} from "../../src/feishu/context.js";
 
 function setMockContext() {
   setFeishuContext({ chatId: "test-chat", channel: mockChannel } as any);
@@ -44,7 +51,9 @@ describe("createFeishuUIContext", () => {
       const sentCard = (mockSend.mock.calls[0] as any)[1]?.card as any;
       expect(sentCard.header.title.content).toBe("确认标题确认信息");
 
-      const buttons = sentCard.body.elements.filter((e: any) => e.tag === "button");
+      const buttons = sentCard.body.elements.filter(
+        (e: any) => e.tag === "button",
+      );
       const yesButton = buttons.find((b: any) => b.text.content === "是");
       const value = yesButton.behaviors[0].value;
       const result = resolveFeishuDialog(value as Record<string, unknown>);
@@ -64,7 +73,9 @@ describe("createFeishuUIContext", () => {
       await vi.runAllTicks();
 
       const sentCard = (mockSend.mock.calls[0] as any)[1]?.card as any;
-      const buttons = sentCard.body.elements.filter((e: any) => e.tag === "button");
+      const buttons = sentCard.body.elements.filter(
+        (e: any) => e.tag === "button",
+      );
       const noButton = buttons.find((b: any) => b.text.content === "否");
       const value = noButton.behaviors[0].value;
       const result2 = resolveFeishuDialog(value as Record<string, unknown>);
@@ -105,7 +116,9 @@ describe("createFeishuUIContext", () => {
 
       const sentCard = (mockSend.mock.calls[0] as any)[1]?.card as any;
       expect(sentCard.header.title.content).toBe("选择标题");
-      const buttons = sentCard.body.elements.filter((e: any) => e.tag === "button");
+      const buttons = sentCard.body.elements.filter(
+        (e: any) => e.tag === "button",
+      );
       expect(buttons).toHaveLength(3);
       expect(buttons[0].text.content).toBe("选项A");
       expect(buttons[1].text.content).toBe("选项B");
@@ -128,7 +141,9 @@ describe("createFeishuUIContext", () => {
       await vi.runAllTicks();
 
       const sentCard = (mockSend.mock.calls[0] as any)[1]?.card as any;
-      const buttons = sentCard.body.elements.filter((e: any) => e.tag === "button");
+      const buttons = sentCard.body.elements.filter(
+        (e: any) => e.tag === "button",
+      );
       expect(buttons[0].text.content.length).toBeLessThan(50);
     });
 
@@ -157,7 +172,9 @@ describe("createFeishuUIContext", () => {
       setMockContext();
       const ui = createFeishuUIContext();
       ui.notify("test message", "warning");
-      expect(mockSend).toHaveBeenCalledWith("test-chat", { text: "⚠️ test message" });
+      expect(mockSend).toHaveBeenCalledWith("test-chat", {
+        text: "⚠️ test message",
+      });
     });
 
     it("does nothing when no context", () => {
@@ -172,7 +189,9 @@ describe("createFeishuUIContext", () => {
     it("returns undefined (no-op)", async () => {
       setMockContext();
       const ui = createFeishuUIContext();
-      expect(await ui.input("输入标题", "占位符", { timeout: 3000 })).toBeUndefined();
+      expect(
+        await ui.input("输入标题", "占位符", { timeout: 3000 }),
+      ).toBeUndefined();
     });
 
     it("returns undefined when no context", async () => {

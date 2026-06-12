@@ -312,7 +312,8 @@ describe("handleCardAction", () => {
       expect.objectContaining({ schema: "2.0" }),
     );
 
-    const updatedCard = (channel.updateCardByToken as any).mock.calls[0][1] as any;
+    const updatedCard = (channel.updateCardByToken as any).mock
+      .calls[0][1] as any;
     expect(updatedCard.header.title.content).toBe("测试标题");
     expect(updatedCard.header.template).toBe("red");
     const md = updatedCard.body.elements[0];

@@ -256,7 +256,10 @@ describe("models card", () => {
   });
 });
 
-import { buildDialogCard, buildDialogResultCard } from "../../src/feishu/cards/dialog.js";
+import {
+  buildDialogCard,
+  buildDialogResultCard,
+} from "../../src/feishu/cards/dialog.js";
 
 describe("dialog card", () => {
   describe("buildDialogCard", () => {
