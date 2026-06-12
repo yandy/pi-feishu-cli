@@ -162,6 +162,7 @@ export async function initRuntime(
         services,
         sessionManager,
         sessionStartEvent,
+        tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "send_file_to_chat"],
       })),
       services,
       diagnostics: services.diagnostics,

@@ -85,6 +85,15 @@ describe("initRuntime", () => {
     }
   }, 30000);
 
+  it("enables grep, find, ls tools by default", async () => {
+    const cwd = process.cwd();
+    const result = await initRuntime({ cwd });
+    const activeTools = result.runtime.session.getActiveToolNames();
+    expect(activeTools).toContain("grep");
+    expect(activeTools).toContain("find");
+    expect(activeTools).toContain("ls");
+  }, 30000);
+
   it("respects piArgs.noSkills to disable skill loading", async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
     try {
