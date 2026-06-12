@@ -55,6 +55,7 @@ function createMockRuntime() {
       model: undefined,
       setModel: vi.fn(),
       setThinkingLevel: vi.fn(),
+      extensionRunner: { setUIContext: vi.fn() },
     },
     newSession: vi.fn(),
     switchSession: vi.fn(),

@@ -29,6 +29,10 @@ import { createMessageHandler } from "./feishu/handler.js";
 import { createStreamingHandler } from "./feishu/streaming.js";
 import { initRuntime } from "./runtime.js";
 import type { FeishuConfig } from "./types.js";
+import {
+  createFeishuUIContext,
+  resolvePermissionCardAction,
+} from "./feishu/permission-ui.js";
 
 export async function resumeMostRecentSession(
   runtime: AgentSessionRuntime,
@@ -341,6 +345,9 @@ export function setupFeishuHandlers(
     handleHelp,
   );
 
+  const feishuUIContext = createFeishuUIContext();
+  let promptLock: Promise<void> = Promise.resolve();
+
   channel.on("message", async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
     // Commands send cards directly without streaming
@@ -353,42 +360,52 @@ export function setupFeishuHandlers(
       return;
     }
 
-    setFeishuContext({ chatId: msg.chatId, channel });
+    let unlock: () => void;
+    const prev = promptLock;
+    promptLock = new Promise<void>((r) => { unlock = r; });
+    await prev;
 
-    let attachments: ProcessedAttachments | undefined;
-    let downloadDir: string | undefined;
+    try {
+      setFeishuContext({ chatId: msg.chatId, channel });
+      runtime.session.extensionRunner.setUIContext(feishuUIContext, "feishu" as any);
 
-    if (msg.resources.length > 0) {
-      downloadDir = join(
-        tmpdir(),
-        "pi-feishu",
-        runtime.session.sessionId ?? "unknown",
-      );
-      attachments = await processAttachments(
-        channel,
-        msg,
-        downloadDir,
-        runtime.session.model?.input,
-      );
-    }
+      let attachments: ProcessedAttachments | undefined;
+      let downloadDir: string | undefined;
 
-    await channel.stream(
-      msg.chatId,
-      {
-        markdown: async (s) => {
-          const unbind = createStreamingHandler(runtime.session, s);
-          try {
-            await messageHandler(msg, attachments);
-          } finally {
-            unbind();
-            if (downloadDir) {
-              rm(downloadDir, { recursive: true, force: true }).catch(() => {});
+      if (msg.resources.length > 0) {
+        downloadDir = join(
+          tmpdir(),
+          "pi-feishu",
+          runtime.session.sessionId ?? "unknown",
+        );
+        attachments = await processAttachments(
+          channel,
+          msg,
+          downloadDir,
+          runtime.session.model?.input,
+        );
+      }
+
+      await channel.stream(
+        msg.chatId,
+        {
+          markdown: async (s) => {
+            const unbind = createStreamingHandler(runtime.session, s);
+            try {
+              await messageHandler(msg, attachments);
+            } finally {
+              unbind();
+              if (downloadDir) {
+                rm(downloadDir, { recursive: true, force: true }).catch(() => {});
+              }
             }
-          }
+          },
         },
-      },
-      { replyTo: msg.messageId },
-    );
+        { replyTo: msg.messageId },
+      );
+    } finally {
+      unlock!();
+    }
   });
 
   channel.on("cardAction", (evt: CardActionEvent) => {
@@ -481,6 +498,11 @@ export async function handleCardAction(
       ),
     });
     if (token) await channel.updateCardByToken(token, card);
+    return;
+  }
+
+  if (cmd === "permission") {
+    resolvePermissionCardAction(value);
     return;
   }
 }
