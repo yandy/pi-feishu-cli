@@ -161,19 +161,10 @@ describe("createFeishuUIContext", () => {
   });
 
   describe("input()", () => {
-    it("sends a card and resolves on timeout", async () => {
+    it("returns undefined (no-op)", async () => {
       setMockContext();
       const ui = createFeishuUIContext();
-
-      const promise = ui.input("输入标题", "占位符", { timeout: 3000 });
-      await vi.runAllTicks();
-
-      expect(mockSend).toHaveBeenCalledOnce();
-      const sentCard = (mockSend.mock.calls[0] as any)[1]?.card as any;
-      expect(sentCard.header.title.content).toBe("输入请求");
-
-      vi.advanceTimersByTime(3001);
-      expect(await promise).toBeUndefined();
+      expect(await ui.input("输入标题", "占位符", { timeout: 3000 })).toBeUndefined();
     });
 
     it("returns undefined when no context", async () => {

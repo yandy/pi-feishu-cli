@@ -40,7 +40,8 @@ function truncate(text: string, max: number): string {
 export function createFeishuUIContext(): ExtensionUIContext {
   return {
     async confirm(title, message, opts) {
-      const result = await this.select(message, ["是", "否"], opts);
+      const fullMessage = message ? `${title}\n\n${message}` : title;
+      const result = await this.select(fullMessage, ["是", "否"], opts);
       return result === "是";
     },
 
@@ -79,46 +80,29 @@ export function createFeishuUIContext(): ExtensionUIContext {
           resolve(undefined);
         }, timeout);
 
+        pendingDialogs.set(dialogId, { resolve, timer });
+
         if (opts?.signal) {
+          if (opts.signal.aborted) {
+            pendingDialogs.delete(dialogId);
+            clearTimeout(timer);
+            resolve(undefined);
+            return;
+          }
           opts.signal.addEventListener("abort", () => {
             pendingDialogs.delete(dialogId);
             clearTimeout(timer);
             resolve(undefined);
           }, { once: true });
         }
-
-        pendingDialogs.set(dialogId, { resolve, timer });
         ctx.channel.send(ctx.chatId, { card }).catch(() => {});
       });
     },
 
-    async input(title, placeholder, opts) {
-      const ctx = getFeishuContext();
-      if (!ctx) return undefined;
-
-      const dialogId = crypto.randomUUID();
-      const elements: CardElement[] = [
-        createMarkdownBlock(title),
-      ];
-      if (placeholder) {
-        elements.push(createMarkdownBlock(placeholder));
-      }
-
-      const card = buildCard(
-        createCardHeader("输入请求", "blue"),
-        elements,
-      );
-
-      return new Promise<string | undefined>((resolve) => {
-        const timeout = opts?.timeout ?? 60000;
-        const timer = setTimeout(() => {
-          pendingDialogs.delete(dialogId);
-          resolve(undefined);
-        }, timeout);
-
-        pendingDialogs.set(dialogId, { resolve, timer });
-        ctx.channel.send(ctx.chatId, { card }).catch(() => {});
-      });
+    async input(_title, _placeholder, _opts) {
+      // input() via Feishu chat requires capturing the user's next text message,
+      // which needs a per-message one-shot listener that's not yet implemented.
+      return undefined;
     },
 
     notify(message, type) {
