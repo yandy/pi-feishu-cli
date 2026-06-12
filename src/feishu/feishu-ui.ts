@@ -1,40 +1,33 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import { buildDialogCard } from "./cards/dialog.js";
 import { getFeishuContext } from "./context.js";
-import {
-  buildCard,
-  type CardElement,
-  createActionButton,
-  createCardHeader,
-  createMarkdownBlock,
-  createDividerBlock,
-} from "./cards/helpers.js";
 
 interface PendingDialog {
   resolve: (value: string | undefined) => void;
   timer: ReturnType<typeof setTimeout>;
+  headerTitle: string;
+  headerTemplate: string;
 }
 
 const pendingDialogs = new Map<string, PendingDialog>();
 
 export function resolveFeishuDialog(
   value: Record<string, unknown>,
-): void {
-  const dialogId = value["dialog_id"] as string | undefined;
-  const choice = value["dialog_choice"] as string | undefined;
+): { choice: string; headerTitle: string; headerTemplate: string } | undefined {
+  const dialogId = value.dialog_id as string | undefined;
+  const choice = value.dialog_choice as string | undefined;
   if (!dialogId) return;
   const dialog = pendingDialogs.get(dialogId);
   if (dialog) {
     pendingDialogs.delete(dialogId);
     clearTimeout(dialog.timer);
     dialog.resolve(choice);
+    return {
+      choice: choice ?? "",
+      headerTitle: dialog.headerTitle,
+      headerTemplate: dialog.headerTemplate,
+    };
   }
-}
-
-const MAX_BUTTON_TEXT = 40;
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max - 2) + "..";
 }
 
 export function createFeishuUIContext(): ExtensionUIContext {
@@ -50,27 +43,10 @@ export function createFeishuUIContext(): ExtensionUIContext {
       if (!ctx) return options[0];
 
       const dialogId = crypto.randomUUID();
-      const elements: CardElement[] = [
-        createMarkdownBlock(title.replace(/\n/g, "\n\n")),
-        createDividerBlock(),
-      ];
-      for (const option of options) {
-        elements.push(
-          createActionButton(
-            truncate(option, MAX_BUTTON_TEXT),
-            {
-              cmd: "feishu_dialog",
-              dialog_id: dialogId,
-              dialog_choice: option,
-            },
-            "default",
-          ),
-        );
-      }
-
-      const card = buildCard(
-        createCardHeader("权限确认", "red"),
-        elements,
+      const { card, headerTitle, headerTemplate } = buildDialogCard(
+        title,
+        options,
+        dialogId,
       );
 
       return new Promise<string | undefined>((resolve) => {
@@ -80,7 +56,12 @@ export function createFeishuUIContext(): ExtensionUIContext {
           resolve(undefined);
         }, timeout);
 
-        pendingDialogs.set(dialogId, { resolve, timer });
+        pendingDialogs.set(dialogId, {
+          resolve,
+          timer,
+          headerTitle,
+          headerTemplate,
+        });
 
         if (opts?.signal) {
           if (opts.signal.aborted) {
@@ -89,11 +70,15 @@ export function createFeishuUIContext(): ExtensionUIContext {
             resolve(undefined);
             return;
           }
-          opts.signal.addEventListener("abort", () => {
-            pendingDialogs.delete(dialogId);
-            clearTimeout(timer);
-            resolve(undefined);
-          }, { once: true });
+          opts.signal.addEventListener(
+            "abort",
+            () => {
+              pendingDialogs.delete(dialogId);
+              clearTimeout(timer);
+              resolve(undefined);
+            },
+            { once: true },
+          );
         }
         ctx.channel.send(ctx.chatId, { card }).catch(() => {});
       });
@@ -108,13 +93,16 @@ export function createFeishuUIContext(): ExtensionUIContext {
     notify(message, type) {
       const ctx = getFeishuContext();
       if (ctx) {
-        const prefix =
-          type === "error" ? "❌" : type === "warning" ? "⚠️" : "ℹ️";
-        ctx.channel.send(ctx.chatId, { text: `${prefix} ${message}` }).catch(() => {});
+        const prefix = type === "error" ? "❌" : type === "warning" ? "⚠️" : "ℹ️";
+        ctx.channel
+          .send(ctx.chatId, { text: `${prefix} ${message}` })
+          .catch(() => {});
       }
     },
 
-    onTerminalInput() { return () => {}; },
+    onTerminalInput() {
+      return () => {};
+    },
     setStatus() {},
     setWorkingMessage() {},
     setWorkingVisible() {},
@@ -124,19 +112,37 @@ export function createFeishuUIContext(): ExtensionUIContext {
     setFooter() {},
     setHeader() {},
     setTitle() {},
-    async custom() { return undefined as never; },
+    async custom() {
+      return undefined as never;
+    },
     pasteToEditor() {},
     setEditorText() {},
-    getEditorText() { return ""; },
-    async editor() { return undefined; },
+    getEditorText() {
+      return "";
+    },
+    async editor() {
+      return undefined;
+    },
     addAutocompleteProvider() {},
     setEditorComponent() {},
-    getEditorComponent() { return undefined; },
-    get theme() { return {} as any; },
-    getAllThemes() { return []; },
-    getTheme() { return undefined; },
-    setTheme() { return { success: false, error: "Not available in feishu mode" }; },
-    getToolsExpanded() { return false; },
+    getEditorComponent() {
+      return undefined;
+    },
+    get theme() {
+      return {} as any;
+    },
+    getAllThemes() {
+      return [];
+    },
+    getTheme() {
+      return undefined;
+    },
+    setTheme() {
+      return { success: false, error: "Not available in feishu mode" };
+    },
+    getToolsExpanded() {
+      return false;
+    },
     setToolsExpanded() {},
   };
 }

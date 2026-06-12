@@ -15,6 +15,7 @@ import {
   type ProcessedAttachments,
   processAttachments,
 } from "./feishu/attachments.js";
+import { buildDialogResultCard } from "./feishu/cards/dialog.js";
 import { buildHelpCard } from "./feishu/cards/help.js";
 import { buildModelsCard } from "./feishu/cards/models.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
@@ -25,14 +26,14 @@ import {
   type NormalizedMessage,
 } from "./feishu/channel.js";
 import { setFeishuContext } from "./feishu/context.js";
-import { createMessageHandler } from "./feishu/handler.js";
-import { createStreamingHandler } from "./feishu/streaming.js";
-import { initRuntime } from "./runtime.js";
-import type { FeishuConfig } from "./types.js";
 import {
   createFeishuUIContext,
   resolveFeishuDialog,
 } from "./feishu/feishu-ui.js";
+import { createMessageHandler } from "./feishu/handler.js";
+import { createStreamingHandler } from "./feishu/streaming.js";
+import { initRuntime } from "./runtime.js";
+import type { FeishuConfig } from "./types.js";
 
 export async function resumeMostRecentSession(
   runtime: AgentSessionRuntime,
@@ -362,12 +363,17 @@ export function setupFeishuHandlers(
 
     let unlock: () => void;
     const prev = promptLock;
-    promptLock = new Promise<void>((r) => { unlock = r; });
+    promptLock = new Promise<void>((r) => {
+      unlock = r;
+    });
     await prev;
 
     try {
       setFeishuContext({ chatId: msg.chatId, channel });
-      runtime.session.extensionRunner.setUIContext(feishuUIContext, "feishu" as any);
+      runtime.session.extensionRunner.setUIContext(
+        feishuUIContext,
+        "feishu" as any,
+      );
 
       let attachments: ProcessedAttachments | undefined;
       let downloadDir: string | undefined;
@@ -396,7 +402,9 @@ export function setupFeishuHandlers(
             } finally {
               unbind();
               if (downloadDir) {
-                rm(downloadDir, { recursive: true, force: true }).catch(() => {});
+                rm(downloadDir, { recursive: true, force: true }).catch(
+                  () => {},
+                );
               }
             }
           },
@@ -502,7 +510,19 @@ export async function handleCardAction(
   }
 
   if (cmd === "feishu_dialog") {
-    resolveFeishuDialog(value);
+    const info = resolveFeishuDialog(value);
+    if (info && token) {
+      channel
+        .updateCardByToken(
+          token,
+          buildDialogResultCard(
+            info.headerTitle,
+            info.headerTemplate,
+            info.choice,
+          ),
+        )
+        .catch(() => {});
+    }
     return;
   }
 }
