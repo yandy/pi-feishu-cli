@@ -12,14 +12,18 @@ const MAX_BUTTON_TEXT = 40;
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
-  return text.slice(0, max - 2) + "..";
+  return `${text.slice(0, max - 2)}..`;
 }
 
 export function buildDialogCard(
   title: string,
   options: string[],
   dialogId: string,
-): { card: Record<string, unknown>; headerTitle: string; headerTemplate: string } {
+): {
+  card: Record<string, unknown>;
+  headerTitle: string;
+  headerTemplate: string;
+} {
   const headerTitle = truncate(title.replace(/\n/g, ""), MAX_HEADER_CHARS);
   const headerTemplate = "red";
 
@@ -54,8 +58,7 @@ export function buildDialogResultCard(
   headerTemplate: string,
   choice: string,
 ): Record<string, unknown> {
-  return buildCard(
-    createCardHeader(headerTitle, headerTemplate),
-    [createMarkdownBlock(`已选择: **${choice}**`)],
-  );
+  return buildCard(createCardHeader(headerTitle, headerTemplate), [
+    createMarkdownBlock(`已选择: **${choice}**`),
+  ]);
 }
