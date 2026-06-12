@@ -255,3 +255,79 @@ describe("models card", () => {
     expect(headers.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+import { buildDialogCard, buildDialogResultCard } from "../../src/feishu/cards/dialog.js";
+
+describe("dialog card", () => {
+  describe("buildDialogCard", () => {
+    it("returns card with title-derived header (no truncation when short)", () => {
+      const { card, headerTitle, headerTemplate } = buildDialogCard(
+        "确认删除",
+        ["是", "否"],
+        "dialog-1",
+      );
+      expect(headerTitle).toBe("确认删除");
+      expect(headerTemplate).toBe("red");
+      expect((card as any).header.title.content).toBe("确认删除");
+      expect((card as any).header.template).toBe("red");
+    });
+
+    it("truncates long title for header (max 20 chars)", () => {
+      const { headerTitle } = buildDialogCard("A".repeat(30), ["选项"], "d-1");
+      expect(headerTitle.length).toBeLessThanOrEqual(20);
+    });
+
+    it("strips newlines from header title", () => {
+      const { headerTitle } = buildDialogCard("标题\n\n描述", ["是"], "d-2");
+      expect(headerTitle).not.toContain("\n");
+      expect(headerTitle).toBe("标题描述");
+    });
+
+    it("includes one button per option with callback value", () => {
+      const { card } = buildDialogCard("选择", ["A", "B", "C"], "d-3");
+      const buttons = ((card as any).body.elements as any[]).filter(
+        (e: any) => e.tag === "button",
+      );
+      expect(buttons).toHaveLength(3);
+      expect(buttons[1].behaviors[0].value).toMatchObject({
+        cmd: "feishu_dialog",
+        dialog_id: "d-3",
+        dialog_choice: "B",
+      });
+    });
+
+    it("places title markdown and divider before buttons", () => {
+      const { card } = buildDialogCard("标题", ["是"], "d-4");
+      const els = (card as any).body.elements;
+      expect(els[0].tag).toBe("markdown");
+      expect(els[1].tag).toBe("hr");
+      expect(els[2].tag).toBe("button");
+    });
+
+    it("includes schema 2.0 and update_multi config", () => {
+      const { card } = buildDialogCard("标题", ["是"], "d-5");
+      expect(card.schema).toBe("2.0");
+      expect((card as any).config).toMatchObject({
+        update_multi: true,
+        width_mode: "fill",
+      });
+    });
+  });
+
+  describe("buildDialogResultCard", () => {
+    it("builds card showing selected choice with original header", () => {
+      const card = buildDialogResultCard("确认删除", "red", "是");
+      expect((card as any).header.title.content).toBe("确认删除");
+      expect((card as any).header.template).toBe("red");
+      const els = (card as any).body.elements;
+      expect(els).toHaveLength(1);
+      expect(els[0].tag).toBe("markdown");
+      expect(els[0].content).toBe("已选择: **是**");
+    });
+
+    it("result card has schema 2.0", () => {
+      const card = buildDialogResultCard("标题", "red", "选项A");
+      expect(card.schema).toBe("2.0");
+    });
+  });
+});
