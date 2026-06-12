@@ -1,24 +1,19 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { getFeishuContext } from "./context.js";
-import {
-  buildCard,
-  type CardElement,
-  createActionButton,
-  createCardHeader,
-  createMarkdownBlock,
-  createDividerBlock,
-} from "./cards/helpers.js";
+import { buildDialogCard } from "./cards/dialog.js";
 
 interface PendingDialog {
   resolve: (value: string | undefined) => void;
   timer: ReturnType<typeof setTimeout>;
+  headerTitle: string;
+  headerTemplate: string;
 }
 
 const pendingDialogs = new Map<string, PendingDialog>();
 
 export function resolveFeishuDialog(
   value: Record<string, unknown>,
-): void {
+): { choice: string; headerTitle: string; headerTemplate: string } | undefined {
   const dialogId = value["dialog_id"] as string | undefined;
   const choice = value["dialog_choice"] as string | undefined;
   if (!dialogId) return;
@@ -27,14 +22,12 @@ export function resolveFeishuDialog(
     pendingDialogs.delete(dialogId);
     clearTimeout(dialog.timer);
     dialog.resolve(choice);
+    return {
+      choice: choice ?? "",
+      headerTitle: dialog.headerTitle,
+      headerTemplate: dialog.headerTemplate,
+    };
   }
-}
-
-const MAX_BUTTON_TEXT = 40;
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max - 2) + "..";
 }
 
 export function createFeishuUIContext(): ExtensionUIContext {
@@ -50,27 +43,10 @@ export function createFeishuUIContext(): ExtensionUIContext {
       if (!ctx) return options[0];
 
       const dialogId = crypto.randomUUID();
-      const elements: CardElement[] = [
-        createMarkdownBlock(title.replace(/\n/g, "\n\n")),
-        createDividerBlock(),
-      ];
-      for (const option of options) {
-        elements.push(
-          createActionButton(
-            truncate(option, MAX_BUTTON_TEXT),
-            {
-              cmd: "feishu_dialog",
-              dialog_id: dialogId,
-              dialog_choice: option,
-            },
-            "default",
-          ),
-        );
-      }
-
-      const card = buildCard(
-        createCardHeader("权限确认", "red"),
-        elements,
+      const { card, headerTitle, headerTemplate } = buildDialogCard(
+        title,
+        options,
+        dialogId,
       );
 
       return new Promise<string | undefined>((resolve) => {
@@ -80,7 +56,7 @@ export function createFeishuUIContext(): ExtensionUIContext {
           resolve(undefined);
         }, timeout);
 
-        pendingDialogs.set(dialogId, { resolve, timer });
+        pendingDialogs.set(dialogId, { resolve, timer, headerTitle, headerTemplate });
 
         if (opts?.signal) {
           if (opts.signal.aborted) {
