@@ -19,6 +19,7 @@ import { buildDialogResultCard } from "./feishu/cards/dialog.js";
 import { buildHelpCard } from "./feishu/cards/help.js";
 import { buildModelsCard } from "./feishu/cards/models.js";
 import { buildSessionsCard } from "./feishu/cards/sessions.js";
+import { buildStopCard, buildStopCardDone } from "./feishu/cards/stop.js";
 import {
   type CardActionEvent,
   type Channel,
@@ -348,6 +349,7 @@ export function setupFeishuHandlers(
 
   const feishuUIContext = createFeishuUIContext();
   let promptLock: Promise<void> = Promise.resolve();
+  const stopCards = new Map<string, string>();
 
   channel.on("message", async (msg: NormalizedMessage) => {
     const content = msg.content.trim();
@@ -392,6 +394,11 @@ export function setupFeishuHandlers(
         );
       }
 
+      const stopCardMsgId = await channel.send(msg.chatId, {
+        card: buildStopCard(),
+      });
+      stopCards.set(msg.chatId, stopCardMsgId);
+
       await channel.stream(
         msg.chatId,
         {
@@ -412,12 +419,36 @@ export function setupFeishuHandlers(
         { replyTo: msg.messageId },
       );
     } finally {
+      const cardMsgId = stopCards.get(msg.chatId);
+      if (cardMsgId) {
+        channel
+          .updateCard(cardMsgId, buildStopCardDone("生成完成"))
+          .catch(() => {});
+        stopCards.delete(msg.chatId);
+      }
       unlock!();
     }
   });
 
   channel.on("cardAction", (evt: CardActionEvent) => {
     setTimeout(() => {
+      const value = (evt?.action?.value ?? {}) as Record<string, unknown>;
+      if (value.cmd === "stop") {
+        if (runtime.session.isStreaming) {
+          runtime.session.abort().catch(() => {});
+        }
+        const raw = evt?.raw as
+          | { event?: { token?: string }; token?: string }
+          | undefined;
+        const token: string | undefined = raw?.event?.token ?? raw?.token;
+        if (token) {
+          channel
+            .updateCardByToken(token, buildStopCardDone("已中断"))
+            .catch(() => {});
+        }
+        stopCards.delete(evt.chatId);
+        return;
+      }
       handleCardAction(evt, runtime, cwd, channel).catch((err) =>
         console.error("Card action failed:", err),
       );
