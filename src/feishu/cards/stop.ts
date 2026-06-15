@@ -1,13 +1,12 @@
+import { createMarkdownBlock } from "./helpers.js";
+
 export function buildStopCard(): Record<string, unknown> {
   return {
     schema: "2.0",
     config: { update_multi: true },
     body: {
       elements: [
-        {
-          tag: "markdown",
-          content: "🤖 AI 正在生成中...",
-        },
+        createMarkdownBlock("🤖 AI 正在生成中..."),
         {
           tag: "action",
           actions: [
@@ -34,7 +33,7 @@ export function buildStopCardDone(status: string): Record<string, unknown> {
     schema: "2.0",
     config: { update_multi: true },
     body: {
-      elements: [{ tag: "markdown", content: `${symbol} ${status}` }],
+      elements: [createMarkdownBlock(`${symbol} ${status}`)],
     },
   };
 }

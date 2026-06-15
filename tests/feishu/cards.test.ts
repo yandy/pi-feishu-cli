@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { buildHelpCard } from "../../src/feishu/cards/help.js";
-import { buildStopCard, buildStopCardDone } from "../../src/feishu/cards/stop.js";
 import {
   buildCard,
   type CardButton,
@@ -10,6 +9,10 @@ import {
   createMarkdownBlock,
   createNoteBlock,
 } from "../../src/feishu/cards/helpers.js";
+import {
+  buildStopCard,
+  buildStopCardDone,
+} from "../../src/feishu/cards/stop.js";
 
 describe("card helpers", () => {
   it("createCardHeader returns header with title", () => {
@@ -314,6 +317,24 @@ describe("dialog card", () => {
       expect((card as any).config).toMatchObject({
         update_multi: true,
         width_mode: "fill",
+      });
+    });
+  });
+
+  describe("buildDialogResultCard", () => {
+    it("builds card showing selected choice with original header", () => {
+      const card = buildDialogResultCard("确认删除", "red", "是");
+      expect((card as any).header.title.content).toBe("确认删除");
+      expect((card as any).header.template).toBe("red");
+      const els = (card as any).body.elements;
+      expect(els).toHaveLength(1);
+      expect(els[0].tag).toBe("markdown");
+      expect(els[0].content).toBe("已选择: **是**");
+    });
+
+    it("result card has schema 2.0", () => {
+      const card = buildDialogResultCard("标题", "red", "选项A");
+      expect(card.schema).toBe("2.0");
     });
   });
 });
@@ -357,22 +378,10 @@ describe("stop card", () => {
       content: "🛑 已中断",
     });
   });
-});
 
-  describe("buildDialogResultCard", () => {
-    it("builds card showing selected choice with original header", () => {
-      const card = buildDialogResultCard("确认删除", "red", "是");
-      expect((card as any).header.title.content).toBe("确认删除");
-      expect((card as any).header.template).toBe("red");
-      const els = (card as any).body.elements;
-      expect(els).toHaveLength(1);
-      expect(els[0].tag).toBe("markdown");
-      expect(els[0].content).toBe("已选择: **是**");
-    });
-
-    it("result card has schema 2.0", () => {
-      const card = buildDialogResultCard("标题", "red", "选项A");
-      expect(card.schema).toBe("2.0");
-    });
+  it("buildStopCardDone defaults to checkmark for unknown status", () => {
+    const card = buildStopCardDone("未知状态");
+    const body = (card as any).body;
+    expect(body.elements[0].content).toBe("✅ 未知状态");
   });
 });
