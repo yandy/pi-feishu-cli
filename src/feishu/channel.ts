@@ -40,7 +40,7 @@ interface RawLarkChannel {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   on(event: string, handler: (...args: unknown[]) => void): void;
-  send(chatId: string, content: unknown, options?: unknown): Promise<void>;
+  send(chatId: string, content: unknown, options?: unknown): Promise<string>;
   stream(chatId: string, producer: unknown, options?: unknown): Promise<void>;
   updateCard(messageId: string, card: unknown): Promise<void>;
   readonly botIdentity: { name: string } | undefined;
@@ -83,7 +83,7 @@ export interface Channel {
     chatId: string,
     content: { text?: string; markdown?: string; card?: unknown },
     options?: { replyTo?: string },
-  ): Promise<void>;
+  ): Promise<string>;
   sendFile(chatId: string, filePath: string, fileName?: string): Promise<void>;
   sendImage(chatId: string, imagePath: string): Promise<void>;
   downloadMessageResource(
@@ -139,7 +139,7 @@ export function createChannel(options: ChannelOptions): Channel {
     },
 
     async send(chatId: string, content: unknown, options?: unknown) {
-      await raw.send(chatId, content, options);
+      return await raw.send(chatId, content, options);
     },
 
     async downloadMessageResource(
