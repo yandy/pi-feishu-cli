@@ -17,90 +17,25 @@
 | `src/feishu/cards/stop.ts` (NEW) | `buildStopCard()` and `buildStopCardDone(status)` — stop card JSON builders |
 | `src/feishu/channel.ts` (MODIFY) | Change `send()` return type from `Promise<void>` to `Promise<string>` |
 | `src/index.ts` (MODIFY) | `stopCards` Map, inline cardAction for "stop" cmd, stop card lifecycle in streaming context |
-| `tests/feishu/cards.test.ts` (MODIFY) | Add tests for `buildStopCard` and `buildStopCardDone` |
+| `tests/feishu/cards.test.ts` (MODIFY) | Tests for `buildStopCard` and `buildStopCardDone` |
+| `tests/feishu/channel.test.ts` (MODIFY) | Test that `send()` returns `message_id` |
 
 ---
 
-### Task 1: Create stop card builders
+### Task 1: Stop card builders (TDD: tests → impl)
 
 **Files:**
 - Create: `src/feishu/cards/stop.ts`
+- Modify: `tests/feishu/cards.test.ts`
 
-- [ ] **Step 1: Write the stop card builder file**
+- [ ] **Step 1: Write failing tests**
 
-```typescript
-export function buildStopCard(): Record<string, unknown> {
-  return {
-    schema: "2.0",
-    config: { update_multi: true },
-    body: {
-      elements: [
-        {
-          tag: "markdown",
-          content: "🤖 AI 正在生成中...",
-        },
-        {
-          tag: "action",
-          actions: [
-            {
-              tag: "button",
-              text: {
-                tag: "plain_text",
-                content: "停止生成",
-              },
-              type: "danger",
-              behaviors: [
-                {
-                  type: "callback",
-                  value: { cmd: "stop" },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  };
-}
-
-export function buildStopCardDone(status: string): Record<string, unknown> {
-  const symbols: Record<string, string> = {
-    生成完成: "✅",
-    已中断: "🛑",
-  };
-  const symbol = symbols[status] ?? "✅";
-  return {
-    schema: "2.0",
-    config: { update_multi: true },
-    body: {
-      elements: [
-        {
-          tag: "markdown",
-          content: `${symbol} ${status}`,
-        },
-      ],
-    },
-  };
-}
-```
-
-- [ ] **Step 2: Run typecheck to verify the new file compiles**
-
-```bash
-npx tsc --noEmit
-```
-Expected: No errors related to `stop.ts`.
-
-- [ ] **Step 3: Write tests**
-
-Append to `tests/feishu/cards.test.ts`:
-
+Append to `tests/feishu/cards.test.ts`, at the top add import:
 ```typescript
 import { buildStopCard, buildStopCardDone } from "../../src/feishu/cards/stop.js";
 ```
 
-Add tests at end of file:
-
+At the end of the file (before last closing), add:
 ```typescript
 describe("stop card", () => {
   it("buildStopCard returns card with stop button", () => {
@@ -140,12 +75,70 @@ describe("stop card", () => {
 });
 ```
 
-- [ ] **Step 4: Run card tests**
+- [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
 npx vitest run tests/feishu/cards.test.ts
 ```
-Expected: 3 new tests PASS.
+Expected: 3 new tests FAIL (module `../../src/feishu/cards/stop.js` not found).
+
+- [ ] **Step 3: Write implementation to make tests pass**
+
+Create `src/feishu/cards/stop.ts`:
+```typescript
+export function buildStopCard(): Record<string, unknown> {
+  return {
+    schema: "2.0",
+    config: { update_multi: true },
+    body: {
+      elements: [
+        {
+          tag: "markdown",
+          content: "🤖 AI 正在生成中...",
+        },
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: { tag: "plain_text", content: "停止生成" },
+              type: "danger",
+              behaviors: [{ type: "callback", value: { cmd: "stop" } }],
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+export function buildStopCardDone(status: string): Record<string, unknown> {
+  const symbols: Record<string, string> = {
+    生成完成: "✅",
+    已中断: "🛑",
+  };
+  const symbol = symbols[status] ?? "✅";
+  return {
+    schema: "2.0",
+    config: { update_multi: true },
+    body: {
+      elements: [{ tag: "markdown", content: `${symbol} ${status}` }],
+    },
+  };
+}
+```
+
+- [ ] **Step 4: Run typecheck + tests to verify pass**
+
+```bash
+npm run check
+```
+Expected: No errors.
+
+```bash
+npx vitest run tests/feishu/cards.test.ts
+```
+Expected: 3 new tests PASS (total 26).
 
 - [ ] **Step 5: Commit**
 
@@ -156,16 +149,44 @@ git commit -m "feat: add stop card builders with tests"
 
 ---
 
-### Task 2: Modify channel.send() to return message_id
+### Task 2: channel.send() returns message_id (TDD: test → impl)
 
 **Files:**
 - Modify: `src/feishu/channel.ts`
+- Modify: `tests/feishu/channel.test.ts`
 
-- [ ] **Step 1: Update `send()` return type and implementation**
+- [ ] **Step 1: Write failing test**
 
-In `src/feishu/channel.ts`, change the `send` method in the `Channel` interface (line 81-85) and the implementation (line 141-143).
+The test should verify `send()` returns the `message_id` that `raw.send()` already returns. Append to `tests/feishu/channel.test.ts`:
 
-**Interface change** (line 81-85):
+```typescript
+describe("send returns message_id", () => {
+  it("returns message_id from raw.send", async () => {
+    mockRawChannel.send.mockResolvedValue("msg_abc123");
+    const channel = createChannel({ appId: "test", appSecret: "secret" });
+    const result = await channel.send("chat_1", { text: "hello" });
+    expect(result).toBe("msg_abc123");
+    expect(mockRawChannel.send).toHaveBeenCalledWith(
+      "chat_1",
+      { text: "hello" },
+      undefined,
+    );
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+npx vitest run tests/feishu/channel.test.ts
+```
+Expected: TypeScript compilation error — `channel.send(...)` returns `Promise<void>` (not assignable to `string`).
+
+- [ ] **Step 3: Fix implementation to make test pass**
+
+In `src/feishu/channel.ts`, two changes:
+
+**Interface** (line 82-86): change return type
 ```typescript
 // Before:
   send(
@@ -182,7 +203,7 @@ In `src/feishu/channel.ts`, change the `send` method in the `Channel` interface 
   ): Promise<string>;
 ```
 
-**Implementation change** (line 141-143):
+**Implementation** (line 141-143): return the value
 ```typescript
 // Before:
     async send(chatId: string, content: unknown, options?: unknown) {
@@ -195,24 +216,31 @@ In `src/feishu/channel.ts`, change the `send` method in the `Channel` interface 
     },
 ```
 
-- [ ] **Step 2: Run typecheck**
+`raw.send()` already returns `Promise<string>` (SDK `index.js:91612`). The `as Channel` type assertion on line 122 may need `as unknown as Channel` if the interface mismatch causes a type error.
+
+- [ ] **Step 4: Run typecheck + tests to verify pass**
 
 ```bash
-npx tsc --noEmit
+npm run check
 ```
-Expected: No errors. `raw.send()` already returns `string` (SDK `index.js:91612`), so existing callers that ignore the return value remain unaffected.
+Expected: No errors.
 
-- [ ] **Step 3: Verify existing channel tests still pass**
+```bash
+npx vitest run tests/feishu/channel.test.ts
+```
+Expected: New test PASS.
+
+- [ ] **Step 5: Run all channel-related tests to ensure no regression**
 
 ```bash
 npx vitest run tests/feishu/channel.test.ts tests/feishu/channel-send-file.test.ts
 ```
-Expected: All existing tests PASS (no behavior change, only return type annotation).
+Expected: All tests PASS.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/feishu/channel.ts
+git add src/feishu/channel.ts tests/feishu/channel.test.ts
 git commit -m "feat: channel.send() returns message_id"
 ```
 
@@ -223,24 +251,25 @@ git commit -m "feat: channel.send() returns message_id"
 **Files:**
 - Modify: `src/index.ts`
 
+> **Note:** This task modifies the streaming context in `setupFeishuHandlers()` and the `cardAction` handler. Writing unit tests for the streaming lifecycle requires a live Feishu bot connection, which is impractical. Verification relies on `npm run check` (type safety) and `npx vitest run` (existing tests pass without regression).
+
 - [ ] **Step 1: Import stop card builders**
 
-At the top of `src/index.ts`, add the import alongside other card imports (near line 20-22):
-
+At the top of `src/index.ts`, add alongside other card imports (near line 20-22):
 ```typescript
 import { buildStopCard, buildStopCardDone } from "./feishu/cards/stop.js";
 ```
 
-- [ ] **Step 2: Add `stopCards` Map and inline cardAction stop handler**
+- [ ] **Step 2: Add `stopCards` Map**
 
-In `setupFeishuHandlers()`, add the Map declaration after `let promptLock` (line 350):
-
+In `setupFeishuHandlers()`, after `let promptLock: Promise<void> = Promise.resolve();` (line 350):
 ```typescript
 const stopCards = new Map<string, string>();
 ```
 
-Replace the `channel.on("cardAction", ...)` handler (lines 419-425):
+- [ ] **Step 3: Replace cardAction handler with inline stop interception**
 
+Replace the `channel.on("cardAction", ...)` block (lines 419-425):
 ```typescript
 // Before:
   channel.on("cardAction", (evt: CardActionEvent) => {
@@ -278,10 +307,9 @@ Replace the `channel.on("cardAction", ...)` handler (lines 419-425):
   });
 ```
 
-- [ ] **Step 3: Add stop card send/update/cleanup in streaming context**
+- [ ] **Step 4: Add stop card send/update/cleanup in streaming context**
 
-Replace the streaming context block (lines 395-416):
-
+Replace the streaming block (lines 395-416):
 ```typescript
 // Before:
       await channel.stream(
@@ -344,23 +372,21 @@ Replace the streaming context block (lines 395-416):
     }
 ```
 
-Note: The `unlock!()` call stays inside the `finally` block (same as before), just now accompanied by the stop card cleanup.
-
-- [ ] **Step 4: Run typecheck**
+- [ ] **Step 5: Run typecheck**
 
 ```bash
-npx tsc --noEmit
+npm run check
 ```
 Expected: No errors.
 
-- [ ] **Step 5: Run all tests**
+- [ ] **Step 6: Run full test suite**
 
 ```bash
 npx vitest run
 ```
-Expected: All tests PASS.
+Expected: All existing tests PASS (no regression).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/index.ts
