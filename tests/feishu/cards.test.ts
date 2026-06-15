@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildHelpCard } from "../../src/feishu/cards/help.js";
+import { buildStopCard, buildStopCardDone } from "../../src/feishu/cards/stop.js";
 import {
   buildCard,
   type CardButton,
@@ -331,6 +332,43 @@ describe("dialog card", () => {
     it("result card has schema 2.0", () => {
       const card = buildDialogResultCard("标题", "red", "选项A");
       expect(card.schema).toBe("2.0");
+    });
+  });
+});
+
+describe("stop card", () => {
+  it("buildStopCard returns card with stop button", () => {
+    const card = buildStopCard();
+    expect(card).toHaveProperty("schema", "2.0");
+    const body = (card as any).body;
+    expect(body.elements).toHaveLength(2);
+    expect(body.elements[0]).toEqual({
+      tag: "markdown",
+      content: "🤖 AI 正在生成中...",
+    });
+    expect(body.elements[1].tag).toBe("action");
+    expect(body.elements[1].actions[0].tag).toBe("button");
+    expect(body.elements[1].actions[0].behaviors[0].value).toEqual({
+      cmd: "stop",
+    });
+  });
+
+  it("buildStopCardDone returns done card with status text", () => {
+    const card = buildStopCardDone("生成完成");
+    const body = (card as any).body;
+    expect(body.elements).toHaveLength(1);
+    expect(body.elements[0]).toEqual({
+      tag: "markdown",
+      content: "✅ 生成完成",
+    });
+  });
+
+  it("buildStopCardDone shows stopped symbol for 已中断", () => {
+    const card = buildStopCardDone("已中断");
+    const body = (card as any).body;
+    expect(body.elements[0]).toEqual({
+      tag: "markdown",
+      content: "🛑 已中断",
     });
   });
 });
