@@ -434,6 +434,7 @@ export function setupFeishuHandlers(
     setTimeout(() => {
       const value = (evt?.action?.value ?? {}) as Record<string, unknown>;
       if (value.cmd === "stop") {
+        if (!stopCards.has(evt.chatId)) return;
         if (runtime.session.isStreaming) {
           runtime.session.abort().catch(() => {});
         }
