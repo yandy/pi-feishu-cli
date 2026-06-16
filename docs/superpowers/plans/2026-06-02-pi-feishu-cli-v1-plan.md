@@ -1,5 +1,7 @@
 # pi-feishu-cli v1 Implementation Plan
 
+> **⚠️ ARCHIVED / 已归档**：本文档为 v1 设计。飞书卡片部分已通过 Card V2 迁移（2026-06-03）升级，`tag: "action"` 容器已被移除。代码块仅供历史参考，**请勿直接复制实现**。当前卡片代码见 `src/feishu/cards/`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rebuild `pi-feishu-cli` as a standalone CLI that embeds Pi's AI agent via `InteractiveMode` TUI and connects to a Feishu bot via Channel SDK, sharing one `AgentSessionRuntime`.

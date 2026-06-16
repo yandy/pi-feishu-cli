@@ -21,7 +21,7 @@ vi.mock("../../src/feishu/streaming.js", () => ({
 }));
 
 const mockChannelStream = vi.fn();
-const mockChannelSend = vi.fn().mockResolvedValue(undefined);
+const mockChannelSend = vi.fn().mockResolvedValue({ messageId: "msg_mock1" });
 const mockSessionPrompt = vi.fn().mockResolvedValue(undefined);
 
 function createMockChannel() {
@@ -37,7 +37,7 @@ function createMockChannel() {
     connect: vi.fn(),
     disconnect: vi.fn(),
     onRawEvent: vi.fn(),
-    updateCard: vi.fn(),
+    updateCard: vi.fn().mockResolvedValue(undefined),
     updateCardByToken: vi.fn().mockResolvedValue(undefined),
     botIdentity: { name: "test-bot" },
     connected: true,

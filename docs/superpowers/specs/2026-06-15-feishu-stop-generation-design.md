@@ -141,6 +141,8 @@ export function buildStopCardDone(status: string): Record<string, unknown> { ...
 
 **停止卡片结构**（生成中）：
 
+> **⚠️ 已废弃**：`"tag": "action"` 在 Card V2 中已不支持，按钮应直接放在 `elements` 数组中。正确写法参见 `src/feishu/cards/stop.ts`。
+
 ```json
 {
   "schema": "2.0",

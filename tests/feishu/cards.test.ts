@@ -350,10 +350,9 @@ describe("stop card", () => {
       tag: "markdown",
       content: "🤖 AI 正在生成中...",
     });
-    expect(body.elements[1].tag).toBe("action");
-    expect(body.elements[1].actions[0].tag).toBe("button");
-    expect(body.elements[1].actions[0].type).toBe("danger");
-    expect(body.elements[1].actions[0].behaviors[0].value).toEqual({
+    expect(body.elements[1].tag).toBe("button");
+    expect(body.elements[1].type).toBe("danger");
+    expect(body.elements[1].behaviors[0].value).toEqual({
       cmd: "stop",
     });
   });

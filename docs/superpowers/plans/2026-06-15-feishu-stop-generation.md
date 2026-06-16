@@ -1,5 +1,7 @@
 # Feishu Stop Generation Implementation Plan
 
+> **⚠️** 本文档中的 `tag: "action"` 代码已废弃。Card V2 不支持 `action` 容器，按钮应使用 `createActionButton("停止生成", { cmd: "stop" }, "danger")` 直接放入 `elements`。修正后的代码见 `src/feishu/cards/stop.ts`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a "Stop" button to Feishu streaming conversations, allowing users to abort ongoing AI generation.
@@ -47,6 +49,7 @@ describe("stop card", () => {
       tag: "markdown",
       content: "🤖 AI 正在生成中...",
     });
+    // ⚠️ 已废弃: Card V2 按钮直放 elements，应为 body.elements[1].tag === "button"
     expect(body.elements[1].tag).toBe("action");
     expect(body.elements[1].actions[0].tag).toBe("button");
     expect(body.elements[1].actions[0].behaviors[0].value).toEqual({
@@ -85,6 +88,8 @@ Expected: 3 new tests FAIL (module `../../src/feishu/cards/stop.js` not found).
 - [ ] **Step 3: Write implementation to make tests pass**
 
 Create `src/feishu/cards/stop.ts`:
+> **⚠️ 已废弃**：以下代码中的 `tag: "action"` 容器在 Card V2 中已不支持。正确写法：按钮使用 `createActionButton(...)` 直接放入 `elements` 数组。详见 `src/feishu/cards/stop.ts`。
+
 ```typescript
 export function buildStopCard(): Record<string, unknown> {
   return {

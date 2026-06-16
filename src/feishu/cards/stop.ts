@@ -1,4 +1,4 @@
-import { createMarkdownBlock } from "./helpers.js";
+import { createActionButton, createMarkdownBlock } from "./helpers.js";
 
 export function buildStopCard(): Record<string, unknown> {
   return {
@@ -7,17 +7,7 @@ export function buildStopCard(): Record<string, unknown> {
     body: {
       elements: [
         createMarkdownBlock("🤖 AI 正在生成中..."),
-        {
-          tag: "action",
-          actions: [
-            {
-              tag: "button",
-              text: { tag: "plain_text", content: "停止生成" },
-              type: "danger",
-              behaviors: [{ type: "callback", value: { cmd: "stop" } }],
-            },
-          ],
-        },
+        createActionButton("停止生成", { cmd: "stop" }, "danger"),
       ],
     },
   };
