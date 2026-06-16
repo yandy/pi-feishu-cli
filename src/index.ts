@@ -370,7 +370,9 @@ export function setupFeishuHandlers(
     });
     await prev;
 
+    let prevUIContext = null as any;
     try {
+      prevUIContext = runtime.session.extensionRunner.getUIContext();
       setFeishuContext({ chatId: msg.chatId, channel });
       runtime.session.extensionRunner.setUIContext(
         feishuUIContext,
@@ -427,6 +429,10 @@ export function setupFeishuHandlers(
         stopCards.delete(msg.chatId);
       }
       unlock!();
+      setFeishuContext(null);
+      if (prevUIContext) {
+        runtime.session.extensionRunner.setUIContext(prevUIContext, "tui" as any);
+      }
     }
   });
 
