@@ -1,5 +1,7 @@
 # `/help` Command Implementation Plan
 
+> **⚠️** 本文档中的 `tag: "action"` 卡片代码已通过 Card V2 迁移（2026-06-03）废弃。按钮应使用 `createActionButton(...)` 直接放入 `elements` 数组。当前代码见 `src/feishu/cards/help.ts`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add `/help` command to Feishu bot with interactive card, and optimize Models card layout.
@@ -191,6 +193,7 @@ describe("help card", () => {
 
   it("help card has session and model action buttons", () => {
     const card = buildHelpCard("Bot");
+    // ⚠️ 已废弃: Card V2 中不再有 action 容器，应检查 elements 中的 button
     const actionBlocks = (card.elements as any[]).filter(
       (e: any) => e.tag === "action",
     );
@@ -235,12 +238,15 @@ export function buildHelpCard(botName: string): Record<string, unknown> {
     ),
     createDividerBlock(),
     createMarkdownBlock("**可用命令**"),
+    // ⚠️ 已废弃: tag: "action" 在 Card V2 中不支持，按钮应直放 elements
+    // 正确写法: elements.push(createActionButton("管理会话", ...))
     {
       tag: "action",
       actions: [
         createActionButton("管理会话", { cmd: "help", action: "sessions" }, "primary"),
       ],
     },
+    // ⚠️ 同上，已废弃
     {
       tag: "action",
       actions: [
@@ -510,6 +516,7 @@ describe("models card", () => {
 
   it("action buttons use short labels", async () => {
     const card = await buildModelsCard({ session: mockSession as any, availableModels: mockModels });
+    // ⚠️ 已废弃: Card V2 中不再有 action 容器，应检查 elements 中的 button
     const actions = (card.elements as any[]).filter((e: any) => e.tag === "action");
     expect(actions.length).toBeGreaterThan(0);
     const buttons = actions[0].actions;
@@ -576,6 +583,7 @@ for (const model of availableModels) {
   const key = modelKey(model);
   elements.push(createDividerBlock());
   elements.push(createMarkdownBlock(`**${key}**`));
+  // ⚠️ 已废弃: tag: "action" 在 Card V2 中不支持，按钮应直放 elements
   elements.push({
     tag: "action",
     actions: THINKING_LEVELS.map((level) => ({

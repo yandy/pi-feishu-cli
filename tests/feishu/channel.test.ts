@@ -142,10 +142,10 @@ describe("createChannel", () => {
 
   describe("send returns message_id", () => {
     it("returns message_id from raw.send", async () => {
-      mockRawChannel.send.mockResolvedValue("msg_abc123");
+      mockRawChannel.send.mockResolvedValue({ messageId: "msg_abc123" });
       const channel = createChannel({ appId: "test", appSecret: "secret" });
       const result = await channel.send("chat_1", { text: "hello" });
-      expect(result).toBe("msg_abc123");
+      expect(result).toEqual({ messageId: "msg_abc123" });
       expect(mockRawChannel.send).toHaveBeenCalledWith(
         "chat_1",
         { text: "hello" },

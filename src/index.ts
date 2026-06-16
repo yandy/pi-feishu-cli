@@ -394,7 +394,7 @@ export function setupFeishuHandlers(
         );
       }
 
-      const stopCardMsgId = await channel.send(msg.chatId, {
+      const { messageId: stopCardMsgId } = await channel.send(msg.chatId, {
         card: buildStopCard(),
       });
       stopCards.set(msg.chatId, stopCardMsgId);

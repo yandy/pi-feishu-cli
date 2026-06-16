@@ -42,7 +42,7 @@ src/feishu/
 ### v1 → v2 完整对照
 
 ```jsonc
-// v1 (当前)
+// v1 (已废弃 — 仅供对比参考)
 {
   "config": { "wide_screen_mode": true, "update_multi": true },
   "header": { "title": { "tag": "plain_text", "content": "..." }, "template": "blue" },

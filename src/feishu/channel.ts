@@ -6,6 +6,7 @@ import {
   createLarkChannel,
   type NormalizedMessage as LarkNormalizedMessage,
   LoggerLevel,
+  type SendResult,
 } from "@larksuiteoapi/node-sdk";
 
 export type { CardActionEvent };
@@ -40,7 +41,7 @@ interface RawLarkChannel {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   on(event: string, handler: (...args: unknown[]) => void): void;
-  send(chatId: string, content: unknown, options?: unknown): Promise<string>;
+  send(chatId: string, content: unknown, options?: unknown): Promise<SendResult>;
   stream(chatId: string, producer: unknown, options?: unknown): Promise<void>;
   updateCard(messageId: string, card: unknown): Promise<void>;
   readonly botIdentity: { name: string } | undefined;
@@ -83,7 +84,7 @@ export interface Channel {
     chatId: string,
     content: { text?: string; markdown?: string; card?: unknown },
     options?: { replyTo?: string },
-  ): Promise<string>;
+  ): Promise<SendResult>;
   sendFile(chatId: string, filePath: string, fileName?: string): Promise<void>;
   sendImage(chatId: string, imagePath: string): Promise<void>;
   downloadMessageResource(
