@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockProcessAttachments, mockCreateStreamingHandler } = vi.hoisted(
-  () => ({
+const { mockProcessAttachments, mockCreateStreamingHandler } =
+  vi.hoisted(() => ({
     mockProcessAttachments: vi.fn().mockResolvedValue({
       images: [
         { type: "image" as const, data: "base64", mimeType: "image/png" },
@@ -9,8 +9,7 @@ const { mockProcessAttachments, mockCreateStreamingHandler } = vi.hoisted(
       text: "[文件: test.txt 已保存到 /tmp/pi-feishu/test/test.txt]",
     }),
     mockCreateStreamingHandler: vi.fn(() => vi.fn()),
-  }),
-);
+  }));
 
 vi.mock("../../src/feishu/attachments.js", () => ({
   processAttachments: mockProcessAttachments,
@@ -19,6 +18,14 @@ vi.mock("../../src/feishu/attachments.js", () => ({
 vi.mock("../../src/feishu/streaming.js", () => ({
   createStreamingHandler: mockCreateStreamingHandler,
 }));
+
+vi.mock("../../src/feishu/context.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/feishu/context.js")>();
+  return {
+    ...actual,
+    setFeishuContext: vi.fn((ctx: unknown) => actual.setFeishuContext(ctx as any)),
+  };
+});
 
 const mockChannelStream = vi.fn();
 const mockChannelSend = vi.fn().mockResolvedValue({ messageId: "msg_mock1" });
@@ -55,7 +62,10 @@ function createMockRuntime() {
       model: undefined,
       setModel: vi.fn(),
       setThinkingLevel: vi.fn(),
-      extensionRunner: { setUIContext: vi.fn() },
+      extensionRunner: {
+        setUIContext: vi.fn(),
+        getUIContext: vi.fn(() => ({ __tuiContext: true })),
+      },
     },
     newSession: vi.fn(),
     switchSession: vi.fn(),
@@ -147,6 +157,69 @@ describe("attachment wiring in message handler", () => {
     await handler(msg);
 
     expect(mockProcessAttachments).not.toHaveBeenCalled();
+  });
+
+  it("restores UIContext and clears Feishu context after non-command message", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+    const prevUIContext = runtime.session.extensionRunner.getUIContext();
+
+    setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
+
+    const handler = (createMockChannel as any)._messageHandler;
+    const msg = {
+      messageId: "msg-4",
+      chatId: "chat-1",
+      content: "hello world",
+      rawContentType: "text",
+      resources: [],
+      mentions: [],
+      mentionAll: false,
+      mentionedBot: false,
+    };
+
+    await handler(msg);
+
+    const setUIContextMock = runtime.session.extensionRunner
+      .setUIContext as any;
+    const calls = setUIContextMock.mock.calls;
+    const lastCall = calls[calls.length - 1];
+
+    // Last setUIContext call should restore the previous (TUI) UIContext
+    expect(lastCall[0]).toEqual(prevUIContext);
+    // And with "tui" mode
+    expect(lastCall[1]).toBe("tui");
+
+    // setFeishuContext should have been called with null (clear)
+    expect(setFeishuContext).toHaveBeenCalledWith(null);
+  });
+
+  it("does not touch UIContext or Feishu context for command messages", async () => {
+    const channel = createMockChannel();
+    const runtime = createMockRuntime();
+
+    setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
+
+    const setUIContextMock = runtime.session.extensionRunner
+      .setUIContext as any;
+    const setUIContextCallsBefore = setUIContextMock.mock.calls.length;
+
+    const handler = (createMockChannel as any)._messageHandler;
+    const msg = {
+      messageId: "msg-5",
+      chatId: "chat-1",
+      content: "/help",
+      rawContentType: "text",
+      resources: [],
+      mentions: [],
+      mentionAll: false,
+      mentionedBot: false,
+    };
+
+    await handler(msg);
+
+    // No additional setUIContext calls for commands
+    expect(setUIContextMock.mock.calls.length).toBe(setUIContextCallsBefore);
   });
 });
 
