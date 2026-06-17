@@ -20,6 +20,18 @@ npm install -g pi-feishu-cli
 npx pi-feishu
 ```
 
+### feishu cli(可选)
+
+> feishu cli 是飞书skill的依赖项，同时可用于创建机器人
+
+```sh
+npm install -g @larksuite/cli
+
+lark-cli config init
+lark-cli auth login --recommend
+lark-cli auth status
+```
+
 ## 快速开始
 
 ```bash
