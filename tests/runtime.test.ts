@@ -1,8 +1,36 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import type { Args } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { initRuntime } from "../src/runtime.js";
+
+const WEATHER_EXT_TS = `\
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+
+export default function weatherReportExtension(pi: ExtensionAPI) {
+  pi.registerTool({
+    name: "weather_report",
+    label: "Weather Report",
+    description: "Report the weather for a city",
+    parameters: Type.Object({ city: Type.String() }),
+    async execute() {
+      return { content: [{ type: "text", text: "sunny" }], details: {} };
+    },
+  });
+}
+`;
+
+function makePiArgs(overrides: Partial<Args> = {}): Args {
+  return {
+    messages: [],
+    fileArgs: [],
+    unknownFlags: new Map(),
+    diagnostics: [],
+    ...overrides,
+  };
+}
 
 const SKILL_CONTENT = `---
 name: test-skill
@@ -121,4 +149,49 @@ describe("initRuntime", () => {
       rmSync(tmpDir, { recursive: true });
     }
   }, 30000);
+
+  it("loads tools registered by -e extension (not filtered out)", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-ext-"));
+    try {
+      const extPath = join(tmpDir, "weather-report.ts");
+      writeFileSync(extPath, WEATHER_EXT_TS);
+
+      const cwd = process.cwd();
+      const result = await initRuntime({
+        cwd,
+        piArgs: makePiArgs({ extensions: [extPath] }),
+      });
+
+      const active = result.runtime.session.getActiveToolNames();
+      expect(active).toContain("weather_report");
+      expect(active).toContain("send_file_to_chat");
+      expect(active).toContain("grep");
+      expect(active).toContain("find");
+      expect(active).toContain("ls");
+    } finally {
+      rmSync(tmpDir, { recursive: true });
+    }
+  }, 60000);
+
+  it("respects explicit piArgs.tools allowlist (filters extension tools)", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-ext-"));
+    try {
+      const extPath = join(tmpDir, "weather-report.ts");
+      writeFileSync(extPath, WEATHER_EXT_TS);
+
+      const cwd = process.cwd();
+      const result = await initRuntime({
+        cwd,
+        piArgs: makePiArgs({ extensions: [extPath], tools: ["read", "bash"] }),
+      });
+
+      const active = result.runtime.session.getActiveToolNames();
+      expect(active).toContain("read");
+      expect(active).toContain("bash");
+      expect(active).not.toContain("weather_report");
+      expect(active).not.toContain("grep");
+    } finally {
+      rmSync(tmpDir, { recursive: true });
+    }
+  }, 60000);
 });

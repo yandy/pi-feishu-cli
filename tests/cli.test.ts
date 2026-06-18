@@ -37,10 +37,7 @@ describe("parseArgs", () => {
     ]);
 
     expect(cliArgs.appId).toBeUndefined();
-    expect(remainingArgs).toEqual([
-      "--model",
-      "claude-sonnet",
-    ]);
+    expect(remainingArgs).toEqual(["--model", "claude-sonnet"]);
   });
 
   it("handles --no-bundle-feishu-skills flag", () => {

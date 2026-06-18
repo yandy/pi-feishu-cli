@@ -157,13 +157,44 @@ export async function initRuntime(
         ],
       },
     });
+    const sessionToolOptions: {
+      tools?: string[];
+      excludeTools?: string[];
+      noTools?: "all" | "builtin";
+    } = {};
+    if (parsed?.noTools) {
+      sessionToolOptions.noTools = "all";
+    } else if (parsed?.noBuiltinTools) {
+      sessionToolOptions.noTools = "builtin";
+    }
+    if (parsed?.tools) {
+      sessionToolOptions.tools = [...parsed.tools];
+    }
+    if (parsed?.excludeTools) {
+      sessionToolOptions.excludeTools = [...parsed.excludeTools];
+    }
+    const sessionResult = await createAgentSessionFromServices({
+      services,
+      sessionManager,
+      sessionStartEvent,
+      ...sessionToolOptions,
+    });
+    const userOverrodeTools =
+      Boolean(parsed?.tools) ||
+      Boolean(parsed?.noTools) ||
+      Boolean(parsed?.noBuiltinTools);
+    if (!userOverrodeTools) {
+      sessionResult.session.setActiveToolsByName([
+        ...new Set([
+          ...sessionResult.session.getActiveToolNames(),
+          "grep",
+          "find",
+          "ls",
+        ]),
+      ]);
+    }
     return {
-      ...(await createAgentSessionFromServices({
-        services,
-        sessionManager,
-        sessionStartEvent,
-        tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "send_file_to_chat"],
-      })),
+      ...sessionResult,
       services,
       diagnostics: services.diagnostics,
     };

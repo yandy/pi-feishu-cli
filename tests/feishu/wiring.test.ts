@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockProcessAttachments, mockCreateStreamingHandler } =
-  vi.hoisted(() => ({
+const { mockProcessAttachments, mockCreateStreamingHandler } = vi.hoisted(
+  () => ({
     mockProcessAttachments: vi.fn().mockResolvedValue({
       images: [
         { type: "image" as const, data: "base64", mimeType: "image/png" },
@@ -9,7 +9,8 @@ const { mockProcessAttachments, mockCreateStreamingHandler } =
       text: "[文件: test.txt 已保存到 /tmp/pi-feishu/test/test.txt]",
     }),
     mockCreateStreamingHandler: vi.fn(() => vi.fn()),
-  }));
+  }),
+);
 
 vi.mock("../../src/feishu/attachments.js", () => ({
   processAttachments: mockProcessAttachments,
@@ -20,10 +21,13 @@ vi.mock("../../src/feishu/streaming.js", () => ({
 }));
 
 vi.mock("../../src/feishu/context.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../src/feishu/context.js")>();
+  const actual =
+    await importOriginal<typeof import("../../src/feishu/context.js")>();
   return {
     ...actual,
-    setFeishuContext: vi.fn((ctx: unknown) => actual.setFeishuContext(ctx as any)),
+    setFeishuContext: vi.fn((ctx: unknown) =>
+      actual.setFeishuContext(ctx as any),
+    ),
   };
 });
 
@@ -72,9 +76,9 @@ function createMockRuntime() {
   };
 }
 
-import { handleCardAction, setupFeishuHandlers } from "../../src/index.js";
-import { createFeishuUIContext } from "../../src/feishu/feishu-ui.js";
 import { setFeishuContext } from "../../src/feishu/context.js";
+import { createFeishuUIContext } from "../../src/feishu/feishu-ui.js";
+import { handleCardAction, setupFeishuHandlers } from "../../src/index.js";
 
 describe("attachment wiring in message handler", () => {
   beforeEach(() => {

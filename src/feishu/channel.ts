@@ -41,7 +41,11 @@ interface RawLarkChannel {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   on(event: string, handler: (...args: unknown[]) => void): void;
-  send(chatId: string, content: unknown, options?: unknown): Promise<SendResult>;
+  send(
+    chatId: string,
+    content: unknown,
+    options?: unknown,
+  ): Promise<SendResult>;
   stream(chatId: string, producer: unknown, options?: unknown): Promise<void>;
   updateCard(messageId: string, card: unknown): Promise<void>;
   readonly botIdentity: { name: string } | undefined;

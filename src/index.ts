@@ -431,7 +431,10 @@ export function setupFeishuHandlers(
       unlock!();
       setFeishuContext(null);
       if (prevUIContext) {
-        runtime.session.extensionRunner.setUIContext(prevUIContext, "tui" as any);
+        runtime.session.extensionRunner.setUIContext(
+          prevUIContext,
+          "tui" as any,
+        );
       }
     }
   });
@@ -477,8 +480,8 @@ export function setupFeishuHandlers(
   return () => {
     process.off("exit", exitCleanup);
   };
-    // 修复 card refresh bug的关键：setTimeout(...) 保证：
-    // channel.on(...) 的回调函数先返回（即先返回服务器空响应），再handleCardAction
+  // 修复 card refresh bug的关键：setTimeout(...) 保证：
+  // channel.on(...) 的回调函数先返回（即先返回服务器空响应），再handleCardAction
 }
 
 export async function handleCardAction(
