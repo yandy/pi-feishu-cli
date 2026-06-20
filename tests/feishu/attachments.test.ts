@@ -1,21 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { processAttachments } from "../../src/feishu/attachments.js";
 import type { NormalizedMessage } from "../../src/feishu/channel.js";
+import { createMockMessage } from "../__fixtures__/mocks.js";
 
 function testMsg(resources: any[]): NormalizedMessage {
-  return {
-    messageId: "msg-1",
-    chatId: "chat-1",
-    chatType: "p2p" as const,
-    senderId: "user-1",
-    content: "look at this",
-    rawContentType: "text",
-    resources,
-    mentions: [],
-    mentionAll: false,
-    mentionedBot: false,
-    createTime: Date.now(),
-  };
+  return createMockMessage({ content: "look at this", resources });
 }
 
 describe("processAttachments", () => {

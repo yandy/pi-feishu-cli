@@ -4,25 +4,9 @@ import {
   LOG_LEVEL_MAP,
   LoggerLevel,
 } from "../../src/feishu/channel.js";
+import { createMockRawChannel } from "../__fixtures__/mocks.js";
 
-const mockDispatcher = { register: vi.fn().mockReturnThis() };
-const mockRawChannel = {
-  on: vi.fn(),
-  botIdentity: undefined,
-  connect: vi.fn(),
-  disconnect: vi.fn(),
-  send: vi.fn(),
-  stream: vi.fn(),
-  updateCard: vi.fn(),
-  get connected() {
-    return false;
-  },
-  dispatcher: mockDispatcher,
-  rawClient: {
-    request: vi.fn(),
-    im: { v1: { messageResource: { get: vi.fn() } } },
-  },
-};
+const mockRawChannel = createMockRawChannel();
 
 vi.mock("@larksuiteoapi/node-sdk", () => ({
   createLarkChannel: vi.fn(() => mockRawChannel),
@@ -62,7 +46,7 @@ describe("createChannel", () => {
 
       channel.onRawEvent("im.message.message_read_v1", handler);
 
-      expect(mockDispatcher.register).toHaveBeenCalledWith({
+      expect(mockRawChannel.dispatcher.register).toHaveBeenCalledWith({
         "im.message.message_read_v1": handler,
       });
     });
@@ -71,7 +55,7 @@ describe("createChannel", () => {
   it("registers a no-op handler for im.message.message_read_v1 on creation", () => {
     createChannel({ appId: "test", appSecret: "secret" });
 
-    expect(mockDispatcher.register).toHaveBeenCalledWith({
+    expect(mockRawChannel.dispatcher.register).toHaveBeenCalledWith({
       "im.message.message_read_v1": expect.any(Function),
     });
   });
