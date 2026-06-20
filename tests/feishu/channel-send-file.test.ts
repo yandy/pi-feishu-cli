@@ -2,25 +2,10 @@ import { basename } from "node:path";
 import { createLarkChannel } from "@larksuiteoapi/node-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createChannel } from "../../src/feishu/channel.js";
+import { createMockRawChannel } from "../__fixtures__/mocks.js";
 
 const mockSend = vi.fn();
-const mockRawChannel = {
-  on: vi.fn(),
-  botIdentity: undefined,
-  connect: vi.fn(),
-  disconnect: vi.fn(),
-  send: mockSend,
-  stream: vi.fn(),
-  updateCard: vi.fn(),
-  get connected() {
-    return false;
-  },
-  dispatcher: { register: vi.fn().mockReturnThis() },
-  rawClient: {
-    request: vi.fn(),
-    im: { v1: { messageResource: { get: vi.fn() } } },
-  },
-};
+const mockRawChannel = createMockRawChannel({ send: mockSend });
 
 vi.mock("@larksuiteoapi/node-sdk", () => ({
   createLarkChannel: vi.fn(() => mockRawChannel),

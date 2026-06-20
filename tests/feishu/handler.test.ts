@@ -1,41 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import type { NormalizedMessage } from "../../src/feishu/channel.js";
 import { createMessageHandler } from "../../src/feishu/handler.js";
+import {
+  createMockMessage,
+  createMockRuntime,
+} from "../__fixtures__/mocks.js";
 
-function createMockRuntime() {
-  return {
-    session: {
-      prompt: vi.fn().mockResolvedValue(undefined),
-      model: { provider: "test", id: "test-model" },
-      thinkingLevel: "off" as const,
-      setModel: vi.fn().mockResolvedValue(undefined),
-      setThinkingLevel: vi.fn(),
-      sessionFile: "/tmp/session.jsonl",
-    },
-    newSession: vi.fn().mockResolvedValue(undefined),
-    switchSession: vi.fn().mockResolvedValue(undefined),
-  };
+function makeRuntime() {
+  return createMockRuntime({
+    model: { provider: "test", id: "test-model" },
+    thinkingLevel: "off" as const,
+  });
 }
 
 function makeMsg(content: string): NormalizedMessage {
-  return {
-    messageId: "msg-1",
-    chatId: "chat-1",
-    chatType: "p2p",
-    senderId: "user-1",
-    content,
-    rawContentType: "text",
-    resources: [],
-    mentions: [],
-    mentionAll: false,
-    mentionedBot: false,
-    createTime: Date.now(),
-  };
+  return createMockMessage({ content });
 }
 
 describe("createMessageHandler", () => {
   it("routes /sessions command to sessions handler", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const sessionsFn = vi.fn().mockResolvedValue(undefined);
     const modelsFn = vi.fn();
     const helpFn = vi.fn().mockResolvedValue(undefined);
@@ -51,7 +35,7 @@ describe("createMessageHandler", () => {
   });
 
   it("routes /models command to models handler", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const sessionsFn = vi.fn();
     const modelsFn = vi.fn().mockResolvedValue(undefined);
     const helpFn = vi.fn().mockResolvedValue(undefined);
@@ -67,7 +51,7 @@ describe("createMessageHandler", () => {
   });
 
   it("routes normal messages to session.prompt with steer (no attachments)", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const handler = createMessageHandler(
       runtime as any,
       vi.fn(),
@@ -82,7 +66,7 @@ describe("createMessageHandler", () => {
   });
 
   it("routes /help command to help handler", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const sessionsFn = vi.fn();
     const modelsFn = vi.fn();
     const helpFn = vi.fn().mockResolvedValue(undefined);
@@ -98,7 +82,7 @@ describe("createMessageHandler", () => {
   });
 
   it("appends attachment text to prompt content", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const handler = createMessageHandler(
       runtime as any,
       vi.fn(),
@@ -116,7 +100,7 @@ describe("createMessageHandler", () => {
   });
 
   it("passes images to prompt when attachments include images", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const handler = createMessageHandler(
       runtime as any,
       vi.fn(),
@@ -134,7 +118,7 @@ describe("createMessageHandler", () => {
   });
 
   it("skips images option when images array is empty", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const handler = createMessageHandler(
       runtime as any,
       vi.fn(),
@@ -149,7 +133,7 @@ describe("createMessageHandler", () => {
   });
 
   it("only uses user text when attachments has no text", async () => {
-    const runtime = createMockRuntime();
+    const runtime = makeRuntime();
     const handler = createMessageHandler(
       runtime as any,
       vi.fn(),

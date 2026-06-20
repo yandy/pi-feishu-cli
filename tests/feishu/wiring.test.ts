@@ -31,49 +31,34 @@ vi.mock("../../src/feishu/context.js", async (importOriginal) => {
   };
 });
 
+import {
+  createMockChannel,
+  createMockRuntime,
+} from "../__fixtures__/mocks.js";
+
 const mockChannelStream = vi.fn();
 const mockChannelSend = vi.fn().mockResolvedValue({ messageId: "msg_mock1" });
 const mockSessionPrompt = vi.fn().mockResolvedValue(undefined);
 
-function createMockChannel() {
-  return {
-    on: vi.fn((event: string, handler: Function) => {
-      if (event === "message")
-        (createMockChannel as any)._messageHandler = handler;
-    }),
+let _messageHandler: ((msg: any) => void) | undefined;
+
+function makeChannel() {
+  return createMockChannel({
     send: mockChannelSend,
-    stream: mockChannelStream.mockImplementation(
-      async (_chatId, _producer, _opts) => {},
-    ),
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    onRawEvent: vi.fn(),
-    updateCard: vi.fn().mockResolvedValue(undefined),
-    updateCardByToken: vi.fn().mockResolvedValue(undefined),
-    botIdentity: { name: "test-bot" },
-    connected: true,
-    downloadMessageResource: vi.fn(),
-  };
+    stream: mockChannelStream,
+    on: vi.fn((event: string, handler: Function) => {
+      if (event === "message") _messageHandler = handler as any;
+    }),
+  });
 }
 
-function createMockRuntime() {
-  return {
-    session: {
-      prompt: mockSessionPrompt,
-      subscribe: vi.fn(() => vi.fn()),
-      sessionId: "session-test-123",
-      sessionFile: "/tmp/sessions/default.json",
-      model: undefined,
-      setModel: vi.fn(),
-      setThinkingLevel: vi.fn(),
-      extensionRunner: {
-        setUIContext: vi.fn(),
-        getUIContext: vi.fn(() => ({ __tuiContext: true })),
-      },
+function makeRuntime() {
+  return createMockRuntime({
+    prompt: mockSessionPrompt,
+    extensionRunner: {
+      getUIContext: vi.fn(() => ({ __tuiContext: true })),
     },
-    newSession: vi.fn(),
-    switchSession: vi.fn(),
-  };
+  });
 }
 
 import { setFeishuContext } from "../../src/feishu/context.js";
@@ -83,17 +68,16 @@ import { handleCardAction, setupFeishuHandlers } from "../../src/index.js";
 describe("attachment wiring in message handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete (createMockChannel as any)._messageHandler;
+    _messageHandler = undefined;
   });
 
   it("processes attachments when message has resources", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
 
-    const handler = (createMockChannel as any)._messageHandler;
-    expect(handler).toBeDefined();
+    expect(_messageHandler).toBeDefined();
 
     const msg = {
       messageId: "msg-1",
@@ -106,7 +90,7 @@ describe("attachment wiring in message handler", () => {
       mentionedBot: false,
     };
 
-    await handler(msg);
+    await _messageHandler!(msg);
 
     expect(mockProcessAttachments).toHaveBeenCalledWith(
       channel,
@@ -118,12 +102,11 @@ describe("attachment wiring in message handler", () => {
   });
 
   it("skips attachments for command messages", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
 
-    const handler = (createMockChannel as any)._messageHandler;
     const msg = {
       messageId: "msg-2",
       chatId: "chat-1",
@@ -135,18 +118,17 @@ describe("attachment wiring in message handler", () => {
       mentionedBot: false,
     };
 
-    await handler(msg);
+    await _messageHandler!(msg);
 
     expect(mockProcessAttachments).not.toHaveBeenCalled();
   });
 
   it("does not call processAttachments when msg has no resources", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
 
-    const handler = (createMockChannel as any)._messageHandler;
     const msg = {
       messageId: "msg-3",
       chatId: "chat-1",
@@ -158,19 +140,18 @@ describe("attachment wiring in message handler", () => {
       mentionedBot: false,
     };
 
-    await handler(msg);
+    await _messageHandler!(msg);
 
     expect(mockProcessAttachments).not.toHaveBeenCalled();
   });
 
   it("restores UIContext and clears Feishu context after non-command message", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
     const prevUIContext = runtime.session.extensionRunner.getUIContext();
 
     setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
 
-    const handler = (createMockChannel as any)._messageHandler;
     const msg = {
       messageId: "msg-4",
       chatId: "chat-1",
@@ -182,25 +163,22 @@ describe("attachment wiring in message handler", () => {
       mentionedBot: false,
     };
 
-    await handler(msg);
+    await _messageHandler!(msg);
 
     const setUIContextMock = runtime.session.extensionRunner
       .setUIContext as any;
     const calls = setUIContextMock.mock.calls;
     const lastCall = calls[calls.length - 1];
 
-    // Last setUIContext call should restore the previous (TUI) UIContext
     expect(lastCall[0]).toEqual(prevUIContext);
-    // And with "tui" mode
     expect(lastCall[1]).toBe("tui");
 
-    // setFeishuContext should have been called with null (clear)
     expect(setFeishuContext).toHaveBeenCalledWith(null);
   });
 
   it("does not touch UIContext or Feishu context for command messages", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
 
@@ -208,7 +186,6 @@ describe("attachment wiring in message handler", () => {
       .setUIContext as any;
     const setUIContextCallsBefore = setUIContextMock.mock.calls.length;
 
-    const handler = (createMockChannel as any)._messageHandler;
     const msg = {
       messageId: "msg-5",
       chatId: "chat-1",
@@ -220,9 +197,8 @@ describe("attachment wiring in message handler", () => {
       mentionedBot: false,
     };
 
-    await handler(msg);
+    await _messageHandler!(msg);
 
-    // No additional setUIContext calls for commands
     expect(setUIContextMock.mock.calls.length).toBe(setUIContextCallsBefore);
   });
 });
@@ -233,8 +209,8 @@ describe("handleCardAction", () => {
   });
 
   it("updates card by token on session switch", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     const evt = {
       messageId: "msg-1",
@@ -262,8 +238,8 @@ describe("handleCardAction", () => {
   });
 
   it("updates card by token on model select", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     const evt = {
       messageId: "msg-2",
@@ -296,8 +272,8 @@ describe("handleCardAction", () => {
   });
 
   it("updates card by token on help → sessions", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     const evt = {
       messageId: "msg-3",
@@ -324,8 +300,8 @@ describe("handleCardAction", () => {
   });
 
   it("does not fail when token is missing", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     const evt = {
       messageId: "msg-4",
@@ -350,8 +326,8 @@ describe("handleCardAction", () => {
   });
 
   it("updates card by token on feishu_dialog with selected choice", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     setFeishuContext({ chatId: "chat-dialog", channel } as any);
 
@@ -401,8 +377,8 @@ describe("handleCardAction", () => {
   });
 
   it("does not update card on feishu_dialog when token is missing", async () => {
-    const channel = createMockChannel();
-    const runtime = createMockRuntime();
+    const channel = makeChannel();
+    const runtime = makeRuntime();
 
     setFeishuContext({ chatId: "chat-d2", channel } as any);
     const ui = createFeishuUIContext();
