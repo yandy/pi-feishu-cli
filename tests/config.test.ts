@@ -148,6 +148,121 @@ describe("loadConfig", () => {
   });
 });
 
+describe("config merge: global + project", () => {
+  const tmpDir = join(process.cwd(), "tests", "__tmp_merge__");
+
+  function cleanup() {
+    try { rmSync(tmpDir, { recursive: true }); } catch {}
+  }
+
+  afterEach(cleanup);
+
+  it("merges global and project configs with project overriding global on same-name fields", () => {
+    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const globalDir = join(tmpDir, "global");
+    const projectDir = join(tmpDir, "project");
+    mkdirSync(globalDir, { recursive: true });
+    mkdirSync(join(projectDir, ".pi"), { recursive: true });
+    process.env.PI_AGENT_DIR = globalDir;
+
+    try {
+      writeFileSync(
+        join(globalDir, "feishu.json"),
+        JSON.stringify({ appId: "global-id", appSecret: "global-secret", botName: "GlobalBot" }),
+      );
+      writeFileSync(
+        join(projectDir, ".pi", "feishu.json"),
+        JSON.stringify({ botName: "ProjectBot", noBundleFeishuSkills: true }),
+      );
+
+      const cfg = loadConfig({ cwd: projectDir });
+
+      expect(cfg.appId).toBe("global-id");
+      expect(cfg.appSecret).toBe("global-secret");
+      expect(cfg.botName).toBe("ProjectBot");
+      expect(cfg.noBundleFeishuSkills).toBe(true);
+    } finally {
+      process.env.PI_AGENT_DIR = prevAgentDir;
+      cleanup();
+    }
+  });
+
+  it("uses only global config when project config does not exist", () => {
+    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const globalDir = join(tmpDir, "global");
+    const projectDir = join(tmpDir, "project");
+    mkdirSync(globalDir, { recursive: true });
+    mkdirSync(projectDir, { recursive: true });
+    process.env.PI_AGENT_DIR = globalDir;
+
+    try {
+      writeFileSync(
+        join(globalDir, "feishu.json"),
+        JSON.stringify({ appId: "global-id", appSecret: "global-secret", botName: "GlobalBot" }),
+      );
+
+      const cfg = loadConfig({ cwd: projectDir });
+
+      expect(cfg.appId).toBe("global-id");
+      expect(cfg.appSecret).toBe("global-secret");
+      expect(cfg.botName).toBe("GlobalBot");
+    } finally {
+      process.env.PI_AGENT_DIR = prevAgentDir;
+      cleanup();
+    }
+  });
+
+  it("uses only project config when global config does not exist", () => {
+    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const globalDir = join(tmpDir, "global");
+    const projectDir = join(tmpDir, "project");
+    mkdirSync(globalDir, { recursive: true });
+    mkdirSync(join(projectDir, ".pi"), { recursive: true });
+    process.env.PI_AGENT_DIR = globalDir;
+
+    try {
+      writeFileSync(
+        join(projectDir, ".pi", "feishu.json"),
+        JSON.stringify({ appId: "project-id", appSecret: "project-secret", botName: "ProjectBot" }),
+      );
+
+      const cfg = loadConfig({ cwd: projectDir });
+
+      expect(cfg.appId).toBe("project-id");
+      expect(cfg.appSecret).toBe("project-secret");
+      expect(cfg.botName).toBe("ProjectBot");
+    } finally {
+      process.env.PI_AGENT_DIR = prevAgentDir;
+      cleanup();
+    }
+  });
+
+  it("falls back to env vars when neither config file exists", () => {
+    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const prevId = process.env.FEISHU_APP_ID;
+    const prevSecret = process.env.FEISHU_APP_SECRET;
+    const globalDir = join(tmpDir, "global");
+    const projectDir = join(tmpDir, "project");
+    mkdirSync(globalDir, { recursive: true });
+    mkdirSync(projectDir, { recursive: true });
+    process.env.PI_AGENT_DIR = globalDir;
+    process.env.FEISHU_APP_ID = "env-id";
+    process.env.FEISHU_APP_SECRET = "env-secret";
+
+    try {
+      const cfg = loadConfig({ cwd: projectDir });
+
+      expect(cfg.appId).toBe("env-id");
+      expect(cfg.appSecret).toBe("env-secret");
+    } finally {
+      process.env.PI_AGENT_DIR = prevAgentDir;
+      process.env.FEISHU_APP_ID = prevId;
+      process.env.FEISHU_APP_SECRET = prevSecret;
+      cleanup();
+    }
+  });
+});
+
 describe("saveCredentials", () => {
   it("writes appId and appSecret to JSON file", () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
