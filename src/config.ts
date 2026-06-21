@@ -41,15 +41,15 @@ function loadPartialFileConfig(path: string): Partial<FeishuConfig> | null {
       result.botName = parsed.botName;
     if (parsed.noBundleFeishuSkills !== undefined)
       result.noBundleFeishuSkills = parsed.noBundleFeishuSkills;
-    return Object.keys(result).length > 0 ? (result as FeishuConfig) : null;
+    return Object.keys(result).length > 0 ? result : null;
   } catch {
     return null;
   }
 }
 
 function loadFileConfigs(cwd: string): {
-  project: FeishuConfig | null;
-  global: FeishuConfig | null;
+  project: Partial<FeishuConfig> | null;
+  global: Partial<FeishuConfig> | null;
 } {
   const projectPath = join(cwd, CONFIG_DIR_NAME, "feishu.json");
   const globalPath = join(getAgentDir(), "feishu.json");
@@ -93,7 +93,7 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   if (process.env.FEISHU_BOT_NAME)
     envConfig.botName = process.env.FEISHU_BOT_NAME;
 
-  let fileConfig: FeishuConfig | null = null;
+  let fileConfig: Partial<FeishuConfig> | null = null;
   const configPath = options.config;
 
   if (configPath) {
