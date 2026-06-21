@@ -1,8 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { CONFIG_DIR_NAME, getAgentDir as piGetAgentDir } from "@earendil-works/pi-coding-agent";
 import type { FeishuConfig } from "./types.js";
+
+function getAgentDir(): string {
+  if (process.env.PI_AGENT_DIR) return process.env.PI_AGENT_DIR;
+  return piGetAgentDir();
+}
 
 export interface ConfigOptions {
   appId?: string;
@@ -14,13 +19,45 @@ export interface ConfigOptions {
 
 function findConfigFile(cwd: string): string | null {
   const paths = [
-    join(cwd, ".pi", "feishu.json"),
-    join(homedir(), ".pi", "agent", "feishu.json"),
+    join(cwd, CONFIG_DIR_NAME, "feishu.json"),
+    join(getAgentDir(), "feishu.json"),
   ];
   for (const p of paths) {
     if (existsSync(p)) return p;
   }
   return null;
+}
+
+function loadPartialFileConfig(path: string): Partial<FeishuConfig> | null {
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(raw);
+    const result: Partial<FeishuConfig> = {};
+    if (parsed.appId && typeof parsed.appId === "string")
+      result.appId = parsed.appId;
+    if (parsed.appSecret && typeof parsed.appSecret === "string")
+      result.appSecret = parsed.appSecret;
+    if (parsed.botName && typeof parsed.botName === "string")
+      result.botName = parsed.botName;
+    if (parsed.noBundleFeishuSkills !== undefined)
+      result.noBundleFeishuSkills = parsed.noBundleFeishuSkills;
+    return Object.keys(result).length > 0 ? (result as FeishuConfig) : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadFileConfigs(cwd: string): {
+  project: FeishuConfig | null;
+  global: FeishuConfig | null;
+} {
+  const projectPath = join(cwd, CONFIG_DIR_NAME, "feishu.json");
+  const globalPath = join(getAgentDir(), "feishu.json");
+
+  return {
+    project: existsSync(projectPath) ? loadPartialFileConfig(projectPath) : null,
+    global: existsSync(globalPath) ? loadPartialFileConfig(globalPath) : null,
+  };
 }
 
 function loadFileConfig(path: string): FeishuConfig | null {
@@ -57,10 +94,17 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
     envConfig.botName = process.env.FEISHU_BOT_NAME;
 
   let fileConfig: FeishuConfig | null = null;
-  const configPath =
-    options.config ?? findConfigFile(options.cwd ?? process.cwd());
+  const configPath = options.config;
+
   if (configPath) {
+    // Explicit config path: single-file mode (backward compatible)
     fileConfig = loadFileConfig(configPath);
+  } else {
+    // Dual-file merge: global + project with project overriding
+    const { project, global } = loadFileConfigs(options.cwd ?? process.cwd());
+    if (project || global) {
+      fileConfig = { ...global, ...project };
+    }
   }
 
   const cliConfig: Partial<FeishuConfig> = {};
@@ -97,7 +141,7 @@ export function saveCredentials(path: string, config: FeishuConfig): void {
   writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
 }
 
-const DEFAULT_SAVE_PATH = join(homedir(), ".pi", "agent", "feishu.json");
+const DEFAULT_SAVE_PATH = join(getAgentDir(), "feishu.json");
 
 async function readNonEmpty(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
