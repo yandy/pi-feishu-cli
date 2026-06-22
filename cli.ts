@@ -97,7 +97,7 @@ Feishu Environment Variables:
   FEISHU_APP_SECRET   Feishu app secret
 
 Config file location:
-  Searched in order: .pi/feishu.json → ~/.pi/agent/feishu.json
+  Searched in order: .pi/feishu-auth.json → ~/.pi/pi-feishu/auth.json
 
 PI Agent Options:
   --provider <name>              Provider name (default: google)

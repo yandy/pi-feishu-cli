@@ -38,7 +38,7 @@ lark-cli auth status
 pi-feishu --app-id cli_xxx --app-secret xxx
 ```
 
-如果缺少凭证，CLI 会交互式提示输入并将其保存到 `~/.pi/agent/feishu.json`。
+如果缺少凭证，CLI 会交互式提示输入并将其保存到 `~/.pi/pi-feishu/auth.json`。
 
 ## CLI 参数
 
@@ -59,7 +59,7 @@ pi-feishu --app-id cli_xxx --app-secret xxx
 | 优先级 | 来源 | 示例 |
 |--------|------|------|
 | 1（最高） | CLI 参数 | `pi-feishu --app-id xxx --app-secret xxx` |
-| 2 | 配置文件 | `.pi/feishu.json` 或 `~/.pi/agent/feishu.json`（按顺序查找） |
+| 2 | 配置文件 | `.pi/feishu-auth.json` 或 `~/.pi/pi-feishu/auth.json`（按顺序查找） |
 | 3（最低） | 环境变量 | `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_BOT_NAME`、`FEISHU_NO_BUNDLE_SKILLS` |
 
 配置文件格式：

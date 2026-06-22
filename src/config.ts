@@ -14,8 +14,8 @@ export interface ConfigOptions {
 
 function findConfigFile(cwd: string): string | null {
   const paths = [
-    join(cwd, ".pi", "feishu.json"),
-    join(homedir(), ".pi", "agent", "feishu.json"),
+    join(cwd, ".pi", "feishu-auth.json"),
+    join(homedir(), ".pi", "pi-feishu", "auth.json"),
   ];
   for (const p of paths) {
     if (existsSync(p)) return p;
@@ -74,7 +74,7 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
   if (!appId || !appSecret) {
     throw new Error(
       "Feishu credentials not configured. Set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, " +
-        "create .pi/feishu.json or ~/.pi/agent/feishu.json, or pass --app-id/--app-secret CLI args.",
+        "create .pi/feishu-auth.json or ~/.pi/pi-feishu/auth.json, or pass --app-id/--app-secret CLI args.",
     );
   }
 
@@ -97,7 +97,7 @@ export function saveCredentials(path: string, config: FeishuConfig): void {
   writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
 }
 
-const DEFAULT_SAVE_PATH = join(homedir(), ".pi", "agent", "feishu.json");
+export const DEFAULT_SAVE_PATH = join(homedir(), ".pi", "pi-feishu", "auth.json");
 
 async function readNonEmpty(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });

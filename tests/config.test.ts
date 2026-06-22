@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadConfig, saveCredentials } from "../src/config.js";
+import { DEFAULT_SAVE_PATH, loadConfig, saveCredentials } from "../src/config.js";
 
 const tmpDir = join(process.cwd(), "tests", "__tmp_config__");
 
@@ -145,6 +145,51 @@ describe("loadConfig", () => {
       process.env.FEISHU_APP_ID = prevId;
       process.env.FEISHU_APP_SECRET = prevSecret;
     }
+  });
+
+  it("finds config at .pi/feishu-auth.json in project directory", () => {
+    const prevId = process.env.FEISHU_APP_ID;
+    const prevSecret = process.env.FEISHU_APP_SECRET;
+    delete process.env.FEISHU_APP_ID;
+    delete process.env.FEISHU_APP_SECRET;
+    try {
+      mkdirSync(join(tmpDir, ".pi"), { recursive: true });
+      writeFileSync(
+        join(tmpDir, ".pi", "feishu-auth.json"),
+        JSON.stringify({ appId: "proj-id", appSecret: "proj-secret" }),
+      );
+      const cfg = loadConfig({ cwd: tmpDir });
+      expect(cfg.appId).toBe("proj-id");
+      expect(cfg.appSecret).toBe("proj-secret");
+    } finally {
+      process.env.FEISHU_APP_ID = prevId;
+      process.env.FEISHU_APP_SECRET = prevSecret;
+      cleanup();
+    }
+  });
+
+  it("error message mentions new config paths", () => {
+    const prevId = process.env.FEISHU_APP_ID;
+    const prevSecret = process.env.FEISHU_APP_SECRET;
+    delete process.env.FEISHU_APP_ID;
+    delete process.env.FEISHU_APP_SECRET;
+    try {
+      expect(() =>
+        loadConfig({ config: join(tmpDir, ".nonexistent.json") }),
+      ).toThrow(".pi/feishu-auth.json");
+      expect(() =>
+        loadConfig({ config: join(tmpDir, ".nonexistent.json") }),
+      ).toThrow("~/.pi/pi-feishu/auth.json");
+    } finally {
+      process.env.FEISHU_APP_ID = prevId;
+      process.env.FEISHU_APP_SECRET = prevSecret;
+    }
+  });
+});
+
+describe("DEFAULT_SAVE_PATH", () => {
+  it("is ~/.pi/pi-feishu/auth.json", () => {
+    expect(DEFAULT_SAVE_PATH).toMatch(/pi-feishu\/auth\.json$/);
   });
 });
 
