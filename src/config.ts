@@ -1,13 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { CONFIG_DIR_NAME, getAgentDir as piGetAgentDir } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { FeishuConfig } from "./types.js";
-
-function getAgentDir(): string {
-  if (process.env.PI_AGENT_DIR) return process.env.PI_AGENT_DIR;
-  return piGetAgentDir();
-}
 
 export interface ConfigOptions {
   appId?: string;
@@ -15,17 +10,6 @@ export interface ConfigOptions {
   config?: string;
   cwd?: string;
   noBundleFeishuSkills?: boolean;
-}
-
-function findConfigFile(cwd: string): string | null {
-  const paths = [
-    join(cwd, CONFIG_DIR_NAME, "feishu.json"),
-    join(getAgentDir(), "feishu.json"),
-  ];
-  for (const p of paths) {
-    if (existsSync(p)) return p;
-  }
-  return null;
 }
 
 function loadPartialFileConfig(path: string): Partial<FeishuConfig> | null {
@@ -39,10 +23,13 @@ function loadPartialFileConfig(path: string): Partial<FeishuConfig> | null {
       result.appSecret = parsed.appSecret;
     if (parsed.botName && typeof parsed.botName === "string")
       result.botName = parsed.botName;
-    if (parsed.noBundleFeishuSkills !== undefined)
+    if (typeof parsed.noBundleFeishuSkills === "boolean")
       result.noBundleFeishuSkills = parsed.noBundleFeishuSkills;
     return Object.keys(result).length > 0 ? result : null;
-  } catch {
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error(`Warning: failed to parse config file "${path}": ${err.message}`);
+    }
     return null;
   }
 }
@@ -117,8 +104,9 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
 
   if (!appId || !appSecret) {
     throw new Error(
-      "Feishu credentials not configured. Set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, " +
-        "create .pi/feishu.json or ~/.pi/agent/feishu.json, or pass --app-id/--app-secret CLI args.",
+      `Feishu credentials not configured. Set FEISHU_APP_ID/FEISHU_APP_SECRET env vars, ` +
+        `create ${join(CONFIG_DIR_NAME, "feishu.json")} or ${join(getAgentDir(), "feishu.json")}, ` +
+        `or pass --app-id/--app-secret CLI args.`,
     );
   }
 

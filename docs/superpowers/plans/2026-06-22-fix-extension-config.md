@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - `CONFIG_DIR_NAME` imported from `@earendil-works/pi-coding-agent` (≥0.79.9) — defaults to `.pi`
-- `getAgentDir()` imported from `@earendil-works/pi-coding-agent` — respects `PI_AGENT_DIR` env var, defaults to `${homedir()}/${CONFIG_DIR_NAME}/agent`
+- `getAgentDir()` imported from `@earendil-works/pi-coding-agent` — respects `PI_CODING_AGENT_DIR` env var, defaults to `${homedir()}/${CONFIG_DIR_NAME}/agent`
 - `DEFAULT_SAVE_PATH` must use `getAgentDir()` instead of hardcoded `~/.pi/agent`
 - Backward compatibility: explicit `config` option still bypasses dual-file merge
 - All existing tests must pass after changes
@@ -62,7 +62,7 @@ git commit -m "chore: upgrade @earendil-works/pi-coding-agent to ^0.79.9"
 
 - [ ] **Step 1: Add import for getAgentDir mock setup**
 
-Since tests need to control both global and project config paths without hardcoding `.pi`, set `PI_AGENT_DIR` env var to a temp directory for global config.
+Since tests need to control both global and project config paths without hardcoding `.pi`, set `PI_CODING_AGENT_DIR` env var to a temp directory for global config.
 
 In `tests/config.test.ts`, add these test cases after existing `describe("loadConfig", ...)` tests:
 

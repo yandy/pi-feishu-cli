@@ -158,12 +158,12 @@ describe("config merge: global + project", () => {
   afterEach(cleanup);
 
   it("merges global and project configs with project overriding global on same-name fields", () => {
-    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
     const globalDir = join(tmpDir, "global");
     const projectDir = join(tmpDir, "project");
     mkdirSync(globalDir, { recursive: true });
     mkdirSync(join(projectDir, ".pi"), { recursive: true });
-    process.env.PI_AGENT_DIR = globalDir;
+    process.env.PI_CODING_AGENT_DIR = globalDir;
 
     try {
       writeFileSync(
@@ -182,18 +182,17 @@ describe("config merge: global + project", () => {
       expect(cfg.botName).toBe("ProjectBot");
       expect(cfg.noBundleFeishuSkills).toBe(true);
     } finally {
-      process.env.PI_AGENT_DIR = prevAgentDir;
-      cleanup();
+      process.env.PI_CODING_AGENT_DIR = prevAgentDir;
     }
   });
 
   it("uses only global config when project config does not exist", () => {
-    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
     const globalDir = join(tmpDir, "global");
     const projectDir = join(tmpDir, "project");
     mkdirSync(globalDir, { recursive: true });
     mkdirSync(projectDir, { recursive: true });
-    process.env.PI_AGENT_DIR = globalDir;
+    process.env.PI_CODING_AGENT_DIR = globalDir;
 
     try {
       writeFileSync(
@@ -207,18 +206,17 @@ describe("config merge: global + project", () => {
       expect(cfg.appSecret).toBe("global-secret");
       expect(cfg.botName).toBe("GlobalBot");
     } finally {
-      process.env.PI_AGENT_DIR = prevAgentDir;
-      cleanup();
+      process.env.PI_CODING_AGENT_DIR = prevAgentDir;
     }
   });
 
   it("uses only project config when global config does not exist", () => {
-    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
     const globalDir = join(tmpDir, "global");
     const projectDir = join(tmpDir, "project");
     mkdirSync(globalDir, { recursive: true });
     mkdirSync(join(projectDir, ".pi"), { recursive: true });
-    process.env.PI_AGENT_DIR = globalDir;
+    process.env.PI_CODING_AGENT_DIR = globalDir;
 
     try {
       writeFileSync(
@@ -232,20 +230,19 @@ describe("config merge: global + project", () => {
       expect(cfg.appSecret).toBe("project-secret");
       expect(cfg.botName).toBe("ProjectBot");
     } finally {
-      process.env.PI_AGENT_DIR = prevAgentDir;
-      cleanup();
+      process.env.PI_CODING_AGENT_DIR = prevAgentDir;
     }
   });
 
   it("falls back to env vars when neither config file exists", () => {
-    const prevAgentDir = process.env.PI_AGENT_DIR;
+    const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
     const prevId = process.env.FEISHU_APP_ID;
     const prevSecret = process.env.FEISHU_APP_SECRET;
     const globalDir = join(tmpDir, "global");
     const projectDir = join(tmpDir, "project");
     mkdirSync(globalDir, { recursive: true });
     mkdirSync(projectDir, { recursive: true });
-    process.env.PI_AGENT_DIR = globalDir;
+    process.env.PI_CODING_AGENT_DIR = globalDir;
     process.env.FEISHU_APP_ID = "env-id";
     process.env.FEISHU_APP_SECRET = "env-secret";
 
@@ -255,10 +252,50 @@ describe("config merge: global + project", () => {
       expect(cfg.appId).toBe("env-id");
       expect(cfg.appSecret).toBe("env-secret");
     } finally {
-      process.env.PI_AGENT_DIR = prevAgentDir;
+      process.env.PI_CODING_AGENT_DIR = prevAgentDir;
       process.env.FEISHU_APP_ID = prevId;
       process.env.FEISHU_APP_SECRET = prevSecret;
-      cleanup();
+    }
+  });
+
+  it("explicit config option bypasses dual-file merge and loads only that file", () => {
+    const prevAgentDir = process.env.PI_CODING_AGENT_DIR;
+    const prevBotName = process.env.FEISHU_BOT_NAME;
+    const globalDir = join(tmpDir, "global");
+    const explicitDir = join(tmpDir, "explicit");
+    const projectDir = join(tmpDir, "project");
+    mkdirSync(globalDir, { recursive: true });
+    mkdirSync(join(projectDir, ".pi"), { recursive: true });
+    mkdirSync(explicitDir, { recursive: true });
+    process.env.PI_CODING_AGENT_DIR = globalDir;
+    delete process.env.FEISHU_BOT_NAME;
+
+    try {
+      writeFileSync(
+        join(globalDir, "feishu.json"),
+        JSON.stringify({ appId: "global-id", appSecret: "global-secret", botName: "GlobalBot" }),
+      );
+      writeFileSync(
+        join(projectDir, ".pi", "feishu.json"),
+        JSON.stringify({ appId: "project-id", appSecret: "project-secret" }),
+      );
+      writeFileSync(
+        join(explicitDir, "explicit.json"),
+        JSON.stringify({ appId: "explicit-id", appSecret: "explicit-secret" }),
+      );
+
+      const cfg = loadConfig({
+        cwd: projectDir,
+        config: join(explicitDir, "explicit.json"),
+      });
+
+      // Should only load explicit config, not merged from global + project
+      expect(cfg.appId).toBe("explicit-id");
+      expect(cfg.appSecret).toBe("explicit-secret");
+      expect(cfg.botName).toBeUndefined();
+    } finally {
+      process.env.PI_CODING_AGENT_DIR = prevAgentDir;
+      process.env.FEISHU_BOT_NAME = prevBotName;
     }
   });
 });
