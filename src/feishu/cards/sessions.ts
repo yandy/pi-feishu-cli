@@ -29,7 +29,9 @@ function relativeTime(date: Date): string {
 }
 
 function sessionLabel(s: SessionInfo): string {
-  const title = s.name || s.firstMessage || "(空会话)";
+  const raw = s.name || s.firstMessage || "(空会话)";
+  // 飞书卡片渲染器中，反引号会导致 markdown 元素解析异常
+  const title = raw.replace(/`/g, "'");
   const truncated = title.length > 40 ? `${title.slice(0, 37)}...` : title;
   return `${truncated}  ·  ${s.messageCount}条  ·  ${relativeTime(s.modified)}`;
 }

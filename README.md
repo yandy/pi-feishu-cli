@@ -176,11 +176,12 @@ npm run update-skills
 
 ```bash
 npm install
-npm run build     # tsc 编译到 dist/
-npm run check     # tsc --noEmit 类型检查
-npm run dev       # tsc --watch
-npm test          # vitest run
-npm run test:watch # vitest
+npm run build       # tsc 编译到 dist/
+npm run typecheck   # tsc --noEmit 类型检查
+npm run check       # biome 格式 & lint 检查
+npm run dev         # tsc --watch
+npm test            # vitest run
+npm run test:watch  # vitest
 ```
 
 ### 测试结构
