@@ -96,16 +96,14 @@ export function createMockRuntime(opts?: {
       setModel: opts?.setModel ?? vi.fn().mockResolvedValue(undefined),
       setThinkingLevel: opts?.setThinkingLevel ?? vi.fn(),
       extensionRunner: {
-        setUIContext:
-          opts?.extensionRunner?.setUIContext ?? vi.fn(),
+        setUIContext: opts?.extensionRunner?.setUIContext ?? vi.fn(),
         getUIContext:
           opts?.extensionRunner?.getUIContext ??
           vi.fn(() => ({ __tuiContext: true })),
       },
     },
     newSession: opts?.newSession ?? vi.fn().mockResolvedValue(undefined),
-    switchSession:
-      opts?.switchSession ?? vi.fn().mockResolvedValue(undefined),
+    switchSession: opts?.switchSession ?? vi.fn().mockResolvedValue(undefined),
   };
 }
 

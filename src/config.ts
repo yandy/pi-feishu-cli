@@ -97,7 +97,12 @@ export function saveCredentials(path: string, config: FeishuConfig): void {
   writeFileSync(path, JSON.stringify(config, null, 2), "utf-8");
 }
 
-export const DEFAULT_SAVE_PATH = join(homedir(), ".pi", "pi-feishu", "auth.json");
+export const DEFAULT_SAVE_PATH = join(
+  homedir(),
+  ".pi",
+  "pi-feishu",
+  "auth.json",
+);
 
 async function readNonEmpty(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });

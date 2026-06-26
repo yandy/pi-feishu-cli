@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { NormalizedMessage } from "../../src/feishu/channel.js";
 import { createMessageHandler } from "../../src/feishu/handler.js";
-import {
-  createMockMessage,
-  createMockRuntime,
-} from "../__fixtures__/mocks.js";
+import { createMockMessage, createMockRuntime } from "../__fixtures__/mocks.js";
 
 function makeRuntime() {
   return createMockRuntime({

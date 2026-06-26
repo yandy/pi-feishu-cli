@@ -31,10 +31,7 @@ vi.mock("../../src/feishu/context.js", async (importOriginal) => {
   };
 });
 
-import {
-  createMockChannel,
-  createMockRuntime,
-} from "../__fixtures__/mocks.js";
+import { createMockChannel, createMockRuntime } from "../__fixtures__/mocks.js";
 
 const mockChannelStream = vi.fn();
 const mockChannelSend = vi.fn().mockResolvedValue({ messageId: "msg_mock1" });

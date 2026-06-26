@@ -9,7 +9,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_SAVE_PATH, loadConfig, saveCredentials } from "../src/config.js";
+import {
+  DEFAULT_SAVE_PATH,
+  loadConfig,
+  saveCredentials,
+} from "../src/config.js";
 
 const tmpDir = join(process.cwd(), "tests", "__tmp_config__");
 
