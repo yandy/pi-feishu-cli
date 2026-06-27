@@ -9,7 +9,6 @@ export interface ConfigOptions {
   appSecret?: string;
   config?: string;
   cwd?: string;
-  noBundleFeishuSkills?: boolean;
 }
 
 function findConfigFile(cwd: string): string | null {
@@ -37,9 +36,6 @@ function loadFileConfig(path: string): FeishuConfig | null {
         appId: parsed.appId,
         appSecret: parsed.appSecret,
         ...(parsed.botName ? { botName: parsed.botName } : {}),
-        ...(parsed.noBundleFeishuSkills !== undefined
-          ? { noBundleFeishuSkills: parsed.noBundleFeishuSkills }
-          : {}),
       };
     }
     return null;
@@ -78,17 +74,10 @@ export function loadConfig(options: ConfigOptions = {}): FeishuConfig {
     );
   }
 
-  const cliNoBundle = options.noBundleFeishuSkills;
-  const envNoBundle =
-    process.env.FEISHU_NO_BUNDLE_SKILLS === "1" ||
-    process.env.FEISHU_NO_BUNDLE_SKILLS === "true";
-  const fileNoBundle = fileConfig?.noBundleFeishuSkills;
-
   return {
     appId,
     appSecret,
     botName: fileConfig?.botName ?? envConfig.botName,
-    noBundleFeishuSkills: cliNoBundle ?? fileNoBundle ?? envNoBundle,
   };
 }
 

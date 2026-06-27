@@ -40,19 +40,6 @@ describe("parseArgs", () => {
     expect(remainingArgs).toEqual(["--model", "claude-sonnet"]);
   });
 
-  it("handles --no-bundle-feishu-skills flag", () => {
-    const { cliArgs, remainingArgs } = parseArgs([
-      "node",
-      "pi-feishu",
-      "--no-bundle-feishu-skills",
-      "--model",
-      "sonnet",
-    ]);
-
-    expect(cliArgs.noBundleFeishuSkills).toBe(true);
-    expect(remainingArgs).toEqual(["--model", "sonnet"]);
-  });
-
   it("handles --bot-name value", () => {
     const { cliArgs, remainingArgs } = parseArgs([
       "node",

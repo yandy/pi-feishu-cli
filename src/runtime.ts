@@ -1,4 +1,4 @@
-import { isAbsolute, join, resolve as nodeResolvePath } from "node:path";
+import { isAbsolute, resolve as nodeResolvePath } from "node:path";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSessionRuntime,
@@ -37,8 +37,6 @@ function resolvePath(input: string, baseDir: string): string {
 export interface InitRuntimeOptions {
   cwd: string;
   agentDir?: string;
-  packageRoot?: string;
-  noBundleFeishuSkills?: boolean;
   piArgs?: PiArgs;
   sessionManager?: SessionManager;
 }
@@ -53,22 +51,12 @@ export async function initRuntime(
   const cwd = nodeResolvePath(options.cwd);
   const agentDir = options.agentDir ?? getAgentDir();
 
-  const packageRoot = options.packageRoot ?? cwd;
-  const noBundle = options.noBundleFeishuSkills ?? false;
-  const skillsDir = join(packageRoot, "skills");
-
   const parsed = options.piArgs;
 
   function resolveCLIPaths(paths?: string[]): string[] | undefined {
     if (!paths || paths.length === 0) return undefined;
     return paths.map((p) => (isLocalPath(p) ? resolvePath(p, cwd) : p));
   }
-
-  const baseSkillPaths = noBundle ? [] : [skillsDir];
-  const additionalSkillPaths = [
-    ...(parsed?.noSkills ? [] : baseSkillPaths),
-    ...(parsed?.skills ? (resolveCLIPaths(parsed.skills) ?? []) : []),
-  ];
 
   const createRuntime: CreateAgentSessionRuntimeFactory = async ({
     cwd: runtimeCwd,
@@ -79,7 +67,7 @@ export async function initRuntime(
       cwd: runtimeCwd,
       extensionFlagValues: parsed?.unknownFlags,
       resourceLoaderOptions: {
-        additionalSkillPaths,
+        additionalSkillPaths: resolveCLIPaths(parsed?.skills),
         additionalExtensionPaths: resolveCLIPaths(parsed?.extensions),
         additionalPromptTemplatePaths: resolveCLIPaths(parsed?.promptTemplates),
         additionalThemePaths: resolveCLIPaths(parsed?.themes),
