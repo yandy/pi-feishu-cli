@@ -54,7 +54,6 @@ export interface MainOptions {
   config?: string;
   cwd?: string;
   logLevel?: string;
-  packageRoot?: string;
   botName?: string;
   piArgs?: PiArgs;
 }
@@ -228,7 +227,6 @@ export async function main(options: MainOptions = {}): Promise<void> {
 
   const { runtime } = await initRuntime({
     cwd,
-    packageRoot: options.packageRoot,
     piArgs: parsed,
     sessionManager,
   });

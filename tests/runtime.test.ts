@@ -79,29 +79,38 @@ describe("initRuntime", () => {
     expect(activeTools).toContain("ls");
   }, 30000);
 
-  it("respects piArgs.noSkills to disable skill loading", async () => {
+  it("respects piArgs.noSkills to disable auto-discovered skill loading", async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
     try {
-      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
+      // Create a fake git repo so PI's auto-discovery walks ancestors
+      mkdirSync(join(tmpDir, ".git"));
+      // Place a skill under .agents/skills/ which PI auto-discovers via
+      // collectAncestorAgentsSkillDirs
+      const skillPath = join(
+        tmpDir,
+        ".agents",
+        "skills",
+        "test-skill",
+        "SKILL.md",
+      );
       mkdirSync(dirname(skillPath), { recursive: true });
       writeFileSync(skillPath, SKILL_CONTENT);
 
-      const cwd = process.cwd();
-      const result = await initRuntime({
-        cwd,
-        packageRoot: tmpDir,
-        piArgs: {
-          messages: [],
-          fileArgs: [],
-          unknownFlags: new Map(),
-          diagnostics: [],
-          noSkills: true,
-        },
-      });
+      // Without noSkills: auto-discovery loads the skill
+      const resultWith = await initRuntime({ cwd: tmpDir });
+      const loadedWith = resultWith.runtime.services.resourceLoader.getSkills();
+      expect(loadedWith.skills.map((s) => s.name)).toContain("test-skill");
 
-      const loaded = result.runtime.services.resourceLoader.getSkills();
-      const names = loaded.skills.map((s) => s.name);
-      expect(names).not.toContain("test-skill");
+      // With noSkills: auto-discovery is blocked, skill NOT loaded
+      const resultNoSkills = await initRuntime({
+        cwd: tmpDir,
+        piArgs: makePiArgs({ noSkills: true }),
+      });
+      const loadedNoSkills =
+        resultNoSkills.runtime.services.resourceLoader.getSkills();
+      expect(loadedNoSkills.skills.map((s) => s.name)).not.toContain(
+        "test-skill",
+      );
     } finally {
       rmSync(tmpDir, { recursive: true });
     }

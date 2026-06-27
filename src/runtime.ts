@@ -37,7 +37,6 @@ function resolvePath(input: string, baseDir: string): string {
 export interface InitRuntimeOptions {
   cwd: string;
   agentDir?: string;
-  packageRoot?: string;
   piArgs?: PiArgs;
   sessionManager?: SessionManager;
 }

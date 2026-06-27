@@ -4,13 +4,8 @@
 // This file is compiled by tsc to dist/cli.js
 // import.meta is available because the package is "type": "module"
 
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parseArgs as parsePiArgs } from "@earendil-works/pi-coding-agent";
 import { main } from "./src/index.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const packageRoot = resolve(dirname(__filename), "..");
 
 interface CliArgs {
   appId?: string;
@@ -146,7 +141,6 @@ main({
   logLevel: cliArgs.logLevel,
   botName: cliArgs.botName,
   piArgs,
-  packageRoot,
 }).catch((err) => {
   console.error(
     "Fatal error:",
