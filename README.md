@@ -49,7 +49,6 @@ pi-feishu --app-id cli_xxx --app-secret xxx
 | `--config <path>` | — | JSON 配置文件路径 |
 | `--log-level <level>` | `warn` | 可选值：`fatal`、`error`、`warn`、`info`、`debug`、`trace` |
 | `--bot-name <name>` | `PI Agent` | 帮助卡片中显示的机器人名称 |
-| `--no-bundle-feishu-skills` | — | 跳过加载项目 `skills/` 目录 |
 | `--help`、`-h` | — | 显示帮助并退出 |
 
 ## 配置
@@ -60,12 +59,12 @@ pi-feishu --app-id cli_xxx --app-secret xxx
 |--------|------|------|
 | 1（最高） | CLI 参数 | `pi-feishu --app-id xxx --app-secret xxx` |
 | 2 | 配置文件 | `.pi/feishu-auth.json` 或 `~/.pi/pi-feishu/auth.json`（按顺序查找） |
-| 3（最低） | 环境变量 | `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_BOT_NAME`、`FEISHU_NO_BUNDLE_SKILLS` |
+| 3（最低） | 环境变量 | `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_BOT_NAME` |
 
 配置文件格式：
 
 ```json
-{ "appId": "cli_xxx", "appSecret": "xxx", "botName": "My Bot", "noBundleFeishuSkills": true }
+{ "appId": "cli_xxx", "appSecret": "xxx", "botName": "My Bot" }
 ```
 
 使用 `--config` 覆盖配置文件路径：
@@ -97,8 +96,7 @@ pi-feishu --config /path/to/config.json
 cli.ts (根目录)              CLI 入口 — 解析 CLI 参数，调用 main()
   └─ src/index.ts            主入口 — 加载配置、初始化 runtime、连接飞书、启动 TUI
        ├─ src/config.ts      凭证解析 CLI > 配置文件 > 环境变量
-       ├─ src/runtime.ts     AgentSessionRuntime 初始化 + skill 加载
-       │                     + send_file_to_chat 工具注册（extension factory）
+       ├─ src/runtime.ts     AgentSessionRuntime 初始化 + send_file_to_chat 工具注册（extension factory）
        ├─ src/types.ts       FeishuConfig 类型定义
        ├─ src/feishu/
        │    ├─ channel.ts    LarkChannel 封装 — WebSocket、发送、流式、卡片、文件/图片
@@ -161,16 +159,6 @@ cli.ts (根目录)              CLI 入口 — 解析 CLI 参数，调用 main()
 - **参数：** `filePath`（字符串，必填）、`fileName`（字符串，可选）
 - **限制：** 仅在飞书对话会话中可用；文件大小限制 20MB
 - **Prompt 引导：** 模型被指示在生成可交付文件（docx、pdf、xlsx、图片等）时自动使用此工具
-
-## Skills
-
-`skills/` 目录包含 26 个 Lark API skills，为 Pi 提供飞书生态的知识：文档、日历、邮件、电子表格、知识库、审批、考勤、任务、会议纪要、白板等。启动时通过 `loadSkillsFromDir()` 自动加载。使用 `--no-bundle-feishu-skills` 可跳过加载这些 skills。
-
-Skills 可从飞书 well-known endpoint 刷新：
-
-```bash
-npm run update-skills
-```
 
 ## 开发
 
