@@ -7,3 +7,4 @@ dist/
 .skills-cache.json
 .superpowers/
 coverage/
+.worktrees/
