@@ -56,7 +56,6 @@ export interface MainOptions {
   logLevel?: string;
   packageRoot?: string;
   botName?: string;
-  noBundleFeishuSkills?: boolean;
   piArgs?: PiArgs;
 }
 
@@ -211,7 +210,6 @@ export async function main(options: MainOptions = {}): Promise<void> {
       appSecret: options.appSecret,
       config: options.config,
       cwd,
-      noBundleFeishuSkills: options.noBundleFeishuSkills,
     });
   } catch {
     console.error("未找到飞书凭证，请输入：");
@@ -231,7 +229,6 @@ export async function main(options: MainOptions = {}): Promise<void> {
   const { runtime } = await initRuntime({
     cwd,
     packageRoot: options.packageRoot,
-    noBundleFeishuSkills: feishuConfig.noBundleFeishuSkills,
     piArgs: parsed,
     sessionManager,
   });

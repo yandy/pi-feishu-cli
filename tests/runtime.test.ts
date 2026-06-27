@@ -48,62 +48,19 @@ describe("initRuntime", () => {
     expect(typeof result.runtime.session.sessionId).toBe("string");
   }, 30000);
 
-  it("skips loading bundled skills when noBundleFeishuSkills is true", async () => {
+  it("loads skills from piArgs.skills (--skill)", async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
     try {
-      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
+      // Create mock skill in tmpDir
+      const skillPath = join(tmpDir, "test-skill", "SKILL.md");
       mkdirSync(dirname(skillPath), { recursive: true });
       writeFileSync(skillPath, SKILL_CONTENT);
 
       const cwd = process.cwd();
       const result = await initRuntime({
         cwd,
-        packageRoot: tmpDir,
-        noBundleFeishuSkills: true,
+        piArgs: makePiArgs({ skills: [tmpDir] }),
       });
-
-      const loaded = result.runtime.services.resourceLoader.getSkills();
-      const skillNames = loaded.skills.map((s) => s.name);
-      expect(skillNames).not.toContain("test-skill");
-    } finally {
-      rmSync(tmpDir, { recursive: true });
-    }
-  }, 30000);
-
-  it("loads bundled skills when noBundleFeishuSkills is false", async () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
-    try {
-      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
-      mkdirSync(dirname(skillPath), { recursive: true });
-      writeFileSync(skillPath, SKILL_CONTENT);
-
-      const cwd = process.cwd();
-      const result = await initRuntime({
-        cwd,
-        packageRoot: tmpDir,
-        noBundleFeishuSkills: false,
-      });
-
-      const loaded = result.runtime.services.resourceLoader.getSkills();
-      const skillNames = loaded.skills.map((s) => s.name);
-      expect(skillNames).toContain("test-skill");
-    } finally {
-      rmSync(tmpDir, { recursive: true });
-    }
-  }, 30000);
-
-  it("loads skills from additionalSkillPaths when packageRoot is set", async () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), "pi-feishu-test-"));
-    try {
-      // Create mock skills under packageRoot/skills/
-      const skillPath = join(tmpDir, "skills", "test-skill", "SKILL.md");
-      mkdirSync(dirname(skillPath), { recursive: true });
-      writeFileSync(skillPath, SKILL_CONTENT);
-
-      // Set cwd to the project root (needed for session to work),
-      // but packageRoot to tmpDir which has only our mock skill
-      const cwd = process.cwd();
-      const result = await initRuntime({ cwd, packageRoot: tmpDir });
 
       const loaded = result.runtime.services.resourceLoader.getSkills();
       const names = loaded.skills.map((s) => s.name);

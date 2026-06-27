@@ -18,7 +18,6 @@ interface CliArgs {
   config?: string;
   logLevel?: string;
   botName?: string;
-  noBundleFeishuSkills?: boolean;
 }
 
 export function parseArgs(argv: string[]): {
@@ -66,10 +65,6 @@ export function parseArgs(argv: string[]): {
           result.botName = argv[++i];
         }
         break;
-      case "--no-bundle-feishu-skills":
-        consumed.add(i);
-        result.noBundleFeishuSkills = true;
-        break;
       // --help/-h is passed through to PI args parser for combined help
     }
   }
@@ -87,7 +82,6 @@ Feishu Options:
   --config <path>     Path to config JSON file
   --log-level <level> Log level (fatal|error|warn|info|debug|trace, default: warn)
   --bot-name <name>   Bot display name (default: PI Agent)
-  --no-bundle-feishu-skills  Skip loading project skills/ directory
   --help, -h          Show this help
 
 Configuration priority: CLI args > config file > environment variables
@@ -151,7 +145,6 @@ main({
   config: cliArgs.config,
   logLevel: cliArgs.logLevel,
   botName: cliArgs.botName,
-  noBundleFeishuSkills: cliArgs.noBundleFeishuSkills,
   piArgs,
   packageRoot,
 }).catch((err) => {
