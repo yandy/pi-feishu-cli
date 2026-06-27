@@ -58,10 +58,6 @@ export async function initRuntime(
     return paths.map((p) => (isLocalPath(p) ? resolvePath(p, cwd) : p));
   }
 
-  const additionalSkillPaths = [
-    ...(parsed?.skills ? (resolveCLIPaths(parsed.skills) ?? []) : []),
-  ];
-
   const createRuntime: CreateAgentSessionRuntimeFactory = async ({
     cwd: runtimeCwd,
     sessionManager,
@@ -71,7 +67,7 @@ export async function initRuntime(
       cwd: runtimeCwd,
       extensionFlagValues: parsed?.unknownFlags,
       resourceLoaderOptions: {
-        additionalSkillPaths,
+        additionalSkillPaths: resolveCLIPaths(parsed?.skills),
         additionalExtensionPaths: resolveCLIPaths(parsed?.extensions),
         additionalPromptTemplatePaths: resolveCLIPaths(parsed?.promptTemplates),
         additionalThemePaths: resolveCLIPaths(parsed?.themes),
