@@ -1,6 +1,6 @@
 {
   "name": "pi-feishu-cli",
-  "version": "1.6.4",
+  "version": "2.0.0",
   "description": "Pi AI agent with Feishu bot integration",
   "keywords": [
     "pi",
