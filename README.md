@@ -22,7 +22,7 @@ npx pi-feishu
 
 ### feishu cli(可选)
 
-> feishu cli 是飞书skill的依赖项，同时可用于创建机器人
+> feishu cli 可用于创建飞书机器人
 
 ```sh
 npm install -g @larksuite/cli

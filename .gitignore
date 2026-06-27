@@ -4,7 +4,6 @@ dist/
 *.sock
 .DS_Store
 .pi/
-.skills-cache.json
 .superpowers/
 coverage/
 .worktrees/
