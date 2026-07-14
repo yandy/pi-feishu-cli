@@ -145,7 +145,7 @@ describe("attachment wiring in message handler", () => {
   it("restores UIContext and clears Feishu context after non-command message", async () => {
     const channel = makeChannel();
     const runtime = makeRuntime();
-    const prevUIContext = runtime.session.extensionRunner.getUIContext();
+    const prevUIContext = (runtime.session.extensionRunner.getUIContext as any)();
 
     setupFeishuHandlers(channel as any, runtime as any, "/tmp/cwd", "test-bot");
 
