@@ -5,7 +5,6 @@ import { join } from "node:path";
 import type { Args as PiArgs } from "@earendil-works/pi-coding-agent";
 import {
   type AgentSessionRuntime,
-  AuthStorage,
   InteractiveMode,
   ModelRegistry,
   SessionManager,
@@ -94,10 +93,10 @@ export function buildInitialMessage({
   return undefined;
 }
 
-type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 function isValidThinkingLevel(s: string): s is ThinkingLevel {
-  return ["off", "minimal", "low", "medium", "high", "xhigh"].includes(s);
+  return ["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(s);
 }
 
 type ModelType = NonNullable<ReturnType<ModelRegistry["find"]>>;
@@ -232,8 +231,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
   });
 
   if (parsed?.model || parsed?.provider) {
-    const authStorage = AuthStorage.create();
-    const registry = ModelRegistry.create(authStorage);
+    const registry = new ModelRegistry(runtime.services.modelRuntime);
     const resolved = resolveCliModel({
       cliProvider: parsed.provider,
       cliModel: parsed.model,
@@ -318,8 +316,7 @@ export function setupFeishuHandlers(
   };
 
   const handleModels = async (chatId: string) => {
-    const authStorage = AuthStorage.create();
-    const registry = ModelRegistry.create(authStorage);
+    const registry = new ModelRegistry(runtime.services.modelRuntime);
     const available = registry.getAvailable();
     const card = await buildModelsCard({
       session: runtime.session,
@@ -498,8 +495,7 @@ export async function handleCardAction(
       const card = await buildSessionsCard({ runtime, cwd });
       if (token) await channel.updateCardByToken(token, card);
     } else if (action === "models") {
-      const authStorage = AuthStorage.create();
-      const registry = ModelRegistry.create(authStorage);
+      const registry = new ModelRegistry(runtime.services.modelRuntime);
       const available = registry.getAvailable();
       const card = await buildModelsCard({
         session: runtime.session,
@@ -529,8 +525,7 @@ export async function handleCardAction(
 
   if (cmd === "model" && action === "select") {
     const { provider, modelId, thinkingLevel } = value;
-    const authStorage = AuthStorage.create();
-    const registry = ModelRegistry.create(authStorage);
+    const registry = new ModelRegistry(runtime.services.modelRuntime);
     const model = registry.find(provider, modelId);
     if (model) {
       await runtime.session.setModel(model);
