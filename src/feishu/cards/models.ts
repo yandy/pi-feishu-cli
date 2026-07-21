@@ -8,7 +8,7 @@ import {
   createMarkdownBlock,
 } from "./helpers.js";
 
-type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface Model {
   provider: string;
@@ -30,6 +30,7 @@ const THINKING_LEVELS: ThinkingLevel[] = [
   "medium",
   "high",
   "xhigh",
+  "max",
 ];
 
 const THINKING_LABELS: Record<ThinkingLevel, string> = {
@@ -39,6 +40,7 @@ const THINKING_LABELS: Record<ThinkingLevel, string> = {
   medium: "med",
   high: "high",
   xhigh: "xhigh",
+  max: "max",
 };
 
 function inputLabel(input: ("text" | "image")[]): string {

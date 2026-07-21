@@ -86,6 +86,13 @@ export function createMockRuntime(opts?: {
   };
 }) {
   return {
+    services: {
+      modelRuntime: {
+        getModels: vi.fn(() => []),
+        getModel: vi.fn(() => undefined),
+        getAvailableSnapshot: vi.fn(() => []),
+      },
+    },
     session: {
       prompt: opts?.prompt ?? vi.fn().mockResolvedValue(undefined),
       subscribe: opts?.subscribe ?? vi.fn(() => vi.fn()),
