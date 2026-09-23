@@ -93,10 +93,19 @@ export function buildInitialMessage({
   return undefined;
 }
 
-type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+type ThinkingLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 function isValidThinkingLevel(s: string): s is ThinkingLevel {
-  return ["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(s);
+  return ["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
+    s,
+  );
 }
 
 type ModelType = NonNullable<ReturnType<ModelRegistry["find"]>>;
