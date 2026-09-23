@@ -8,7 +8,14 @@ import {
   createMarkdownBlock,
 } from "./helpers.js";
 
-type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+type ThinkingLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 export interface Model {
   provider: string;

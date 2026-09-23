@@ -1,7 +1,28 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import type { NormalizedMessage } from "../../src/feishu/channel.js";
 
 // ---- mock raw lark channel (the @larksuiteoapi/node-sdk shape) ----
+
+// A mock of any callable. Written with `any` because vitest 5 types `vi.fn()`
+// as `Mock<Constructable | Procedure>`, whose internal union type names cannot
+// be emitted into declarations (TS2883/TS4058).
+type MockFn = Mock<any>;
+
+export interface MockRawChannel {
+  on: MockFn;
+  botIdentity: { name: string } | undefined;
+  connect: MockFn;
+  disconnect: MockFn;
+  send: MockFn;
+  stream: MockFn;
+  updateCard: MockFn;
+  readonly connected: boolean;
+  dispatcher: { register: MockFn };
+  rawClient: {
+    request: MockFn;
+    im: { v1: { messageResource: { get: MockFn } } };
+  };
+}
 
 export function createMockRawChannel(opts?: {
   send?: ReturnType<typeof vi.fn>;
@@ -12,7 +33,7 @@ export function createMockRawChannel(opts?: {
   updateCard?: ReturnType<typeof vi.fn>;
   request?: ReturnType<typeof vi.fn>;
   messageResourceGet?: ReturnType<typeof vi.fn>;
-}) {
+}): MockRawChannel {
   return {
     on: opts?.on ?? vi.fn(),
     botIdentity: undefined as { name: string } | undefined,
@@ -40,6 +61,20 @@ export function createMockRawChannel(opts?: {
 
 // ---- mock wrapped channel (the project's Channel interface) ----
 
+export interface MockChannel {
+  on: MockFn;
+  send: MockFn;
+  stream: MockFn;
+  connect: MockFn;
+  disconnect: MockFn;
+  onRawEvent: MockFn;
+  updateCard: MockFn;
+  updateCardByToken: MockFn;
+  botIdentity: { name: string } | undefined;
+  connected: boolean;
+  downloadMessageResource: MockFn;
+}
+
 export function createMockChannel(opts?: {
   on?: ReturnType<typeof vi.fn>;
   send?: ReturnType<typeof vi.fn>;
@@ -52,7 +87,7 @@ export function createMockChannel(opts?: {
   downloadMessageResource?: ReturnType<typeof vi.fn>;
   botIdentity?: { name: string } | undefined;
   connected?: boolean;
-}) {
+}): MockChannel {
   return {
     on: opts?.on ?? vi.fn(),
     send: opts?.send ?? vi.fn().mockResolvedValue({ messageId: "msg_mock1" }),
@@ -71,6 +106,32 @@ export function createMockChannel(opts?: {
 
 // ---- mock pi runtime ----
 
+export interface MockRuntime {
+  services: {
+    modelRuntime: {
+      getModels: MockFn;
+      getModel: MockFn;
+      getAvailableSnapshot: MockFn;
+    };
+  };
+  session: {
+    prompt: MockFn;
+    subscribe: MockFn;
+    sessionId: string;
+    sessionFile: string;
+    model: { provider: string; id: string; name?: string } | undefined;
+    thinkingLevel: string | undefined;
+    setModel: MockFn;
+    setThinkingLevel: MockFn;
+    extensionRunner: {
+      setUIContext: MockFn;
+      getUIContext: MockFn;
+    };
+  };
+  newSession: MockFn;
+  switchSession: MockFn;
+}
+
 export function createMockRuntime(opts?: {
   prompt?: ReturnType<typeof vi.fn>;
   subscribe?: ReturnType<typeof vi.fn>;
@@ -84,7 +145,7 @@ export function createMockRuntime(opts?: {
     setUIContext?: ReturnType<typeof vi.fn>;
     getUIContext?: ReturnType<typeof vi.fn>;
   };
-}) {
+}): MockRuntime {
   return {
     services: {
       modelRuntime: {
